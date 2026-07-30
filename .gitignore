@@ -1,0 +1,27 @@
+# --- Secrets -------------------------------------------------------------
+# .env holds real API keys and must never be committed.
+# .env.sample IS committed and documents the required variable names.
+.env
+.env.local
+
+# --- Python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Virtual environment -------------------------------------------------
+# Note: .venv/ is ignored but uv.lock is COMMITTED. The lockfile is the
+# reproducibility record that lets anyone rebuild identical dependencies;
+# the virtualenv is a machine-specific build artifact.
+.venv/
+
+# --- Local MCP client config --------------------------------------------
+# May contain API keys in its "env" block. .mcp.json.sample is committed.
+.mcp.json
+
+# --- OS / editor ---------------------------------------------------------
+.DS_Store
+*.swp

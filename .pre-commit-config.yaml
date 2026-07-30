@@ -1,0 +1,56 @@
+# Pre-commit hooks. Install once with `make hooks` (or `uv run pre-commit install`).
+#
+# Note the ruff hooks use `repo: local` rather than astral-sh/ruff-pre-commit.
+# That is deliberate: a local hook runs `uv run ruff`, which is the exact version
+# pinned in uv.lock, so pre-commit, `make lint-check` and CI can never disagree.
+# The upstream hook pins its own ruff separately, and that drift produces the
+# irritating case where the hook auto-fixes something CI still complains about.
+# Trade-off: these hooks need `uv sync` to have run, and would not work on the
+# hosted pre-commit.ci service.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict # catches names that collide on macOS/Windows
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: check-added-large-files
+        # Raised from the 500kB default: generated illustrations land in data/
+        # (gitignored), but a deliberately committed sample asset could exceed it.
+        args: [--maxkb=1024]
+
+  - repo: local
+    hooks:
+      # .gitignore already excludes .env, but that only stops the accident.
+      # This stops `git add -f .env` on a repository that will be public.
+      # The pattern deliberately excludes .env.sample, which IS committed.
+      - id: forbid-env-files
+        name: block committing .env files
+        entry: ".env must never be committed. Use .env.sample for the template."
+        language: fail
+        files: '(^|/)\.env(\.local)?$'
+
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+# Tests are deliberately NOT a pre-commit hook. Hooks run on every commit and
+# must stay fast; a suite that grows to include live model calls would make
+# committing painful and train people to reach for --no-verify. `make ci-local`
+# and the CI pipeline are where the full suite belongs.

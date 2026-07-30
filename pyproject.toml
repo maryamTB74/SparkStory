@@ -1,0 +1,78 @@
+[project]
+name = "sparkstory"
+version = "0.1.0"
+description = "Agentic MCP server that generates personalised, illustrated children's storybooks"
+readme = "README.md"
+# PEP 639: SPDX expression plus the file to ship in built distributions. Declared
+# here as well as in LICENSE so packaging metadata states it, not just the repo.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Maryam Tabatabaei", email = "maryamtabatabaiii@gmail.com" }
+]
+requires-python = ">=3.14.0"
+dependencies = [
+    "fastmcp>=2.12,<3",
+    "langchain>=1.3.14",
+    "langchain-core>=1.5.2",
+    "langchain-google-genai>=4.3.2",
+    "pydantic-settings>=2.14.2",
+]
+
+[project.scripts]
+# Points at the server entry point, not the package root. This is the command
+# the README's Cursor/MCP client configuration invokes: `uv run sparkstory`.
+sparkstory = "sparkstory.server:main"
+
+[build-system]
+# Upper bound widened from the <0.10.0 that `uv init` generated: the build
+# backend version tracks the uv version, and the standalone uv here is 0.12.0,
+# which fell outside that range and warned on every build.
+requires = ["uv_build>=0.9.28,<0.13.0"]
+build-backend = "uv_build"
+
+# Resolve dependencies from public PyPI.
+#
+# This is committed deliberately. Without it, uv inherits whatever index is
+# marked `default = true` in the user-level ~/.config/uv/uv.toml -- on this
+# machine that is a private AWS CodeArtifact mirror, which (a) requires an SSO
+# session, and (b) would leak internal infrastructure into a public repo's
+# lockfile. Declaring a project-level default index displaces the user-level
+# one, so anyone cloning this repo resolves from PyPI with no extra setup.
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# asyncio_mode = "auto" so async tests need no per-test marker. Most of this
+# codebase is async; opting in individually is pure noise.
+asyncio_mode = "auto"
+filterwarnings = [
+    # fastmcp's JWT provider imports the deprecated authlib.jose module.
+    # Third-party, nothing we can fix, and it appears in every test run.
+    "ignore:.*authlib.jose module is deprecated.*",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort -- import ordering
+    "UP",  # pyupgrade -- flag outdated syntax for our Python floor
+    "B",   # bugbear -- likely bugs, e.g. mutable default arguments
+    "SIM", # simplify
+]

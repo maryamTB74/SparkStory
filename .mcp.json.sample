@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "sparkstory": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/SparkStory",
+        "run",
+        "sparkstory"
+      ],
+      "env": {
+        "GOOGLE_API_KEY": "your-google-api-key-here"
+      }
+    }
+  }
+}

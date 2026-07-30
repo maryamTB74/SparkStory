@@ -1,7 +1,11 @@
 """Story Planner behaviour, and the tool layer's error translation.
 
-No network. The model is replaced with a stub, which is the point of routing
-every model through ``get_chat_model``: there is exactly one seam to intercept.
+No network. Node tests pass a ``FakeModel`` to the constructor rather than
+patching a module attribute by string path -- a patch target is a string, so it
+rots silently on rename and the test then passes for the wrong reason.
+
+``plan_story`` still chooses the model from settings, so the few tests that care
+about *which* model is chosen do intercept the factory.
 """
 
 from typing import Any
@@ -14,68 +18,46 @@ from sparkstory.entities.exceptions import ConfigurationError, SparkStoryError
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.mcp.tools.plan_story import plan_story_tool
 from sparkstory.models.exceptions import MissingAPIKeyError, UnknownModelError
-from sparkstory.nodes.story_planner import plan_story
+from sparkstory.models.fake_model import FakeModel
+from sparkstory.nodes.story_planner import StoryPlannerNode, plan_story
 
 PLANNER_FACTORY = "sparkstory.nodes.story_planner.get_chat_model"
 
 
-class StubModel:
-    """Stands in for a structured-output runnable, recording what it received."""
-
-    def __init__(self, result: Any) -> None:
-        self._result = result
-        self.messages: list[Any] = []
-
-    async def ainvoke(self, messages: list[Any]) -> Any:
-        self.messages = messages
-        return self._result
-
-
-class TestPlanStory:
+class TestStoryPlannerNode:
     async def test_returns_the_models_outline(
-        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+        self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
-        monkeypatch.setattr(PLANNER_FACTORY, lambda *a, **k: StubModel(outline))
-        assert await plan_story(brief) is outline
+        node = StoryPlannerNode(model=FakeModel(outline), brief=brief)
+        assert await node.ainvoke() is outline
 
-    async def test_requests_the_configured_model_and_schema(
-        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+    async def test_binds_its_own_output_schema(
+        self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
-        """The schema must be bound at the factory, not parsed afterwards."""
-        seen: dict[str, Any] = {}
-
-        def factory(model_id: str, schema: type | None = None) -> StubModel:
-            seen["model_id"] = model_id
-            seen["schema"] = schema
-            return StubModel(outline)
-
-        monkeypatch.setattr(PLANNER_FACTORY, factory)
-        await plan_story(brief)
-
-        assert seen["model_id"] == settings.planner_model
-        assert seen["schema"] is StoryOutline
+        """The schema must be bound to the model, not parsed out afterwards."""
+        fake = FakeModel(outline)
+        StoryPlannerNode(model=fake, brief=brief)
+        assert fake.bound_schema is StoryOutline
 
     async def test_sends_a_system_and_a_human_message(
-        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+        self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
-        stub = StubModel(outline)
-        monkeypatch.setattr(PLANNER_FACTORY, lambda *a, **k: stub)
-        await plan_story(brief)
+        fake = FakeModel(outline)
+        await StoryPlannerNode(model=fake, brief=brief).ainvoke()
 
-        assert len(stub.messages) == 2
-        system, human = stub.messages
+        assert len(fake.messages) == 2
+        system, human = fake.messages
         assert system.type == "system"
         assert human.type == "human"
 
     async def test_brief_constraints_reach_the_model(
-        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+        self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
         """An `avoid` entry that never reaches the prompt is a safety failure."""
-        stub = StubModel(outline)
-        monkeypatch.setattr(PLANNER_FACTORY, lambda *a, **k: stub)
-        await plan_story(brief)
+        fake = FakeModel(outline)
+        await StoryPlannerNode(model=fake, brief=brief).ainvoke()
 
-        human = stub.messages[1].content
+        human = fake.messages[1].content
         assert brief.premise in human
         assert brief.child.name in human
         assert brief.child.pronouns.value in human
@@ -83,6 +65,23 @@ class TestPlanStory:
             assert avoided in human
         for required in brief.must_include:
             assert required in human
+
+
+class TestPlanStory:
+    """The thin orchestrator that picks a model and runs the node."""
+
+    async def test_uses_the_configured_planner_model(
+        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+    ) -> None:
+        seen: dict[str, Any] = {}
+
+        def factory(model_id: str) -> FakeModel:
+            seen["model_id"] = model_id
+            return FakeModel(outline)
+
+        monkeypatch.setattr(PLANNER_FACTORY, factory)
+        assert await plan_story(brief) is outline
+        assert seen["model_id"] == settings.planner_model
 
 
 class TestToolErrorTranslation:

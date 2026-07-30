@@ -26,12 +26,16 @@ mechanically by ``.with_structured_output(...)``. Restating it in prose burns
 tokens and risks contradicting the schema when one of the two changes.
 """
 
+from typing import Any
+
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import Runnable
 
 from sparkstory.config import settings
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.models.get_model import get_chat_model
+from sparkstory.nodes.base import Node
 from sparkstory.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -103,49 +107,69 @@ def render_story_brief(brief: StoryBrief) -> str:
     return "\n".join(lines)
 
 
+class StoryPlannerNode(Node):
+    """Plans a story: what happens and why it matters, before any prose."""
+
+    output_schema = StoryOutline
+
+    def __init__(self, model: Runnable[Any, Any], brief: StoryBrief) -> None:
+        super().__init__(model)
+        self.brief = brief
+
+    async def ainvoke(self) -> StoryOutline:
+        """Produce a story outline from the brief.
+
+        Returns:
+            A validated :class:`StoryOutline`.
+
+        Raises:
+            Exception: the model returned output that does not satisfy the schema.
+                Deliberately allowed to propagate -- a later session turns this
+                into a retry carrying the validation error as feedback, and
+                swallowing it here would hide the signal that loop depends on.
+        """
+        brief = self.brief
+
+        # Age and reading level only. A child's name is personal data about a
+        # minor, so it is confined to DEBUG and never appears in INFO-level logs
+        # that may be shipped off the machine.
+        logger.info(
+            "Planning story: age=%d level=%s tone=%s pages=%d",
+            brief.child.age,
+            brief.child.reading_level.value,
+            brief.tone.value,
+            brief.page_count,
+        )
+        logger.debug("Brief premise: %r for child %r", brief.premise, brief.child.name)
+
+        outline: StoryOutline = await self.model.ainvoke(
+            [
+                SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
+                HumanMessage(content=render_story_brief(brief)),
+            ]
+        )
+
+        logger.info(
+            "Planned %r with %d beats and %d characters",
+            outline.title,
+            len(outline.beats),
+            len(outline.characters),
+        )
+        return outline
+
+
 async def plan_story(brief: StoryBrief) -> StoryOutline:
-    """Produce a story outline from a brief.
+    """Build the planner with its configured model and run it.
 
-    Args:
-        brief: What the user asked for, including the child's profile.
-
-    Returns:
-        A validated :class:`StoryOutline`.
+    The node takes an injected model, so something has to choose which one. That
+    choice is orchestration, and in the next commit it moves into the workflow as
+    a ``@task``. Until the workflow exists this function is the orchestrator, and
+    keeping it means the MCP tool layer does not change twice.
 
     Raises:
         MissingAPIKeyError: the configured model's API key is not set.
         UnknownModelError: ``PLANNER_MODEL`` is not a known model id.
-        Exception: the model returned output that does not satisfy the schema.
-            Deliberately allowed to propagate -- a later session turns this into
-            a retry carrying the validation error as feedback, and swallowing it
-            here would hide the signal that loop depends on.
     """
-    # Age and reading level only. A child's name is personal data about a minor,
-    # so it is confined to DEBUG and never appears in INFO-level logs that may be
-    # shipped off the machine.
-    logger.info(
-        "Planning story: age=%d level=%s tone=%s pages=%d model=%s",
-        brief.child.age,
-        brief.child.reading_level.value,
-        brief.tone.value,
-        brief.page_count,
-        settings.planner_model,
-    )
-    logger.debug("Brief premise: %r for child %r", brief.premise, brief.child.name)
-
-    model = get_chat_model(settings.planner_model, schema=StoryOutline)
-
-    outline = await model.ainvoke(
-        [
-            SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
-            HumanMessage(content=render_story_brief(brief)),
-        ]
-    )
-
-    logger.info(
-        "Planned %r with %d beats and %d characters",
-        outline.title,
-        len(outline.beats),
-        len(outline.characters),
-    )
-    return outline
+    model = get_chat_model(settings.planner_model)
+    logger.debug("Story planner using model %s", settings.planner_model)
+    return await StoryPlannerNode(model=model, brief=brief).ainvoke()

@@ -5,8 +5,9 @@ and get back a runnable with all the cross-cutting concerns already attached:
 
 * provider parameters resolved from the model registry in ``settings``
 * the correct API key looked up, with a precise error when it is absent
-* structured output bound, when a schema is supplied
 * retries delegated to LangChain via ``max_retries`` in the registry params
+
+Structured output is bound by the *node*, not here -- see ``nodes/base.py``.
 
 Keeping this a single function is the whole point. Tracing, a cost-and-token
 audit, a rate limiter, or a fallback provider each become one edit here instead
@@ -17,7 +18,6 @@ from typing import Any
 
 from langchain.chat_models import init_chat_model
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel
 
 from sparkstory.config import settings
 from sparkstory.entities.exceptions import ConfigurationError
@@ -32,23 +32,19 @@ logger = get_logger(__name__)
 _EXCLUSIVE_THINKING_PARAMS = ("thinking_budget", "thinking_level")
 
 
-def get_chat_model(
-    model_id: str,
-    schema: type[BaseModel] | None = None,
-) -> Runnable[Any, Any]:
+def get_chat_model(model_id: str) -> Runnable[Any, Any]:
     """Build a chat model from the registry.
 
     Args:
         model_id: A key of ``settings.llm_configs``, e.g. ``"gemini-3.5-flash"``.
-            Agents pass a value from settings (``settings.planner_model``)
+            Callers pass a value from settings (``settings.planner_model``)
             rather than a literal, so swapping a model is a config change.
-        schema: Optional Pydantic model. When given, the returned runnable
-            emits a validated instance of it instead of free text.
 
     Returns:
-        A runnable. Note this is not necessarily a ``BaseChatModel``:
-        ``with_structured_output`` returns a wrapping runnable, so the declared
-        type is the broader ``Runnable``.
+        An unbound runnable. Binding structured output is the *node's* job, not
+        this function's: a node's output schema is its contract, so it is
+        declared beside the prompt that must satisfy it. Each node's schema
+        differs, so there is nothing shared here to centralise.
 
     Raises:
         UnknownModelError: ``model_id`` is not in the registry. The message lists
@@ -90,20 +86,12 @@ def get_chat_model(
             f"Add {api_key_env_var} to your .env (see .env.sample)."
         )
 
-    logger.debug(
-        "Building model %r (identifier=%s, structured=%s)",
-        model_id,
-        config["identifier"],
-        schema.__name__ if schema is not None else None,
-    )
+    logger.debug("Building model %r (identifier=%s)", model_id, config["identifier"])
 
     model: Runnable[Any, Any] = init_chat_model(
         config["identifier"],
         api_key=api_key,
         **params,
     )
-
-    if schema is not None:
-        model = model.with_structured_output(schema)
 
     return model

@@ -22,7 +22,7 @@ dependencies = [
 [project.scripts]
 # Points at the server entry point, not the package root. This is the command
 # the README's Cursor/MCP client configuration invokes: `uv run sparkstory`.
-sparkstory = "sparkstory.server:main"
+sparkstory = "sparkstory.mcp.server:main"
 
 [build-system]
 # Upper bound widened from the <0.10.0 that `uv init` generated: the build

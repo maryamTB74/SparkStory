@@ -1,0 +1,42 @@
+"""Typed exception hierarchy.
+
+Why this exists, given that built-in exceptions with precise messages had been
+doing the job: the tool layer needs to decide *which* failures are safe to
+report to a client, and doing that by built-in type is unsound. An earlier
+version of ``mcp/tools/plan_story.py`` caught ``RuntimeError`` to mean "the API key
+is missing" -- so any ``RuntimeError`` raised anywhere beneath it, from LangChain
+internals to the transport, would have been reported to the user as
+"GOOGLE_API_KEY is not set". Actively misleading, and precisely the kind of thing
+that costs an hour of debugging the wrong layer.
+
+The distinction that matters is **who can fix it**:
+
+``ConfigurationError``
+    The operator can fix it by editing ``.env`` or ``settings.py``. Safe to
+    surface verbatim to a client, because the message is actionable.
+
+Anything else
+    A bug, or an upstream failure. Must propagate rather than be dressed up as
+    a polite message.
+
+Subclasses raised by a specific layer live with that layer:
+``models/exceptions.py`` holds the ones ``models/get_model.py`` raises. Only the
+shared bases live here, so ``entities`` depends on nothing.
+
+Siblings intended for later sessions -- a ``ProviderError`` for upstream failures
+once retry and fallback exist, and a ``GenerationError`` for output that fails
+validation once the evaluator-optimizer loop can act on it -- are deliberately
+not declared yet. Nothing raises them today, and empty classes are speculation.
+"""
+
+
+class SparkStoryError(Exception):
+    """Base class for errors this package raises deliberately.
+
+    Lets a caller distinguish our failures from arbitrary Python exceptions with
+    a single ``except SparkStoryError``.
+    """
+
+
+class ConfigurationError(SparkStoryError):
+    """Something in the configuration is wrong and an operator can fix it."""

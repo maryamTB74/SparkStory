@@ -1,0 +1,98 @@
+"""Shared fixtures.
+
+Fixtures build objects explicitly rather than reading from ``.env`` so tests do
+not depend on whatever happens to be configured on the machine running them.
+"""
+
+import pytest
+
+from sparkstory.entities.stories import (
+    CharacterSketch,
+    ChildProfile,
+    NarrativeFunction,
+    Pronouns,
+    ReadingLevel,
+    StoryBeat,
+    StoryBrief,
+    StoryOutline,
+    Tone,
+)
+
+
+@pytest.fixture
+def child() -> ChildProfile:
+    return ChildProfile(
+        name="Maryam",
+        age=5,
+        pronouns=Pronouns.SHE_HER,
+        reading_level=ReadingLevel.EARLY_READER,
+        interests=["foxes", "astronomy"],
+    )
+
+
+@pytest.fixture
+def brief(child: ChildProfile) -> StoryBrief:
+    return StoryBrief(
+        child=child,
+        premise="a fox who wants to visit the moon",
+        tone=Tone.MAGICAL,
+        page_count=10,
+        must_include=["a paper rocket"],
+        avoid=["spiders", "the dark"],
+    )
+
+
+@pytest.fixture
+def outline() -> StoryOutline:
+    """A minimal valid outline: exactly the four-beat floor."""
+    return StoryOutline(
+        title="Maryam and the Paper Rocket",
+        logline="A girl and a fox build a rocket to say goodnight to the moon.",
+        theme="trying something new even when it feels too big",
+        characters=[
+            CharacterSketch(
+                name="Maryam",
+                role="main character",
+                description="A curious girl who loves looking at the stars.",
+            ),
+            CharacterSketch(
+                name="Pip",
+                role="loyal companion",
+                description="A small fox who is braver than he feels.",
+            ),
+        ],
+        beats=[
+            StoryBeat(
+                position=1,
+                function=NarrativeFunction.SETUP,
+                title="Goodnight, moon",
+                summary=(
+                    "Maryam waves to the moon each night and wishes it were closer."
+                ),
+                characters_present=["Maryam"],
+            ),
+            StoryBeat(
+                position=2,
+                function=NarrativeFunction.INCITING_INCIDENT,
+                title="The paper rocket",
+                summary=(
+                    "Pip brings her a paper rocket and suggests they visit instead."
+                ),
+                characters_present=["Maryam", "Pip"],
+            ),
+            StoryBeat(
+                position=3,
+                function=NarrativeFunction.CLIMAX,
+                title="Too high",
+                summary="The rocket will not fly and Maryam nearly gives up trying.",
+                characters_present=["Maryam", "Pip"],
+            ),
+            StoryBeat(
+                position=4,
+                function=NarrativeFunction.RESOLUTION,
+                title="A closer moon",
+                summary="They find the moon reflected in a puddle and say goodnight.",
+                characters_present=["Maryam", "Pip"],
+            ),
+        ],
+    )

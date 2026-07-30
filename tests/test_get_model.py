@@ -24,7 +24,11 @@ def _explicit_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setattr(
         "sparkstory.models.get_model.settings",
-        Settings(google_api_key="test-key", _env_file=None),  # type: ignore[call-arg]
+        Settings(  # type: ignore[call-arg]
+            google_api_key="test-key",
+            xai_api_key="test-key",
+            _env_file=None,
+        ),
     )
 
 
@@ -93,3 +97,41 @@ class TestSuccessfulBuild:
         model = get_chat_model("gemini-3.5-flash")
         assert hasattr(model, "ainvoke")
         assert hasattr(model, "with_structured_output")
+
+
+class TestRegistryIsWellFormed:
+    """Guards every entry, including ones added later.
+
+    The registry is the place a model gets swapped under load, so a malformed
+    entry is discovered at the worst possible moment -- mid-outage, while
+    switching away from a model that is down.
+    """
+
+    def test_every_entry_can_be_built(self) -> None:
+        for model_id in Settings(_env_file=None).llm_configs:  # type: ignore[call-arg]
+            get_chat_model(model_id)
+
+    def test_no_entry_mixes_thinking_parameters(self) -> None:
+        """Gemini 2.5 takes thinking_budget, 3.x takes thinking_level.
+
+        Passing both is an opaque provider-side error, so the pairing is
+        load-bearing and easy to get wrong when copying an existing entry.
+        """
+        for model_id, config in Settings(_env_file=None).llm_configs.items():  # type: ignore[call-arg]
+            params = config.get("params", {})
+            both = {"thinking_budget", "thinking_level"} <= set(params)
+            assert not both, f"{model_id} sets both thinking parameters"
+
+    def test_every_entry_declares_a_resolvable_api_key(self) -> None:
+        """An api_key_env_var that api_key_for() does not know always reads as unset."""
+        settings = Settings(  # type: ignore[call-arg]
+            google_api_key="test-key",
+            xai_api_key="test-key",
+            _env_file=None,
+        )
+        for model_id, config in settings.llm_configs.items():
+            resolved = settings.api_key_for(config["api_key_env_var"])
+            assert resolved == "test-key", (
+                f"{model_id} declares {config['api_key_env_var']!r}, which "
+                "api_key_for() does not map"
+            )

@@ -64,3 +64,17 @@ class TestSystemPrompt:
         assert "pronouns" in lowered
         assert "avoid" in lowered
         assert "moralise" in lowered
+
+    def test_caps_beats_by_the_page_count(self) -> None:
+        """A 6-beat outline for a 5-page book is unbuildable, so say so up front.
+
+        Only the prompt can prevent this; validation can merely reject it after a
+        model call has been paid for.
+        """
+        assert "never plan more beats than the book has pages" in (
+            STORY_PLANNER_SYSTEM_PROMPT.lower()
+        )
+
+    def test_the_beat_limit_is_rendered_as_a_number(self, brief: StoryBrief) -> None:
+        """ "Target length" alone left the limit to be inferred, and it was not."""
+        assert f"at most {brief.page_count} beats" in render_story_brief(brief)

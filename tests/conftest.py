@@ -10,11 +10,15 @@ from sparkstory.entities.stories import (
     CharacterSketch,
     ChildProfile,
     NarrativeFunction,
+    PagePlan,
     Pronouns,
     ReadingLevel,
+    ScenePlan,
     StoryBeat,
     StoryBrief,
     StoryOutline,
+    StoryPage,
+    StoryProse,
     Tone,
 )
 
@@ -95,4 +99,39 @@ def outline() -> StoryOutline:
                 characters_present=["Maryam", "Pip"],
             ),
         ],
+    )
+
+
+#: Beat each page draws from, in order: ten pages covering all four beats, with the
+#: climax given the most room. Matches `brief.page_count` and stays non-decreasing,
+#: so this plan passes validation and a test that wants a failure must break it
+#: deliberately.
+_PAGE_BEATS = (1, 1, 2, 2, 3, 3, 3, 3, 4, 4)
+
+
+@pytest.fixture
+def page_plan() -> PagePlan:
+    """A valid ten-page plan for the `outline` fixture and `brief.page_count`."""
+    return PagePlan(
+        pages=[
+            ScenePlan(
+                page_number=number,
+                beat_position=beat,
+                setting="the garden at night",
+                scene_summary=f"A single quiet moment, drawn on page {number}.",
+                characters_present=["Maryam", "Pip"],
+            )
+            for number, beat in enumerate(_PAGE_BEATS, start=1)
+        ]
+    )
+
+
+@pytest.fixture
+def prose(page_plan: PagePlan) -> StoryProse:
+    """Prose matching the `page_plan` fixture page for page."""
+    return StoryProse(
+        pages=[
+            StoryPage(page_number=page.page_number, text=f"Page {page.page_number}.")
+            for page in page_plan.pages
+        ]
     )

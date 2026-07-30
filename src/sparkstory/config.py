@@ -104,6 +104,12 @@ class Settings(BaseSettings):
         alias="GOOGLE_API_KEY",
         description="Google AI Studio key, used for Gemini text generation",
     )
+    # Added when a second provider became necessary rather than in advance
+    xai_api_key: SecretStr | None = Field(
+        default=None,
+        alias="XAI_API_KEY",
+        description="xAI key, used for Grok text generation",
+    )
 
     # --- Which model each task uses -------------------------------------
     # One field per agent. Values must be keys of `llm_configs` below.
@@ -112,9 +118,23 @@ class Settings(BaseSettings):
         alias="PLANNER_MODEL",
         description="Model used by the Story Planner agent",
     )
+    plot_model: str = Field(
+        default="gemini-3.5-flash",
+        alias="PLOT_MODEL",
+        description="Model used by the Plot Planner agent",
+    )
+    # One field per agent, all defaulting to the same registry entry so that we are
+    # able to runs nodes at different settings -- its reviewer at temperature 0 and
+    # thinking_level high, its writer at medium -- which this registry expresses as
+    # separate entries, so raising only the writer's quality stays a config change.
+    writer_model: str = Field(
+        default="gemini-3.5-flash",
+        alias="WRITER_MODEL",
+        description="Model used by the Writer agent",
+    )
 
     # --- Validators -----------------------------------------------------
-    @field_validator("google_api_key", mode="before")
+    @field_validator("google_api_key", "xai_api_key", mode="before")
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         """Treat a blank environment variable as unset.
@@ -168,6 +188,31 @@ class Settings(BaseSettings):
                     "max_retries": 3,
                 },
             },
+            # --- xAI / Grok -------------------------------------------------
+            # A second provider, not merely a second model.
+            # Reached through the OpenAI-compatible surface: xAI implements
+            # OpenAI's API, so `openai:<model>` plus a base_url needs no new
+            # provider integration -- and `langchain-openai` is already a course
+            # dependency. `base_url` travels in params like any other provider
+            # parameter, so `get_chat_model` needs no change.
+            "grok-4": {
+                "identifier": "openai:grok-4",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                    "temperature": 1,
+                    "max_retries": 3,
+                },
+            },
+            "grok-3-mini": {
+                "identifier": "openai:grok-3-mini",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                    "temperature": 1,
+                    "max_retries": 3,
+                },
+            },
         }
 
     def api_key_for(self, env_var: str) -> str | None:
@@ -181,6 +226,7 @@ class Settings(BaseSettings):
         """
         secrets: dict[str, SecretStr | None] = {
             "GOOGLE_API_KEY": self.google_api_key,
+            "XAI_API_KEY": self.xai_api_key,
         }
         secret = secrets.get(env_var)
         return secret.get_secret_value() if secret is not None else None

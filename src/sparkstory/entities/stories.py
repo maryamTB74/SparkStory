@@ -258,3 +258,94 @@ class StoryOutline(BaseModel):
             "incident, a climax and a resolution at minimum."
         ),
     )
+
+
+# `beat_position` is what makes this plan checkable rather than merely plausible:
+# code can assert every beat received a page, that no page cites a beat that does
+# not exist, and that the pages do not wander back and forth through the
+# structure. Without it, "did it drop the climax?" can only be answered by reading.
+class ScenePlan(BaseModel):
+    """One page of the book."""
+
+    page_number: int = Field(
+        ge=1,
+        description="This page's 1-based position in the book.",
+    )
+    beat_position: int = Field(
+        ge=1,
+        description="The position of the story beat this page draws from.",
+    )
+    setting: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Where this page happens, in a few words.",
+    )
+    scene_summary: str = Field(
+        min_length=10,
+        max_length=400,
+        description=(
+            "The single moment this page shows, in one or two sentences. It must "
+            "be one moment that could be drawn as one picture, not a sequence of "
+            "events. Describe what happens and what is felt, not finished prose."
+        ),
+    )
+    characters_present: list[str] = Field(
+        default_factory=list,
+        max_length=6,
+        description="Names of the characters who appear on this page.",
+    )
+
+
+class PagePlan(BaseModel):
+    """A story laid out page by page, before any prose is written."""
+
+    pages: list[ScenePlan] = Field(
+        min_length=4,
+        max_length=24,
+        description=(
+            "Every page of the book, in order. Give a beat more pages when it "
+            "needs room to breathe and fewer when it does not; turning the page "
+            "is itself part of the drama."
+        ),
+    )
+
+
+class StoryPage(BaseModel):
+    """The words printed on one page."""
+
+    page_number: int = Field(
+        ge=1,
+        description="The page these words belong to.",
+    )
+    # Bounds are deliberately generous rather than reading-level-specific: a Field
+    # constraint is static, while the right length varies by ReadingLevel. Judging
+    # length against the level belongs to the reading-level rubric in a later
+    # session, which can give feedback instead of only rejecting.
+    text: str = Field(
+        min_length=1,
+        max_length=1200,
+        description="The words on this page, written to be read aloud.",
+    )
+
+
+class StoryProse(BaseModel):
+    """The finished words of a story."""
+
+    pages: list[StoryPage] = Field(
+        min_length=4,
+        max_length=24,
+        description="One entry per page of the plan, in order, none left out.",
+    )
+
+
+# The workflow assembles this; no LLM ever returns it. So unlike every other model
+# in this module, its docstring and field names are NOT prompt text -- which is
+# also why it needs no Field descriptions.
+class Story(BaseModel):
+    """A finished story: the plan it was built from and the words it became."""
+
+    outline: StoryOutline
+    page_plan: PagePlan
+    # Kept as the pages themselves rather than the StoryProse wrapper: the wrapper
+    # exists only because structured output needs a top-level model.
+    pages: list[StoryPage]

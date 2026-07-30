@@ -57,6 +57,9 @@ realises, never from a coincidence or an adult solving it for them.
 lost toy can carry more weight than a saved kingdom.
 
 Rules you must follow:
+- Never plan more beats than the book has pages. Each beat needs at least one \
+page of its own, so a five-page book cannot carry six beats. Fewer beats than \
+pages is good: a short book wants four strong beats, not six rushed ones.
 - The child described in the brief is always the main character, referred to by \
 their given name and their stated pronouns. Never guess at pronouns.
 - Anything in the brief's "avoid" list is an absolute constraint. Do not \
@@ -93,9 +96,12 @@ def render_story_brief(brief: StoryBrief) -> str:
         "",
         f"Premise: {brief.premise}",
         f"Tone: {brief.tone.value}",
-        # The planner does not produce pages, but knowing the target length tells
-        # it how much story the beats have to carry.
+        # The planner does not produce pages, but the page count is a hard bound
+        # on the beat count, not merely a hint about how much story to carry: a
+        # beat needs a page of its own. Stating the limit as a number rather than
+        # leaving it to be inferred from "target length".
         f"Target length: {brief.page_count} pages",
+        f"Use at most {brief.page_count} beats, and fewer if the story is short.",
     ]
 
     if brief.must_include:

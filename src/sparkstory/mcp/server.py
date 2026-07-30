@@ -24,6 +24,11 @@ characters and ordered beats. Show the outline to the user and get their
 approval before proceeding -- the outline determines everything downstream, and
 changing it later means discarding work.
 
+Once the user is happy, `write_story` produces the finished book: the same
+planning, laid out across pages, with the words written for every page. It is
+slower and costs several model calls, so do not call it on a premise the user
+has not agreed to.
+
 Every story is written for a specific child. Always establish their name, age
 and pronouns before calling a tool. Never guess pronouns from a name."""
 

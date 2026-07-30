@@ -12,14 +12,15 @@ from sparkstory.mcp.server import create_server
 
 
 class TestToolRegistration:
-    async def test_plan_story_is_exposed(self) -> None:
+    async def test_both_tools_are_exposed(self) -> None:
         async with Client(create_server()) as client:
             names = [t.name for t in await client.list_tools()]
-        assert "plan_story" in names
+        assert {"plan_story", "write_story"} <= set(names)
 
-    async def test_tool_has_description_and_output_schema(self) -> None:
+    @pytest.mark.parametrize("tool_name", ["plan_story", "write_story"])
+    async def test_tool_has_description_and_output_schema(self, tool_name: str) -> None:
         async with Client(create_server()) as client:
-            tool = next(t for t in await client.list_tools() if t.name == "plan_story")
+            tool = next(t for t in await client.list_tools() if t.name == tool_name)
 
         assert tool.description, (
             "clients rely on this to decide whether to call the tool"
@@ -27,6 +28,19 @@ class TestToolRegistration:
         assert tool.outputSchema, (
             "structured output means clients get a validated shape"
         )
+
+    async def test_write_story_tells_a_client_it_is_the_expensive_one(self) -> None:
+        """An agent chooses between the two tools by reading their descriptions.
+
+        Without this, a client agent will reasonably call write_story on a premise
+        the parent has not seen, which spends several model calls on a story that
+        may be discarded -- and removes the review step the HITL prompt depends on.
+        """
+        async with Client(create_server()) as client:
+            tool = next(t for t in await client.list_tools() if t.name == "write_story")
+
+        assert tool.description is not None
+        assert "plan_story" in tool.description
 
 
 class TestClientVisibleSchema:
@@ -38,13 +52,16 @@ class TestClientVisibleSchema:
             tool = next(t for t in await client.list_tools() if t.name == "plan_story")
         return tool.inputSchema
 
-    async def test_nested_definitions_are_inlined(self, schema: dict) -> None:
+    @pytest.mark.parametrize("tool_name", ["plan_story", "write_story"])
+    async def test_nested_definitions_are_inlined(self, tool_name: str) -> None:
         """A client cannot resolve a $ref it was never given.
 
         FastMCP inlines Pydantic's $defs; this asserts that stays true, because a
         dangling reference would leave clients unable to construct a brief.
         """
-        assert "$defs" not in schema
+        async with Client(create_server()) as client:
+            tool = next(t for t in await client.list_tools() if t.name == tool_name)
+        assert "$defs" not in tool.inputSchema
 
     async def test_child_fields_are_visible(self, schema: dict) -> None:
         child = schema["properties"]["brief"]["properties"]["child"]["properties"]

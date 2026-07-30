@@ -11,7 +11,7 @@ PYTEST := uv run pytest
 
 # Everything ruff should look at. Kept in one variable so a new top-level
 # directory is added once rather than in four targets.
-QA_PATHS := src tests
+QA_PATHS := src tests scripts
 
 .DEFAULT_GOAL := help
 

@@ -22,6 +22,18 @@ __pycache__/
 # May contain API keys in its "env" block. .mcp.json.sample is committed.
 .mcp.json
 
+# --- Generated runs ------------------------------------------------------
+# scripts/write_one_story.py writes one directory per run here: the brief, each
+# stage's output, the book, and the log. Ignored for two reasons: every run holds
+# a real child's name, which is personal data about a minor, and generated stories
+# would bloat the repository. To keep one as a sample, copy it somewhere tracked.
+outputs/
+
+# --- Local data ----------------------------------------------------------
+# Reserved for real persistence (the canon store). Not the same thing as
+# outputs/, which is debugging output that can be deleted at any time.
+data/
+
 # --- OS / editor ---------------------------------------------------------
 .DS_Store
 *.swp

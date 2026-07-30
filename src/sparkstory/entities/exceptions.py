@@ -40,3 +40,18 @@ class SparkStoryError(Exception):
 
 class ConfigurationError(SparkStoryError):
     """Something in the configuration is wrong and an operator can fix it."""
+
+
+class StoryStructureError(SparkStoryError):
+    """A model's output is well-formed but structurally wrong.
+
+    Raised when output satisfies its schema yet violates a rule the schema cannot
+    express -- a page count that disagrees with the brief, a dropped beat, pages
+    that wander backwards through the structure.
+
+    Deliberately **not** a ``ConfigurationError``: no operator can fix it by
+    editing ``.env``, so it must not be dressed up as a configuration problem.
+    It is also excluded from workflow retries, because retrying with an identical
+    prompt only re-rolls the dice. Session 4 catches it and retries *with the
+    message as feedback*, which is the point of raising something specific.
+    """

@@ -28,11 +28,12 @@ tokens and risks contradicting the schema when one of the two changes.
 
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
 from sparkstory.config import settings
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
+from sparkstory.entities.reviews import OutlineReviews
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.base import Node
@@ -74,6 +75,54 @@ about planets.
 - Give characters plain, sayable names a young child can pronounce.
 
 Plan the story. Do not write it."""
+
+
+# Sent only on a revision pass, as two extra turns after the first two. Those
+# first two stay byte-identical to a first pass, which is what preserves the
+# provider-side prompt-cache prefix.
+OUTLINE_REVISION_PROMPT_TEMPLATE = """\
+An editor read the plan you just wrote and found problems with it. Fix all of \
+them and return the whole plan again.
+
+What they checked it against:
+- **Protagonist:** the child the book is for must want something, and the story's \
+events must follow from what they do about it.
+- **Earned resolution:** the ending must come from what the child does, decides \
+or realises -- never from a coincidence or something conveniently found.
+
+Here is what they found:
+
+{reviews}
+
+Fix every one. Keep everything that was not criticised: the title, the theme and \
+the beats that work should survive unless a fix genuinely requires changing them.
+
+One exception, and it matters: **a protagonist problem cannot be fixed in one \
+beat.** Whose story it is runs through the logline, the theme, every character \
+description and every beat at once. If that is the finding, change all of them. A \
+plan whose logline still says the child is helping someone else reach their dream \
+has not been fixed, however the beats now read -- and making the child "decide" to \
+help is not the same as giving the child a want.
+
+Return the complete plan, not a description of what you changed."""
+
+
+def render_outline_reviews(reviews: OutlineReviews) -> str:
+    """Render reviews as the human half of the revision prompt.
+
+    Each review is anchored to its beat where it has one. A comment with no
+    anchor makes the planner guess which beat to look at, and guessing wrong
+    means the fix lands on something the editor never complained about.
+    """
+    lines = []
+    for review in reviews.reviews:
+        where = (
+            f"beat {review.beat_position}"
+            if review.beat_position is not None
+            else "the story as a whole"
+        )
+        lines.append(f"- [{review.rubric.value}] {where}: {review.comment}")
+    return "\n".join(lines)
 
 
 def render_story_brief(brief: StoryBrief) -> str:
@@ -118,9 +167,19 @@ class StoryPlannerNode(Node):
 
     output_schema = StoryOutline
 
-    def __init__(self, model: Runnable[Any, Any], brief: StoryBrief) -> None:
+    def __init__(
+        self,
+        model: Runnable[Any, Any],
+        brief: StoryBrief,
+        reviews: OutlineReviews | None = None,
+    ) -> None:
         super().__init__(model)
         self.brief = brief
+        # The generator is also the editor: its
+        # `edit_based_on_reviews` rebuilds `ArticleWriter` with `reviews=` rather
+        # than calling a separate node. One prompt, one voice, and no second set
+        # of craft rules to keep in sync with this one.
+        self.reviews = reviews
 
     async def ainvoke(self) -> StoryOutline:
         """Produce a story outline from the brief.
@@ -148,12 +207,24 @@ class StoryPlannerNode(Node):
         )
         logger.debug("Brief premise: %r for child %r", brief.premise, brief.child.name)
 
-        outline: StoryOutline = await self.model.ainvoke(
-            [
-                SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
-                HumanMessage(content=render_story_brief(brief)),
+        messages: list[Any] = [
+            SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
+            HumanMessage(content=render_story_brief(brief)),
+        ]
+        if self.reviews is not None:
+            # The previous draft is replayed as the model's *own* turn, following
+            # brown's article_writer.py: it then edits something it owns rather
+            # than critiquing a stranger's work.
+            messages += [
+                AIMessage(content=self.reviews.outline.model_dump_json(indent=2)),
+                HumanMessage(
+                    content=OUTLINE_REVISION_PROMPT_TEMPLATE.format(
+                        reviews=render_outline_reviews(self.reviews)
+                    )
+                ),
             ]
-        )
+
+        outline: StoryOutline = await self.model.ainvoke(messages)
 
         logger.info(
             "Planned %r with %d beats and %d characters",

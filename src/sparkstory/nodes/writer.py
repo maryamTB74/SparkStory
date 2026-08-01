@@ -9,16 +9,24 @@ rather than hoped for.
 
 Per-page generation was rejected: pages blind to their neighbours produce three
 openings of "Suddenly", the same favourite adjective throughout, and no built
-rhythm. Per-page *revision* is a different thing and arrives in a later session,
-where a page flagged by a critic is rewritten with the whole text as context.
+rhythm.
+
+**Revision keeps that property rather than trading it away.** When a critic
+returns findings this node runs again with ``reviews`` set, and it regenerates
+the *whole* book, not the flagged pages -- following ``brown``, whose
+``edit_based_on_reviews`` rebuilds ``ArticleWriter`` rather than calling an editor
+node. Patching individual pages would reintroduce exactly the seam that one-call
+generation exists to avoid. The cost is that untouched pages could drift, so the
+revision prompt insists they come back word for word.
 """
 
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
+from sparkstory.entities.reviews import ProseReviews
 from sparkstory.entities.stories import (
     PagePlan,
     StoryBrief,
@@ -70,6 +78,52 @@ disappointed; they must never be endangered or humiliated.
 - Weave the child's interests in as texture, not as a list of facts.
 - No page numbers, titles, headings or stage directions in the text. Only the \
 words that are printed on the page."""
+
+
+# Sent only on a revision pass, as two extra turns after the first two. Those
+# first two stay byte-identical to a first pass, preserving the provider-side
+# prompt-cache prefix.
+PROSE_REVISION_PROMPT_TEMPLATE = """\
+An editor read your manuscript aloud and found problems with it. Fix all of them \
+and return the whole book again.
+
+Here is what they found:
+
+{reviews}
+
+Satisfying a note never means writing the note down. If an editor says a page's \
+feeling never arrives, the fix is to show it happening -- in what the character \
+does, notices or says. Copying the note onto the page is the one thing that \
+cannot work: it is the failure they were describing, spelled out.
+
+Fix every one. **Leave every page they did not mention unchanged** -- word for \
+word. You are returning the whole book because that is how the pages are handed \
+over, not because this is a fresh draft, and a voice that shifts between passes \
+is audible when a book is read aloud twice in a week.
+
+Keep every rule you were given the first time: the reading level, the pronouns, \
+the things to avoid, one entry per page in order, and no stated lesson at the \
+end."""
+
+
+def render_prose_reviews(reviews: ProseReviews) -> str:
+    """Render reviews as the human half of the revision prompt.
+
+    Anchored to a page where the review has one, and explicitly *not* anchored
+    where it does not. A comment with no anchor makes the Writer guess which page
+    to change, and a guess lands the fix on a page the editor never mentioned; a
+    book-wide finding given an invented page number gets fixed on that one page
+    instead of all of them.
+    """
+    lines = []
+    for review in reviews.reviews:
+        where = (
+            f"page {review.page_number}"
+            if review.page_number is not None
+            else "the book as a whole"
+        )
+        lines.append(f"- [{review.rubric.value}] {where}: {review.comment}")
+    return "\n".join(lines)
 
 
 def render_prose_request(
@@ -130,11 +184,16 @@ class WriterNode(Node):
         brief: StoryBrief,
         outline: StoryOutline,
         page_plan: PagePlan,
+        reviews: ProseReviews | None = None,
     ) -> None:
         super().__init__(model)
         self.brief = brief
         self.outline = outline
         self.page_plan = page_plan
+        # Following brown, the generator is the editor. The whole book is
+        # rewritten rather than patched -- which is also what keeps the voice
+        # consistent, since it was always one call for all pages anyway.
+        self.reviews = reviews
 
     async def ainvoke(self) -> StoryProse:
         """Produce the words for every page.
@@ -149,16 +208,25 @@ class WriterNode(Node):
             self.brief.child.reading_level.value,
         )
 
-        prose: StoryProse = await self.model.ainvoke(
-            [
-                SystemMessage(content=WRITER_SYSTEM_PROMPT),
+        messages: list[Any] = [
+            SystemMessage(content=WRITER_SYSTEM_PROMPT),
+            HumanMessage(
+                content=render_prose_request(self.brief, self.outline, self.page_plan)
+            ),
+        ]
+        if self.reviews is not None:
+            # The previous draft replayed as the model's own turn, following
+            # brown's article_writer.py: it edits something it owns.
+            messages += [
+                AIMessage(content=self.reviews.prose.model_dump_json(indent=2)),
                 HumanMessage(
-                    content=render_prose_request(
-                        self.brief, self.outline, self.page_plan
+                    content=PROSE_REVISION_PROMPT_TEMPLATE.format(
+                        reviews=render_prose_reviews(self.reviews)
                     )
                 ),
             ]
-        )
+
+        prose: StoryProse = await self.model.ainvoke(messages)
 
         logger.info(
             "Wrote %d pages, %d words total",

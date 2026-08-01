@@ -55,3 +55,19 @@ class StoryStructureError(SparkStoryError):
     prompt only re-rolls the dice. Session 4 catches it and retries *with the
     message as feedback*, which is the point of raising something specific.
     """
+
+
+class UnsafeContentError(SparkStoryError):
+    """A safety finding survived every revision, so no book is returned.
+
+    Raised only after the Writer was shown the problem and did not fix it. This
+    product writes for a named child whose parent listed things to keep out of
+    it, so the guardrail fails closed: returning a book with a known safety
+    finding still in it is worse than returning none.
+
+    Deliberately **not** a ``ConfigurationError`` -- no operator fixes it by
+    editing ``.env``. But unlike ``StoryStructureError`` it is not a bug either:
+    it means the system worked and the answer is no. That distinction is why the
+    tool layer translates it for the client instead of letting it propagate as an
+    unhandled failure.
+    """

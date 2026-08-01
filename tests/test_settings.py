@@ -58,13 +58,24 @@ class TestApiKeyResolution:
 
 
 class TestModelRegistry:
-    def test_configured_planner_model_exists(self) -> None:
-        """Guards against a typo in PLANNER_MODEL reaching runtime.
+    def test_every_configured_model_exists(self) -> None:
+        """Guards against a typo in any ``*_MODEL`` reaching runtime.
 
         Deliberately asserts against the live settings object, since the failure
-        this catches is a misconfigured .env, not a code defect.
+        this catches is a misconfigured .env, not a code defect. Discovered from
+        the fields rather than listed, so a new agent's model setting is covered
+        the moment it is declared.
         """
-        assert settings.planner_model in settings.llm_configs
+        configured = {
+            name: getattr(settings, name)
+            for name in type(settings).model_fields
+            if name.endswith("_model")
+        }
+        assert configured, "no *_model settings found -- the discovery broke"
+        for name, value in configured.items():
+            assert value in settings.llm_configs, (
+                f"{name}={value!r} is not a key of llm_configs"
+            )
 
     def test_every_entry_is_well_formed(self) -> None:
         for name, cfg in settings.llm_configs.items():
@@ -78,3 +89,61 @@ class TestModelRegistry:
             params = cfg.get("params", {})
             both = "thinking_budget" in params and "thinking_level" in params
             assert not both, f"{name} sets both thinking params"
+
+
+class TestCriticSettings:
+    def test_every_critic_entry_is_deterministic(self) -> None:
+        """A critic returning different findings on identical input turns the
+        empty-review-list stop signal into noise.
+
+        Discovered by suffix rather than listed, so a third critic entry cannot
+        drift in at a non-zero temperature.
+        """
+        critics = {
+            name: cfg
+            for name, cfg in Settings().llm_configs.items()
+            if name.endswith("-critic")
+        }
+        assert critics, "no *-critic entries found -- the discovery broke"
+        for name, cfg in critics.items():
+            assert cfg["params"]["temperature"] == 0.0, f"{name} is not deterministic"
+
+    def test_every_critic_entry_reuses_a_base_entry(self) -> None:
+        """A registry entry, not a new model: `<base>-critic` must name the same
+        identifier as `<base>`. The two-level registry exists so that per-node
+        parameters cost one entry and no code."""
+        configs = Settings().llm_configs
+        for name, cfg in configs.items():
+            if not name.endswith("-critic"):
+                continue
+            base = name.removesuffix("-critic")
+            assert base in configs, f"{name} has no base entry {base!r}"
+            assert cfg["identifier"] == configs[base]["identifier"]
+
+    def test_a_critic_exists_for_each_provider_in_use(self) -> None:
+        """Defaulting the critic to a provider the rest of the pipeline does not
+        use makes the loop's one call the most likely thing in a run to fail."""
+        configs = Settings().llm_configs
+        critic_keys = {
+            cfg["api_key_env_var"]
+            for name, cfg in configs.items()
+            if name.endswith("-critic")
+        }
+        assert {"GOOGLE_API_KEY", "XAI_API_KEY"} <= critic_keys
+
+    def test_loop_budget_defaults(self) -> None:
+        """Both are guesses until we have run data; pinned so a change is
+        deliberate rather than drift."""
+        fresh = Settings()
+        assert fresh.max_outline_revisions == 2
+        assert fresh.max_reviews_per_pass == 5
+
+    def test_either_loop_may_be_set_to_zero_revisions(self) -> None:
+        """Both loops run N revisions and N+1 critiques, so 0 means "critique
+        once, never revise" for either. Not "skip the critic": every draft has
+        to be scored for the loop to keep the best one, and for prose a
+        guardrail must not be switchable off through a knob labelled
+        "revisions"."""
+        fresh = Settings(max_outline_revisions=0, max_prose_revisions=0)
+        assert fresh.max_outline_revisions == 0
+        assert fresh.max_prose_revisions == 0

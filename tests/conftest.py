@@ -130,12 +130,33 @@ def page_plan() -> PagePlan:
     )
 
 
+#: One distinct opening word per page. Deliberately varied: the deterministic
+#: read-aloud check in `workflows/reviews.py` flags pages that share an opening,
+#: so prose reading "Page 1.", "Page 2." would produce a finding in every test
+#: that runs the prose loop and drown out whatever that test was measuring.
+_PAGE_OPENINGS = (
+    "Maryam waited by the window.",
+    "Softly, the wind turned over.",
+    "Up above, something glittered.",
+    "Pip pressed his nose to the glass.",
+    "Down came a scattering of light.",
+    "Away it went, over the fence.",
+    "In the garden nothing moved at all.",
+    "Nobody spoke for a long moment.",
+    "Then the whole sky leaned closer.",
+    "So they said goodnight to the moon.",
+)
+
+
 @pytest.fixture
 def prose(page_plan: PagePlan) -> StoryProse:
     """Prose matching the `page_plan` fixture page for page."""
     return StoryProse(
         pages=[
-            StoryPage(page_number=page.page_number, text=f"Page {page.page_number}.")
+            StoryPage(
+                page_number=page.page_number,
+                text=_PAGE_OPENINGS[page.page_number - 1],
+            )
             for page in page_plan.pages
         ]
     )

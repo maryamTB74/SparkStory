@@ -132,6 +132,54 @@ class Settings(BaseSettings):
         alias="WRITER_MODEL",
         description="Model used by the Writer agent",
     )
+    outline_critic_model: str = Field(
+        default="gemini-3.5-flash-critic",
+        alias="OUTLINE_CRITIC_MODEL",
+        description="Model used by the Outline Critic agent",
+    )
+    prose_critic_model: str = Field(
+        default="gemini-3.5-flash-critic",
+        alias="PROSE_CRITIC_MODEL",
+        description="Model used by the Prose Critic agent",
+    )
+
+    # --- Evaluator-optimizer loop budgets --------------------------------
+    # Two knobs which separates how many review->edit rounds
+    # to run (`num_reviews`) from how many findings one round may return
+    # (`max_reviews_per_iteration`). Both values are guesses until we have run
+    # data: the number that matters is how often a critic returns empty on the
+    # first pass, which is why every iteration is written to the run artifacts.
+    # Both loops run N revisions and N+1 critiques, so `0` means "critique once,
+    # never revise" rather than "skip the critic". Every draft has to be scored
+    # for the loop to keep the best one rather than the last, and a draft that is
+    # never critiqued cannot be scored.
+    max_outline_revisions: int = Field(
+        default=2,
+        ge=0,
+        alias="MAX_OUTLINE_REVISIONS",
+        description=(
+            "How many times the outline may be revised from reviews. 0 still "
+            "runs one critique."
+        ),
+    )
+    # 0 here means "check but never rewrite", and the safety gate still fails
+    # closed: a guardrail on a kids' product must not be switchable off through a
+    # knob labelled "revisions".
+    max_prose_revisions: int = Field(
+        default=2,
+        ge=0,
+        alias="MAX_PROSE_REVISIONS",
+        description=(
+            "How many times the prose may be rewritten from reviews. 0 still "
+            "runs one critique and still fails closed on a safety finding."
+        ),
+    )
+    max_reviews_per_pass: int = Field(
+        default=5,
+        ge=1,
+        alias="MAX_REVIEWS_PER_PASS",
+        description="Cap on findings a critic may return in one pass",
+    )
 
     # --- Validators -----------------------------------------------------
     @field_validator("google_api_key", "xai_api_key", mode="before")
@@ -188,6 +236,19 @@ class Settings(BaseSettings):
                     "max_retries": 3,
                 },
             },
+            # Same model, different temperature -- this is what the two-level
+            # registry is for. A critic that returns different findings
+            # on identical input turns the empty-review-list stop signal into noise.
+            "gemini-3.5-flash-critic": {
+                "identifier": "google_genai:gemini-3.5-flash",
+                "api_key_env_var": "GOOGLE_API_KEY",
+                "params": {
+                    "temperature": 0.0,
+                    "thinking_level": "low",
+                    "include_thoughts": False,
+                    "max_retries": 3,
+                },
+            },
             # --- xAI / Grok -------------------------------------------------
             # A second provider, not merely a second model.
             # Reached through the OpenAI-compatible surface: xAI implements
@@ -210,6 +271,20 @@ class Settings(BaseSettings):
                 "params": {
                     "base_url": "https://api.x.ai/v1",
                     "temperature": 1,
+                    "max_retries": 3,
+                },
+            },
+            # A critic on the same provider as the rest of the pipeline. Not
+            # redundant with the Gemini critic entry: when every *_MODEL points
+            # at Grok, defaulting the critic to Google makes the loop's one
+            # Google call the most likely thing in the run to fail -- and a 503
+            # there tells us nothing about whether the critic works.
+            "grok-3-mini-critic": {
+                "identifier": "openai:grok-3-mini",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                    "temperature": 0.0,
                     "max_retries": 3,
                 },
             },

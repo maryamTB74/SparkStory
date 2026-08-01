@@ -344,7 +344,20 @@ async def run_stages(
     # The full pipeline re-runs planning. Wasteful, and deliberately so: this path
     # must exercise the workflow exactly as the MCP tool does, and stitching a
     # half-finished run into it would be testing something else.
-    story = await run_story_pipeline(brief)
+    #
+    # One numbered file per completed task. The revision loops run inside the
+    # workflow, so the returned Story shows only the drafts that survived --
+    # `critique_outline-1.json` holding an empty review list is the single most
+    # useful fact in a run, because it says the critic approved on the first
+    # pass, and that is what validates or kills the MAX_*_REVISIONS default of 2.
+    iterations: dict[str, int] = {}
+
+    def save_iteration(task_name: str, value: object) -> None:
+        index = iterations[task_name] = iterations.get(task_name, 0) + 1
+        if isinstance(value, BaseModel):
+            save_json(run_dir, f"{task_name}-{index}.json", value)
+
+    story = await run_story_pipeline(brief, on_task_result=save_iteration)
     save_json(run_dir, "story.json", story)
     if run_dir is not None:
         (run_dir / "story.md").write_text(
@@ -368,14 +381,17 @@ async def run_stages(
     level = brief.child.reading_level.value
     print(f"pages over {limit} words for {level}: {dense or 'none'}")
 
-    # Nothing enforces `avoid` yet -- the writer is only asked. Until the safety
-    # rubric exists, checking by eye is the whole of the check.
+    # The safety critic enforces `avoid` now, and a run carrying an unresolved
+    # safety finding raises rather than reaching this line. This substring check
+    # stays as a cross-check on the critic: a hit here, on a run that passed,
+    # means the critic missed a literal match -- the cheapest possible false
+    # negative, and the one most worth knowing about.
     hits = [
         page.page_number
         for page in story.pages
         if any(term.lower() in page.text.lower() for term in brief.avoid)
     ]
-    print(f"pages with an 'avoid' term (unenforced, check by eye): {hits or 'none'}")
+    print(f"pages with a literal 'avoid' term (critic cross-check): {hits or 'none'}")
 
     save_json(
         run_dir,

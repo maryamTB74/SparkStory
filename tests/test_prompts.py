@@ -5,6 +5,10 @@ the model produces. These tests treat the rendered prompt as an output worth
 asserting on.
 """
 
+import importlib
+import pkgutil
+
+import sparkstory.nodes
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.stories import (
     ChildProfile,
@@ -15,10 +19,15 @@ from sparkstory.entities.stories import (
 )
 from sparkstory.nodes.plot_planner import PLOT_PLANNER_SYSTEM_PROMPT
 from sparkstory.nodes.story_planner import (
+    OUTLINE_REVISION_PROMPT_TEMPLATE,
     STORY_PLANNER_SYSTEM_PROMPT,
     render_story_brief,
 )
-from sparkstory.nodes.writer import WRITER_SYSTEM_PROMPT, render_prose_request
+from sparkstory.nodes.writer import (
+    PROSE_REVISION_PROMPT_TEMPLATE,
+    WRITER_SYSTEM_PROMPT,
+    render_prose_request,
+)
 
 
 class TestReadingLevelGuidance:
@@ -139,3 +148,92 @@ class TestWriterSystemPrompt:
         """Without this, 'do not copy' is satisfiable by ignoring the notes --
         which is the page-drift half of the same defect."""
         assert "all three" in WRITER_SYSTEM_PROMPT.lower()
+
+
+#: Words that belong to us, not to a children's book editor. Each would read to
+#: the model as part of its task. An earlier version transmitted "the Canon
+#: Agent" and "spend tokens" to Gemini exactly this way.
+_INTERNAL_TERMS = (
+    "langgraph",
+    "langchain",
+    "pydantic",
+    "json",
+    "schema",
+    "workflow",
+    "pipeline",
+    "spend tokens",
+    "token budget",
+    "agent",
+    "node",
+    "rubric",
+)
+
+
+def _prompt_constants() -> dict[str, str]:
+    """Every ``*_PROMPT`` / ``*_PROMPT_TEMPLATE`` across the nodes package.
+
+    Discovered rather than listed. A hardcoded list of modules silently stops
+    covering new nodes, and it stops covering them at exactly the moment one is
+    added -- which is when the audit is most needed.
+    """
+    found: dict[str, str] = {}
+    for info in pkgutil.iter_modules(sparkstory.nodes.__path__):
+        module = importlib.import_module(f"sparkstory.nodes.{info.name}")
+        for name in dir(module):
+            if name.endswith(("_PROMPT", "_PROMPT_TEMPLATE")):
+                found[f"{info.name}.{name}"] = getattr(module, name)
+    return found
+
+
+class TestNoInternalTermsLeak:
+    def test_the_audit_actually_finds_prompts(self) -> None:
+        """A broken walk would make every assertion below vacuously pass, which
+        is worse than no audit because it reads as coverage."""
+        found = _prompt_constants()
+        assert len(found) >= 5, f"only found {sorted(found)}"
+
+    def test_the_audit_covers_every_node_module(self) -> None:
+        """A node whose prompt is built inline rather than as a named constant
+        would slip past the discovery entirely."""
+        covered = {name.split(".")[0] for name in _prompt_constants()}
+        modules = {
+            info.name
+            for info in pkgutil.iter_modules(sparkstory.nodes.__path__)
+            if info.name not in {"base", "__init__"}
+        }
+        assert modules <= covered, f"no prompt constant found in {modules - covered}"
+
+    def test_no_prompt_mentions_our_machinery(self) -> None:
+        for where, text in _prompt_constants().items():
+            lowered = text.lower()
+            for term in _INTERNAL_TERMS:
+                assert term not in lowered, f"{where} leaks {term!r} to the model"
+
+
+class TestProseRevisionPrompt:
+    def test_forbids_writing_the_note_down(self) -> None:
+        """Live-run regression: an interiority finding was "fixed" by copying
+        the note onto the page, which is the failure it described."""
+        assert "satisfying a note never means writing the note down" in (
+            PROSE_REVISION_PROMPT_TEMPLATE.lower()
+        )
+
+    def test_still_protects_uncriticised_pages(self) -> None:
+        """The live run left 5 of 8 pages byte-identical. Keep that."""
+        assert "unchanged" in PROSE_REVISION_PROMPT_TEMPLATE.lower()
+
+
+class TestOutlineRevisionPrompt:
+    def test_exempts_protagonist_from_keeping_what_was_not_criticised(self) -> None:
+        """Live-run regression (outputs/20260730-232426-*). "Keep everything that
+        was not criticised" licensed a one-clause patch to beat 1 while the
+        logline still read "to help her fox friend reach the moon"."""
+        lowered = OUTLINE_REVISION_PROMPT_TEMPLATE.lower()
+        assert "cannot be fixed in one beat" in lowered
+        assert "logline" in lowered
+
+    def test_still_protects_uncriticised_beats(self) -> None:
+        """The exemption must not become a licence to churn everything."""
+        assert "keep everything that was not criticised" in (
+            OUTLINE_REVISION_PROMPT_TEMPLATE.lower()
+        )

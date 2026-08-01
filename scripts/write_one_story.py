@@ -240,7 +240,7 @@ def story_markdown(story: Story, brief: StoryBrief) -> str:
             page.text,
             "",
             f"<!-- beat {scene.beat_position} · {scene.setting} · "
-            f"{scene.scene_summary} -->",
+            f"{scene.visual_action} · inside: {scene.emotional_shift} -->",
             "",
         ]
     return "\n".join(lines)
@@ -321,7 +321,10 @@ async def run_stages(
     print(f"\n{'-' * 66}\nPage plan ({len(plan.pages)} pages)\n{'-' * 66}")
     for page in plan.pages:
         print(f"  p{page.page_number} (beat {page.beat_position}) {page.setting}")
-        print(f"     {page.scene_summary}")
+        print(f"     shows:  {page.visual_action}")
+        print(f"     inside: {page.emotional_shift}")
+        if page.page_turn_hook:
+            print(f"     hook:   {page.page_turn_hook}")
 
     if args.stage == "plot":
         save_json(

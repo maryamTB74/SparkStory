@@ -45,9 +45,20 @@ appear -- no colours, clothing or features. Words that contradict an illustratio
 cannot be fixed without a rewrite.
 - Trust the child. Say the true thing simply rather than explaining it.
 
+Each page gives you three notes: what the picture shows, what changes inside the \
+main character, and the question the page leaves open. They are notes, not a \
+draft. **Never copy their wording** -- if a line of yours shares a phrase with a \
+note, rewrite it. Write the page so all three are true of it: the action \
+happens, the feeling is in the words rather than named, and the reader wants to \
+turn over.
+
+Do not write the same shape of page eight times. Some pages are one line. Some \
+are dialogue. Some are a sound. A page that is always "action, then feeling, \
+then question" is a form, not a story.
+
 Hard rules:
-- Write exactly one entry for every page you are given, in order, and match what \
-that page's moment says happens. Do not merge pages, skip pages, or add pages.
+- Write exactly one entry for every page you are given, in order, and write that \
+page's moment and no other. Do not merge pages, skip pages, or add pages.
 - The child named in the brief is the main character, referred to by their name \
 and their stated pronouns. Never guess at pronouns.
 - Anything in the "avoid" list must not appear: not directly, not alluded to, not \
@@ -94,9 +105,16 @@ def render_prose_request(
     for page in page_plan.pages:
         who = ", ".join(page.characters_present) or "no one named"
         lines.append(
-            f"- Page {page.page_number} | setting: {page.setting} | "
-            f"present: {who} | {page.scene_summary}"
+            f"- Page {page.page_number} | setting: {page.setting} | present: {who}"
         )
+        # Separately labelled and indented so the three notes read as three
+        # things. Run together on one line they become a sentence to lift.
+        lines.append(f"    shows: {page.visual_action}")
+        lines.append(f"    inside: {page.emotional_shift}")
+        # Omitted rather than rendered empty on the final page: a bare
+        # "leaves open:" invites an invented cliffhanger where the book ends.
+        if page.page_turn_hook:
+            lines.append(f"    leaves open: {page.page_turn_hook}")
 
     return "\n".join(lines)
 

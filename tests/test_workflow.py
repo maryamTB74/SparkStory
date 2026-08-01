@@ -89,7 +89,7 @@ class TestRunStoryPipeline:
 
         writer_prompt = fakes[StoryProse].messages[1].content
         assert outline.title in writer_prompt
-        assert page_plan.pages[0].scene_summary in writer_prompt
+        assert page_plan.pages[0].visual_action in writer_prompt
 
     async def test_every_stage_is_called_exactly_once(
         self, fakes: dict[type, FakeModel], brief: StoryBrief

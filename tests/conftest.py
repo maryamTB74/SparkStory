@@ -118,7 +118,11 @@ def page_plan() -> PagePlan:
                 page_number=number,
                 beat_position=beat,
                 setting="the garden at night",
-                scene_summary=f"A single quiet moment, drawn on page {number}.",
+                visual_action=f"a single quiet moment, drawn on page {number}",
+                emotional_shift="something small shifts",
+                # None on the last page only, so the fixture exercises both
+                # branches of the optional field rather than just one.
+                page_turn_hook=None if number == len(_PAGE_BEATS) else "and then?",
                 characters_present=["Maryam", "Pip"],
             )
             for number, beat in enumerate(_PAGE_BEATS, start=1)

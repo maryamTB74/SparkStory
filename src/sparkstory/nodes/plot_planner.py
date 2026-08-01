@@ -44,9 +44,21 @@ does not happen.
 - Vary the setting where the story allows it. Twelve pages in one room is dull \
 to look at.
 
+For each page you record three separate notes, and they must stay separate:
+- **What the picture shows** -- the one action or image, drawable as one image.
+- **What changes inside** the main character: what they feel, notice or decide. \
+Every page shifts something, even slightly. A page where nothing changes inside \
+is a page the book does not need.
+- **The question the page turn leaves open** -- except on the last page, which \
+answers rather than asks.
+
+Write all three as **notes, not narration**. "rocket tips over, Pip's ears \
+flatten" is a note. "The rocket tipped over and Pip's ears flattened" is a \
+sentence from the finished book, and writing one here means the author has \
+nothing left to do but copy it. Never write a sentence someone could print.
+
 What not to do:
-- Do not write the story. Describe what happens on each page; someone else \
-writes the words.
+- Do not write the story. Someone else writes the words.
 - Do not invent characters. Use only the characters you were given.
 - Do not describe how anyone or anything looks -- no colours, clothing or \
 features. The pictures decide that later, and text that contradicts them cannot \

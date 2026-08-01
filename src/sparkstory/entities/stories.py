@@ -264,6 +264,14 @@ class StoryOutline(BaseModel):
 # code can assert every beat received a page, that no page cites a beat that does
 # not exist, and that the pages do not wander back and forth through the
 # structure. Without it, "did it drop the climax?" can only be answered by reading.
+#
+# The three note fields replace a single `scene_summary`, whose description asked
+# for "one or two sentences ... not finished prose" -- a self-contradiction the
+# model resolved by writing prose, which the Writer then paraphrased on four of
+# eight pages. Three orthogonal notes cannot be concatenated into a page, so the
+# Writer has to write. Splitting them also makes interiority a required field
+# rather than something that can be silently dropped, and gives the page turn a
+# slot of its own.
 class ScenePlan(BaseModel):
     """One page of the book."""
 
@@ -280,13 +288,32 @@ class ScenePlan(BaseModel):
         max_length=120,
         description="Where this page happens, in a few words.",
     )
-    scene_summary: str = Field(
-        min_length=10,
-        max_length=400,
+    visual_action: str = Field(
+        min_length=5,
+        max_length=300,
         description=(
-            "The single moment this page shows, in one or two sentences. It must "
-            "be one moment that could be drawn as one picture, not a sequence of "
-            "events. Describe what happens and what is felt, not finished prose."
+            "What the picture shows: the one action or image on this page, "
+            "drawable as a single image. Write notes, never sentences from the "
+            "story. 'rocket tips over, Pip's ears flatten' -- not 'The rocket "
+            "tipped over and Pip's ears flattened.'"
+        ),
+    )
+    emotional_shift: str = Field(
+        min_length=3,
+        max_length=200,
+        description=(
+            "What changes inside the main character on this page: what they "
+            "feel, notice or decide. A few words, not a sentence from the story. "
+            "Every page changes something, even if only a little."
+        ),
+    )
+    page_turn_hook: str | None = Field(
+        default=None,
+        max_length=200,
+        description=(
+            "The question this page leaves unanswered, answered after the page "
+            "turn. A few words. Leave empty on the final page, which answers "
+            "rather than asks."
         ),
     )
     characters_present: list[str] = Field(

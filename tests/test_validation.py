@@ -178,5 +178,6 @@ class TestScenePlanSchema:
                 page_number=0,
                 beat_position=1,
                 setting="a garden",
-                scene_summary="Something happens here.",
+                visual_action="something happens here",
+                emotional_shift="a small change",
             )

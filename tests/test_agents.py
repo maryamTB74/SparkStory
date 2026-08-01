@@ -113,7 +113,10 @@ class TestWriterNode:
         human = fake.messages[1].content
         for page in page_plan.pages:
             assert f"Page {page.page_number}" in human
-            assert page.scene_summary in human
+            # Both notes, not just one: a renderer that dropped emotional_shift
+            # would silently undo finding #4's structural fix.
+            assert page.visual_action in human
+            assert page.emotional_shift in human
 
     async def test_reading_level_guidance_reaches_the_model(
         self,

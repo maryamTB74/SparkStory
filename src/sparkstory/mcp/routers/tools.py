@@ -21,22 +21,24 @@ def register_mcp_tools(mcp: FastMCP) -> None:
         """Plan a personalised children's story from a brief.
 
         Produces the structure of a story -- title, theme, characters and
-        ordered beats -- without writing any prose. This is the cheap preview:
-        show the outline to the user and get their approval before calling
-        `write_story`, which is slower and builds on whatever this returns.
+        ordered beats -- without writing any prose. It revises its own plan
+        until it passes review, so the outline it returns is the one the book
+        will be built from. Show it to the user, get their approval, then pass
+        it to `write_story` unchanged.
         """
         return await plan_story_tool(brief)
 
     @mcp.tool()
-    async def write_story(brief: StoryBrief) -> Story:
-        """Write a complete personalised children's story from a brief.
+    async def write_story(brief: StoryBrief, outline: StoryOutline) -> Story:
+        """Write a complete personalised children's story from an approved plan.
 
-        Runs the whole pipeline: plans the structure, lays it out across pages,
-        and writes the words for every page at the child's reading level.
-        Returns the finished text together with the plan it came from.
+        Takes the outline `plan_story` returned and the user approved, and
+        builds the book from exactly that plan -- same title, same characters,
+        same beats. Pass the outline through unchanged; do not edit it or write
+        one yourself.
 
-        This takes considerably longer than `plan_story` and makes several model
-        calls. If the user has not yet agreed to the story's premise, use
-        `plan_story` first and confirm the outline with them.
+        Runs several model calls and takes considerably longer than
+        `plan_story`. If the user has not yet agreed to the outline, confirm it
+        with them first.
         """
-        return await write_story_tool(brief)
+        return await write_story_tool(brief, outline)

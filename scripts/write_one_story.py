@@ -9,17 +9,28 @@ debugging a stage you want its raw output. Both are easier here.
 
 Each run is saved under ``outputs/<timestamp>-<premise-slug>/``:
 
-    brief.json       exactly what was asked for -- the run is reproducible
-    meta.json        which model ran each stage, and how long it took
-    outline.json     stage 1 output
-    page_plan.json   stage 2 output
-    story.json       the whole provenance chain
-    story.md         the book, readable
-    run.log          every log line, including the request_id and any traceback
+    brief.json          exactly what was asked for -- the run is reproducible
+    meta.json           which model ran each stage, and how long it took
+    plan_outline-N.json every outline draft, in order
+    critique_outline-N  what the critic said about each one
+    plan_pages-N.json   the page plan the book was written from
+    write_prose-N.json  every prose draft
+    critique_prose-N    what the critic said about each one
+    story.json          the whole provenance chain, with the drafts that survived
+    story.md            the book, readable
+    run.log             every log line, including the request_id and any traceback
 
-Artifacts are written **as each stage finishes**, so a crash in the writer still
+Artifacts are written **as each task finishes**, so a crash in the writer still
 leaves the outline and page plan that led to it. That is the point: the run worth
 inspecting is usually the one that failed.
+
+**One plan per run.** The numbered files are the only plans, and they are the
+ones the book was built from. There used to be an `outline.json` and a
+`page_plan.json` written by this script's *own* planning calls, while the book
+came from the workflow's -- so the two disagreed, and comparing prose against the
+wrong one invented character-name bugs that did not exist. Twice, in two
+different sessions. `page_plan.json` now appears only under ``--stage plot``,
+where the run stops before any competing plan exists.
 
 ``outputs/`` is gitignored. Every file holds a real child's name, which is
 personal data about a minor, and these would bloat the repository. To keep one as
@@ -62,8 +73,8 @@ from sparkstory.entities.stories import (
 )
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
-from sparkstory.nodes.story_planner import StoryPlannerNode
 from sparkstory.utils.logging_utils import configure_logging
+from sparkstory.workflows.plan_outline import run_outline_pipeline
 from sparkstory.workflows.write_story import run_story_pipeline
 
 logger = logging.getLogger(__name__)
@@ -289,10 +300,24 @@ async def run_stages(
     started: float,
 ) -> int:
     """Run up to the requested stage, printing and saving as each completes."""
-    outline = await StoryPlannerNode(
-        model=get_chat_model(settings.planner_model), brief=brief
-    ).ainvoke()
-    save_json(run_dir, "outline.json", outline)
+    # One numbered file per completed task, shared by both pipelines so the
+    # numbering runs straight through a run. The revision loops live inside the
+    # entrypoints, so a returned Story shows only the drafts that survived --
+    # `critique_outline-1.json` holding an empty review list is the single most
+    # useful fact in a run, because it says the critic approved on the first
+    # pass, and that is what validates or kills the MAX_*_REVISIONS default of 2.
+    iterations: dict[str, int] = {}
+
+    def save_iteration(task_name: str, value: object) -> None:
+        index = iterations[task_name] = iterations.get(task_name, 0) + 1
+        if isinstance(value, BaseModel):
+            save_json(run_dir, f"{task_name}-{index}.json", value)
+
+    # Planned once, and this is the outline the book is built from -- there is no
+    # second planning call any more. That is what retires the artifact trap:
+    # `outline.json` used to come from a throwaway plan while the book came from
+    # another, so the two disagreed and the disagreement looked like a bug. Twice.
+    outline = await run_outline_pipeline(brief, on_task_result=save_iteration)
 
     print(f"\n{'=' * 66}\n  {outline.title}\n  {outline.logline}\n{'=' * 66}")
     print(f"\nTheme: {outline.theme}\n")
@@ -313,20 +338,24 @@ async def run_stages(
         )
         return 0
 
-    plan = await PlotPlannerNode(
-        model=get_chat_model(settings.plot_model), brief=brief, outline=outline
-    ).ainvoke()
-    save_json(run_dir, "page_plan.json", plan)
-
-    print(f"\n{'-' * 66}\nPage plan ({len(plan.pages)} pages)\n{'-' * 66}")
-    for page in plan.pages:
-        print(f"  p{page.page_number} (beat {page.beat_position}) {page.setting}")
-        print(f"     shows:  {page.visual_action}")
-        print(f"     inside: {page.emotional_shift}")
-        if page.page_turn_hook:
-            print(f"     hook:   {page.page_turn_hook}")
-
     if args.stage == "plot":
+        # Only this path calls the Plot Planner directly. A full run gets its
+        # page plan from the workflow as `plan_pages-1.json`; producing a second
+        # one here for display is the same trap one stage down -- two plans that
+        # disagree, and no way to tell from the filename which the book used.
+        plan = await PlotPlannerNode(
+            model=get_chat_model(settings.plot_model), brief=brief, outline=outline
+        ).ainvoke()
+        save_json(run_dir, "page_plan.json", plan)
+
+        print(f"\n{'-' * 66}\nPage plan ({len(plan.pages)} pages)\n{'-' * 66}")
+        for page in plan.pages:
+            print(f"  p{page.page_number} (beat {page.beat_position}) {page.setting}")
+            print(f"     shows:  {page.visual_action}")
+            print(f"     inside: {page.emotional_shift}")
+            if page.page_turn_hook:
+                print(f"     hook:   {page.page_turn_hook}")
+
         save_json(
             run_dir,
             "meta.json",
@@ -341,23 +370,10 @@ async def run_stages(
         )
         return 0
 
-    # The full pipeline re-runs planning. Wasteful, and deliberately so: this path
-    # must exercise the workflow exactly as the MCP tool does, and stitching a
-    # half-finished run into it would be testing something else.
-    #
-    # One numbered file per completed task. The revision loops run inside the
-    # workflow, so the returned Story shows only the drafts that survived --
-    # `critique_outline-1.json` holding an empty review list is the single most
-    # useful fact in a run, because it says the critic approved on the first
-    # pass, and that is what validates or kills the MAX_*_REVISIONS default of 2.
-    iterations: dict[str, int] = {}
-
-    def save_iteration(task_name: str, value: object) -> None:
-        index = iterations[task_name] = iterations.get(task_name, 0) + 1
-        if isinstance(value, BaseModel):
-            save_json(run_dir, f"{task_name}-{index}.json", value)
-
-    story = await run_story_pipeline(brief, on_task_result=save_iteration)
+    # Built from the outline above -- the same object, not a re-plan. This path
+    # now exercises the workflow exactly as the MCP tool does, because the tool
+    # threads an outline in too.
+    story = await run_story_pipeline(brief, outline, on_task_result=save_iteration)
     save_json(run_dir, "story.json", story)
     if run_dir is not None:
         (run_dir / "story.md").write_text(

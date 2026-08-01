@@ -23,6 +23,12 @@ from sparkstory.nodes.story_planner import StoryPlannerNode, plan_story
 
 PLANNER_FACTORY = "sparkstory.nodes.story_planner.get_chat_model"
 
+#: The tool no longer routes through the node's factory: it runs the outline
+#: workflow, which builds its own models. Two constants rather than one because
+#: the two are genuinely different seams now, and a tool test patching the node's
+#: factory would reach a *real* model and quietly make a network call.
+TOOL_FACTORY = "sparkstory.workflows.plan_outline.get_chat_model"
+
 
 class TestStoryPlannerNode:
     async def test_returns_the_models_outline(
@@ -95,7 +101,7 @@ class TestToolErrorTranslation:
                 "Model 'gemini-3.5-flash' requires GOOGLE_API_KEY, which is not set."
             )
 
-        monkeypatch.setattr(PLANNER_FACTORY, raise_missing_key)
+        monkeypatch.setattr(TOOL_FACTORY, raise_missing_key)
         with pytest.raises(ToolError, match="GOOGLE_API_KEY"):
             await plan_story_tool(brief)
 
@@ -107,7 +113,7 @@ class TestToolErrorTranslation:
                 "Unknown model_id 'nope'. Known models: gemini-3.5-flash."
             )
 
-        monkeypatch.setattr(PLANNER_FACTORY, raise_unknown)
+        monkeypatch.setattr(TOOL_FACTORY, raise_unknown)
         with pytest.raises(ToolError, match="Known models"):
             await plan_story_tool(brief)
 
@@ -119,7 +125,7 @@ class TestToolErrorTranslation:
         def raise_bug(*_: Any, **__: Any) -> None:
             raise ZeroDivisionError("a real bug")
 
-        monkeypatch.setattr(PLANNER_FACTORY, raise_bug)
+        monkeypatch.setattr(TOOL_FACTORY, raise_bug)
         with pytest.raises(ZeroDivisionError):
             await plan_story_tool(brief)
 
@@ -144,7 +150,7 @@ class TestToolErrorTranslation:
         def raise_builtin(*_: Any, **__: Any) -> None:
             raise builtin_error
 
-        monkeypatch.setattr(PLANNER_FACTORY, raise_builtin)
+        monkeypatch.setattr(TOOL_FACTORY, raise_builtin)
         with pytest.raises(type(builtin_error)):
             await plan_story_tool(brief)
 

@@ -20,16 +20,22 @@ from fastmcp.exceptions import ToolError
 
 from sparkstory.entities.exceptions import ConfigurationError
 from sparkstory.entities.stories import StoryBrief, StoryOutline
-from sparkstory.nodes.story_planner import plan_story
 from sparkstory.utils.logging_utils import get_logger
+from sparkstory.workflows.plan_outline import run_outline_pipeline
 
 logger = get_logger(__name__)
 
 
 async def plan_story_tool(brief: StoryBrief) -> StoryOutline:
-    """Plan a story, mapping configuration failures to client-facing errors."""
+    """Plan a story and revise it until a critic approves.
+
+    No longer a bare planner call. The outline this returns is the one a parent
+    approves *and* the one ``write_story`` builds from, so it runs the same
+    revision loop the pipeline used to run internally -- 2-4 model calls rather
+    than 1. Errors are translated exactly as before: only ``ConfigurationError``.
+    """
     try:
-        return await plan_story(brief)
+        return await run_outline_pipeline(brief)
     except ConfigurationError as exc:
         # Operator error with a known fix. The original messages already name the
         # variable to set or list the valid model ids, so pass them through.

@@ -26,10 +26,9 @@ approval before proceeding -- the outline determines everything downstream, and
 changing it later means discarding work. The `create_storybook` prompt walks
 through this whole flow, including the confirmation step.
 
-Once the user is happy, `write_story` produces the finished book: the same
-planning, laid out across pages, with the words written for every page. It is
-slower and costs several model calls, so do not call it on a premise the user
-has not agreed to.
+Once the user is happy, `write_story` produces the finished book from the outline
+`plan_story` returned -- pass it through unchanged. It is slower and costs several
+model calls, so do not call it on a premise the user has not agreed to.
 
 Every story is written for a specific child. Always establish their name, age
 and pronouns before calling a tool. Never guess pronouns from a name."""

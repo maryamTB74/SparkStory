@@ -23,7 +23,10 @@ The answer depends on which model plays the client, so ``--model`` exists and a
 single run proves little on its own. A small model disobeying says little about a
 frontier one, and vice versa.
 
-Costs roughly four client calls plus up to two real ``plan_story`` calls.
+Costs roughly six client calls plus up to two real ``plan_story`` calls, each of
+which now runs the outline critic. ``write_story`` is **inspected, never called**:
+its arguments answer the question, and running it would buy a whole book to learn
+nothing more.
 
 Examples::
 
@@ -57,6 +60,8 @@ OPENING_MESSAGE = (
 )
 
 FOLLOW_UP_MESSAGE = "Make Maryam the one who wants to go, not the fox."
+
+APPROVAL_MESSAGE = "That's perfect, yes. Please write it."
 
 
 def parse_args() -> argparse.Namespace:
@@ -156,6 +161,46 @@ async def main() -> int:
             messages.append(HumanMessage(content=FOLLOW_UP_MESSAGE))
             fourth = await model.ainvoke(messages)
             calls_4 = report_turn("TURN 4 -- change requested", fourth)
+            messages.append(fourth)
+
+        # --- Turns 5 and 6: approve, and watch what it sends to write_story -
+        #
+        # The hardest thing the prompt asks for, and the reason this harness had
+        # to grow past turn 4: `write_story` takes the outline as an argument
+        # now, so the client must carry a structured object out of one tool
+        # result and into another tool's arguments. Nothing before this turn
+        # tests that, and a client that gets it wrong gets an error rather than
+        # a book.
+        #
+        # The write_story call is inspected, never executed. Its arguments are
+        # the whole answer, and running it would spend a full book's worth of
+        # calls to learn nothing more.
+        approved_outline: dict = {}
+        sent_outline: Any = None
+        calls_6: list[dict] = []
+        replanned = [c for c in calls_4 if c["name"] == "plan_story"]
+        if replanned:
+            call = replanned[0]
+            result = await client.call_tool("plan_story", call["args"])
+            approved_outline = result.structured_content or {}
+            messages.append(
+                ToolMessage(
+                    content=json.dumps(approved_outline, indent=2),
+                    tool_call_id=call["id"],
+                )
+            )
+            fifth = await model.ainvoke(messages)
+            report_turn("TURN 5 -- revised outline returned", fifth)
+            messages.append(fifth)
+
+            messages.append(HumanMessage(content=APPROVAL_MESSAGE))
+            sixth = await model.ainvoke(messages)
+            calls_6 = report_turn("TURN 6 -- approved, write it", sixth)
+            for c in calls_6:
+                if c["name"] == "write_story":
+                    sent_outline = c["args"].get("outline")
+                    print(f"outline arg: {'present' if sent_outline else 'MISSING'}")
+                    break
 
     print(f"\n{'=' * 70}\nVERDICTS   (client model: {args.model})\n{'=' * 70}")
     results = [
@@ -183,9 +228,51 @@ async def main() -> int:
             asked_first and "pronoun" in (first.content or "").lower(),
             "asked before planning" if asked_first else "planned without asking",
         ),
+        verdict(
+            "Q5  calls write_story once approved, with an outline argument",
+            sent_outline is not None,
+            f"approval turn requested {[c['name'] for c in calls_6] or 'nothing'}; "
+            f"outline argument {'present' if sent_outline else 'absent'}",
+        ),
+        verdict(
+            "Q6  passes back the outline plan_story returned, unchanged",
+            _same_outline(sent_outline, approved_outline),
+            _outline_diff(sent_outline, approved_outline),
+        ),
     ]
-    print(f"\n{sum(results)}/4 passed")
+    print(f"\n{sum(results)}/6 passed")
     return 0 if all(results) else 1
+
+
+def _same_outline(sent: Any, approved: dict) -> bool:
+    """Did the client thread the object through, or retype it?
+
+    The failure this catches is not a refusal -- it is a client that helpfully
+    rebuilds the outline from its own summary, producing a book built from a
+    plan the parent never saw. That is the exact defect the whole design was
+    changed to prevent, arriving through the client instead of the server.
+    """
+    return isinstance(sent, dict) and bool(approved) and sent == approved
+
+
+def _outline_diff(sent: Any, approved: dict) -> str:
+    if sent is None:
+        return "no outline was sent, so there is nothing to compare"
+    if not isinstance(sent, dict):
+        return f"outline arrived as {type(sent).__name__}, not an object"
+    if not approved:
+        return "no approved outline was captured"
+    if sent == approved:
+        return "byte-identical to what plan_story returned"
+    differing = sorted(
+        k for k in set(sent) | set(approved) if sent.get(k) != approved.get(k)
+    )
+    missing = sorted(set(approved) - set(sent))
+    return (
+        f"differs in {differing}"
+        + (f"; missing {missing}" if missing else "")
+        + " -- the client rebuilt the outline instead of passing it through"
+    )
 
 
 def _looks_like_a_full_outline(text: str) -> bool:

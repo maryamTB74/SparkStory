@@ -42,6 +42,19 @@ class TestToolRegistration:
         assert tool.description is not None
         assert "plan_story" in tool.description
 
+    async def test_write_story_takes_brief_and_outline(self) -> None:
+        """A client must pass the approved plan, not just the brief.
+
+        This is the schema half of the whole design: if `outline` were optional
+        the server would silently fall back to building a book the parent never
+        saw, which is precisely the defect this replaced.
+        """
+        async with Client(create_server()) as client:
+            tool = next(t for t in await client.list_tools() if t.name == "write_story")
+
+        assert {"brief", "outline"} <= set(tool.inputSchema["properties"])
+        assert set(tool.inputSchema.get("required", [])) == {"brief", "outline"}
+
 
 class TestClientVisibleSchema:
     """A client can only call what the schema fully describes."""
@@ -156,6 +169,31 @@ class TestPromptContent:
             f"the create_storybook prompt never mentions {sorted(missing)}, so a "
             "client following it cannot reach those tools"
         )
+
+    async def test_it_tells_the_client_to_pass_the_outline_on(self, text: str) -> None:
+        """The hardest thing this prompt asks for, and the flow breaks without it.
+
+        `write_story` requires the outline now, so a client that does not thread
+        the structured result of one tool into another tool's arguments gets an
+        error instead of a book.
+
+        Asserted against the line that *calls* the tool, not merely against a
+        line mentioning both words -- the old "an outline you edited by hand
+        never reaches the book" sentence satisfied that weaker check while
+        telling the client the opposite of what is now true.
+        """
+        call_lines = [ln for ln in text.splitlines() if "call `write_story`" in ln]
+        assert call_lines, "the prompt never tells the client to call write_story"
+        assert any("outline" in ln for ln in call_lines), (
+            "the write_story call instruction never mentions the outline"
+        )
+
+    async def test_it_does_not_call_planning_one_model_call(self, text: str) -> None:
+        """plan_story runs the outline critic now, so the old claim is false.
+
+        A client told planning is cheap will re-plan freely; it is 2-4 calls.
+        """
+        assert "one model call" not in text
 
     async def test_planning_comes_before_writing(self, text: str) -> None:
         """The order is the workflow. Reversed, the confirmation is pointless."""

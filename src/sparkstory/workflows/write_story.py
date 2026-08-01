@@ -24,15 +24,13 @@ from uuid import uuid4
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.func import entrypoint, task
-from langgraph.types import RetryPolicy, default_retry_on
 
 from sparkstory.config import settings
 from sparkstory.entities.exceptions import (
-    ConfigurationError,
     StoryStructureError,
     UnsafeContentError,
 )
-from sparkstory.entities.reviews import OutlineReviews, ProseReviews, ProseRubric
+from sparkstory.entities.reviews import ProseReviews, ProseRubric
 from sparkstory.entities.stories import (
     PagePlan,
     Story,
@@ -41,16 +39,14 @@ from sparkstory.entities.stories import (
     StoryProse,
 )
 from sparkstory.models.get_model import get_chat_model
-from sparkstory.nodes.outline_critic import OutlineCriticNode
 from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.prose_critic import ProseCriticNode
-from sparkstory.nodes.story_planner import StoryPlannerNode
 from sparkstory.nodes.writer import WriterNode
 from sparkstory.utils.logging_utils import get_logger
+from sparkstory.workflows.retries import RETRY_POLICY
 from sparkstory.workflows.reviews import (
     deterministic_prose_reviews,
     draft_score,
-    drop_unroutable_outline_reviews,
     drop_unroutable_prose_reviews,
     format_pacing_report,
 )
@@ -62,92 +58,6 @@ from sparkstory.workflows.validation import (
 )
 
 logger = get_logger(__name__)
-
-
-def _retry_on(exc: Exception) -> bool:
-    """Retry transient failures only.
-
-    LangGraph's ``default_retry_on`` declines to retry ``ValueError``, and
-    pydantic's ``ValidationError`` is one -- so schema failures are excluded for
-    free. It returns ``True`` for exception types it does not recognise, though,
-    which includes every error of ours. Both current kinds must be excluded, and
-    both exclusions were earned:
-
-    ``ConfigurationError``
-        Found by running it. A missing ``GOOGLE_API_KEY`` was retried three times,
-        printing three tracebacks for a problem whose fix is one line in ``.env``.
-        Trying again cannot make a key appear.
-
-    ``StoryStructureError``
-        Retrying re-sends an identical prompt and re-rolls the dice, while hiding
-        how often an agent gets a page count wrong -- exactly the frequency data
-        the evaluator-optimizer loop of a later session is designed from.
-
-    ``UnsafeContentError``
-        Retrying cannot make content safe. It is raised only after the Writer was
-        already shown the finding and failed to act on it, so an identical second
-        attempt buys nothing but latency.
-
-    Listed explicitly rather than excluding ``SparkStoryError`` wholesale: an
-    upstream ``ProviderError``, when one exists, *should* be retried.
-    """
-    if isinstance(exc, ConfigurationError | StoryStructureError | UnsafeContentError):
-        return False
-    return default_retry_on(exc)
-
-
-#:``max_attempts=3``, narrowed by ``_retry_on`` above.
-RETRY_POLICY = RetryPolicy(max_attempts=3, retry_on=_retry_on)
-
-
-@task(retry_policy=RETRY_POLICY)
-async def plan_outline(
-    request_id: str, brief: StoryBrief, reviews: OutlineReviews | None = None
-) -> StoryOutline:
-    """Stage 1: plan the story's structure, or revise it from reviews.
-
-    One task for both, because there is no editor node -- the generator does the
-    editing. Validation runs on a revision exactly as it does on a first draft:
-    a fix that breaks the beat cap must be caught, not trusted because a critic
-    asked for it.
-    """
-    logger.info(
-        "[%s] stage=plan model=%s revision=%s",
-        request_id,
-        settings.planner_model,
-        reviews is not None,
-    )
-    node = StoryPlannerNode(
-        model=get_chat_model(settings.planner_model),
-        brief=brief,
-        reviews=reviews,
-    )
-    outline = await node.ainvoke()
-    validate_outline(brief, outline)
-    return outline
-
-
-@task(retry_policy=RETRY_POLICY)
-async def critique_outline(
-    request_id: str, brief: StoryBrief, outline: StoryOutline
-) -> OutlineReviews:
-    """Judge the plan before any prose is paid for.
-
-    An empty review list is the signal that the plan is good, not a failure to
-    review -- see the loop in ``story_workflow``.
-    """
-    logger.info(
-        "[%s] stage=critique_outline model=%s",
-        request_id,
-        settings.outline_critic_model,
-    )
-    node = OutlineCriticNode(
-        model=get_chat_model(settings.outline_critic_model),
-        brief=brief,
-        outline=outline,
-        max_reviews=settings.max_reviews_per_pass,
-    )
-    return drop_unroutable_outline_reviews(await node.ainvoke(), outline)
 
 
 @task(retry_policy=RETRY_POLICY)
@@ -239,54 +149,13 @@ def build_story_workflow(
     async def story_workflow(payload: StoryWorkflowInput) -> Story:
         request_id = payload["request_id"]
         brief = payload["brief"]
+        outline = payload["outline"]
 
-        outline = await plan_outline(request_id, brief)
-
-        # A plain `for` in the entrypoint body, as brown's generate_article.py
-        # does it. Safe against the resume trap: this body re-executes when a run
-        # resumes, but every @task inside is replayed from the checkpoint, so the
-        # control flow repeats without re-paying for a single call.
-        #
-        # `+ 1` so that *every* draft gets critiqued, including the last. Two
-        # reasons, and both were earned by running it. Scoring drafts to keep the
-        # best one is impossible if the final draft is never scored -- it would
-        # be discarded unseen, making a cap of 2 behave like 1. And a loop that
-        # ends on an unreviewed revision cannot say whether it converged.
-        best_outline, best_outline_score = outline, None
-        for attempt in range(settings.max_outline_revisions + 1):
-            reviews = await critique_outline(request_id, brief, outline)
-            score = draft_score(reviews.reviews)
-            if best_outline_score is None or score < best_outline_score:
-                best_outline, best_outline_score = outline, score
-            if not reviews.reviews:
-                logger.info(
-                    "[%s] outline approved after %d revision(s)", request_id, attempt
-                )
-                break
-            if attempt == settings.max_outline_revisions:
-                # Keeping the best draft rather than raising: a plan a critic
-                # still dislikes is worse than one it approved, and far better
-                # than no book at all.
-                logger.warning(
-                    "[%s] outline still has %d finding(s) after %d revision(s)",
-                    request_id,
-                    len(reviews.reviews),
-                    settings.max_outline_revisions,
-                )
-                break
-            logger.info(
-                "[%s] revising outline: %d finding(s), attempt %d/%d",
-                request_id,
-                len(reviews.reviews),
-                attempt + 1,
-                settings.max_outline_revisions,
-            )
-            outline = await plan_outline(request_id, brief, reviews)
-
-        # The best draft seen, not the last. A later revision can be worse: the
-        # critic cannot reliably tell a feeling shown subtly from one that is
-        # absent, so it re-flags a good page and the generator degrades it.
-        outline = best_outline
+        # The outline arrives from the caller, so this validates *someone else's*
+        # data -- in the MCP flow, an outline an LLM client threaded through from
+        # plan_story. It can be stale, hand-edited or invented. Checked before a
+        # single model call is paid for.
+        validate_outline(brief, outline)
 
         page_plan = await plan_pages(request_id, brief, outline)
         prose = await write_prose(request_id, brief, outline, page_plan)
@@ -356,15 +225,19 @@ STORY_WORKFLOW = build_story_workflow()
 
 async def run_story_pipeline(
     brief: StoryBrief,
+    outline: StoryOutline,
     on_task_result: Callable[[str, Any], None] | None = None,
 ) -> Story:
-    """Write a complete story from a brief.
+    """Write a complete story from a brief and an approved plan.
 
     Mints the ``request_id`` here rather than inside the workflow, so it survives
     a resume -- see :class:`~sparkstory.workflows.types.StoryWorkflowInput`.
 
     Args:
         brief: What to write.
+        outline: The approved plan to build from. Produced by
+            ``run_outline_pipeline``. Never planned here: the whole point is
+            that the book matches the outline a parent was shown.
         on_task_result: Called with ``(task_name, result)`` as each ``@task``
             completes, including every loop iteration. The revision loops run
             inside the entrypoint, so the returned ``Story`` shows only the
@@ -376,8 +249,8 @@ async def run_story_pipeline(
     Raises:
         MissingAPIKeyError: a configured model's API key is not set.
         UnknownModelError: a ``*_MODEL`` setting is not a known model id.
-        StoryStructureError: an agent's output was well-formed but structurally
-            wrong.
+        StoryStructureError: the outline does not fit the brief, or an agent's
+            output was well-formed but structurally wrong.
         UnsafeContentError: a safety finding survived every rewrite, so no book
             is returned.
     """
@@ -397,7 +270,7 @@ async def run_story_pipeline(
     # task, keyed by task name; the entrypoint's own return arrives the same way.
     story: Story | None = None
     async for update in STORY_WORKFLOW.astream(
-        StoryWorkflowInput(request_id=request_id, brief=brief),
+        StoryWorkflowInput(request_id=request_id, brief=brief, outline=outline),
         stream_mode="updates",
     ):
         for name, value in update.items():

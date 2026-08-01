@@ -9,6 +9,7 @@ these were fused, neither would be possible without spawning a subprocess.
 from fastmcp import FastMCP
 
 from sparkstory.config import settings
+from sparkstory.mcp.routers.prompts import register_mcp_prompts
 from sparkstory.mcp.routers.tools import register_mcp_tools
 from sparkstory.utils.logging_utils import configure_logging, get_logger
 
@@ -22,7 +23,8 @@ SparkStory plans and writes personalised, illustrated children's storybooks.
 Start by planning a story with `plan_story`, which returns a title, theme,
 characters and ordered beats. Show the outline to the user and get their
 approval before proceeding -- the outline determines everything downstream, and
-changing it later means discarding work.
+changing it later means discarding work. The `create_storybook` prompt walks
+through this whole flow, including the confirmation step.
 
 Once the user is happy, `write_story` produces the finished book: the same
 planning, laid out across pages, with the words written for every page. It is
@@ -44,6 +46,7 @@ def create_server() -> FastMCP:
     )
 
     register_mcp_tools(mcp)
+    register_mcp_prompts(mcp)
 
     logger.info(
         "%s v%s ready (planner model: %s)",

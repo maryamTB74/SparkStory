@@ -20,11 +20,18 @@ from langgraph.func import entrypoint, task
 
 from sparkstory.config import settings
 from sparkstory.entities.exceptions import StoryStructureError
+from sparkstory.entities.grounding import StoryGrounding
 from sparkstory.entities.reviews import OutlineReviews
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.outline_critic import OutlineCriticNode
+from sparkstory.nodes.researcher import ResearcherNode, build_researcher_agent
 from sparkstory.nodes.story_planner import StoryPlannerNode
+from sparkstory.retrieval.embed import get_embedder
+from sparkstory.retrieval.hybrid import HybridIndex
+from sparkstory.retrieval.provenance import drop_unprovenanced
+from sparkstory.retrieval.store import LocalVectorStore
+from sparkstory.retrieval.tools import build_retrieval_tools
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.retries import RETRY_POLICY
 from sparkstory.workflows.reviews import draft_score, drop_unroutable_outline_reviews
@@ -34,9 +41,66 @@ from sparkstory.workflows.validation import validate_outline
 logger = get_logger(__name__)
 
 
+def build_research_context() -> tuple[Any, LocalVectorStore]:
+    """Build the research agent and the store its tools search.
+
+    Returned together because the store is needed twice: the tools search it, and
+    provenance filtering asks it whether a cited chunk exists.
+
+    A named function rather than inline construction so tests can replace the whole
+    research half in one patch -- the same seam shape as ``get_chat_model`` in this
+    module, and patched here rather than at its definition for the same reason.
+
+    Built per call rather than cached. The index is 58 chunks, so re-reading it
+    costs a file read, while caching it would serve a stale index after a re-ingest
+    without anything saying so. Model weights *are* cached, inside ``get_embedder``.
+    """
+    store = LocalVectorStore(
+        root=settings.knowledge_root,
+        embedder=get_embedder(settings.embedding_model),
+    )
+    agent = build_researcher_agent(
+        model=get_chat_model(settings.researcher_model),
+        tools=build_retrieval_tools(HybridIndex(store=store)),
+    )
+    return agent, store
+
+
+@task(retry_policy=RETRY_POLICY)
+async def research(request_id: str, brief: StoryBrief) -> StoryGrounding:
+    """Stage 0: find what this story must not get wrong, before it is planned.
+
+    The only stage that chooses its own actions -- it decides whether to search at
+    all, which collection to search, and what to search for.
+
+    Provenance filtering runs here rather than in the entrypoint so that the
+    artifact this task reports is the grounding that was actually *used*. Facts the
+    corpus cannot support never reach the planner, and never appear in a run
+    artifact as though they had.
+
+    Exceptions are deliberately allowed to propagate, so ``RETRY_POLICY`` still
+    applies to a transient provider failure. The decision to continue without
+    grounding is made by the caller -- see ``outline_workflow``.
+    """
+    logger.info(
+        "[%s] stage=research model=%s max_steps=%d",
+        request_id,
+        settings.researcher_model,
+        settings.max_research_steps,
+    )
+    agent, store = build_research_context()
+    grounding = await ResearcherNode(
+        agent=agent, brief=brief, max_steps=settings.max_research_steps
+    ).ainvoke()
+    return drop_unprovenanced(grounding, store)
+
+
 @task(retry_policy=RETRY_POLICY)
 async def plan_outline(
-    request_id: str, brief: StoryBrief, reviews: OutlineReviews | None = None
+    request_id: str,
+    brief: StoryBrief,
+    reviews: OutlineReviews | None = None,
+    grounding: StoryGrounding | None = None,
 ) -> StoryOutline:
     """Stage 1: plan the story's structure, or revise it from reviews.
 
@@ -55,6 +119,7 @@ async def plan_outline(
         model=get_chat_model(settings.planner_model),
         brief=brief,
         reviews=reviews,
+        grounding=grounding,
     )
     outline = await node.ainvoke()
     validate_outline(brief, outline)
@@ -98,7 +163,28 @@ def build_outline_workflow(
         request_id = payload["request_id"]
         brief = payload["brief"]
 
-        outline = await plan_outline(request_id, brief)
+        # Fail open, and this is the one place that decides it. Grounding is
+        # enrichment: a book with no retrieved facts is a book, while no book at
+        # all is a failure -- the opposite of the safety gate, which fails closed.
+        # The rule is not "fail closed", it is "fail closed on harm, open on
+        # enrichment".
+        #
+        # Logged at ERROR rather than WARNING, with the exception, because the
+        # likeliest cause is a misconfigured provider and the symptom otherwise
+        # reads as "research found nothing" -- the difference between a one-line
+        # fix and an hour in the wrong layer.
+        grounding: StoryGrounding | None = None
+        if settings.max_research_steps > 0:
+            try:
+                grounding = await research(request_id, brief)
+            except Exception:
+                logger.exception(
+                    "[%s] research failed; planning without grounding", request_id
+                )
+        else:
+            logger.info("[%s] research skipped (MAX_RESEARCH_STEPS=0)", request_id)
+
+        outline = await plan_outline(request_id, brief, grounding=grounding)
 
         # A plain `for` in the entrypoint body, as brown's generate_article.py
         # does it. Safe against the resume trap: this body re-executes when a run
@@ -139,7 +225,10 @@ def build_outline_workflow(
                 attempt + 1,
                 settings.max_outline_revisions,
             )
-            outline = await plan_outline(request_id, brief, reviews)
+            # Grounding travels into the revision too. Without it a revised plan
+            # would silently lose every constraint the first draft was built to
+            # respect, and the critic would have no way to notice.
+            outline = await plan_outline(request_id, brief, reviews, grounding)
 
         # The best draft seen, not the last. A later revision can be worse: the
         # critic cannot reliably tell a feeling shown subtly from one that is

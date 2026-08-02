@@ -11,6 +11,7 @@ Each run is saved under ``outputs/<timestamp>-<premise-slug>/``:
 
     brief.json          exactly what was asked for -- the run is reproducible
     meta.json           which model ran each stage, and how long it took
+    research-N.json     what research found, after unprovenanced items were dropped
     plan_outline-N.json every outline draft, in order
     critique_outline-N  what the critic said about each one
     plan_pages-N.json   the page plan the book was written from
@@ -39,7 +40,8 @@ a sample, copy it somewhere tracked deliberately.
 Examples::
 
     uv run python scripts/write_one_story.py
-    uv run python scripts/write_one_story.py --stage plan          # cheapest
+    uv run python scripts/write_one_story.py --stage research      # cheapest
+    uv run python scripts/write_one_story.py --stage plan          # + outline loop
     uv run python scripts/write_one_story.py --stage plot          # + page plan
     uv run python scripts/write_one_story.py --debug               # log prompts
     uv run python scripts/write_one_story.py --level pre_reader --pages 6
@@ -70,11 +72,17 @@ from sparkstory.entities.stories import (
     Story,
     StoryBrief,
     Tone,
+    WorldRules,
 )
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
+from sparkstory.nodes.researcher import ResearcherNode
+from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import configure_logging
-from sparkstory.workflows.plan_outline import run_outline_pipeline
+from sparkstory.workflows.plan_outline import (
+    build_research_context,
+    run_outline_pipeline,
+)
 from sparkstory.workflows.write_story import run_story_pipeline
 
 logger = logging.getLogger(__name__)
@@ -107,6 +115,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tone", default=Tone.MAGICAL.value, choices=[t.value for t in Tone]
     )
+    parser.add_argument(
+        "--world-rules",
+        default=WorldRules.IMAGINATIVE.value,
+        choices=[rule.value for rule in WorldRules],
+        help=(
+            "How far the story's world must obey the real one. 'realistic' makes "
+            "every retrieved fact binding; 'imaginative' makes them detail the "
+            "premise may break."
+        ),
+    )
     parser.add_argument("--premise", default="a fox who wants to visit the moon")
     parser.add_argument("--pages", type=int, default=10)
     parser.add_argument("--interests", nargs="*", default=["foxes", "astronomy"])
@@ -114,9 +132,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--avoid", nargs="*", default=["spiders", "the dark"])
     parser.add_argument(
         "--stage",
-        choices=["plan", "plot", "all"],
+        choices=["research", "plan", "plot", "all"],
         default="all",
-        help="Stop after this stage. 'plan' is one model call; 'all' is three.",
+        help=(
+            "Stop after this stage. 'research' is the cheapest and needs no "
+            "planning; 'plan' runs the outline loop; 'all' writes the book."
+        ),
     )
     parser.add_argument(
         "--debug",
@@ -148,6 +169,7 @@ def build_brief(args: argparse.Namespace) -> StoryBrief:
         ),
         premise=args.premise,
         tone=Tone(args.tone),
+        world_rules=WorldRules(args.world_rules),
         page_count=args.pages,
         must_include=args.must_include,
         avoid=args.avoid,
@@ -203,11 +225,19 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
     return {
         "at": datetime.now().isoformat(timespec="seconds"),
         "stage_requested": args.stage,
+        # Not decoration. An A/B is two runs differing in one field, and a run
+        # whose artifacts do not say which mode produced them is not evidence --
+        # this project has already lost debugging time to reading the wrong
+        # artifact (finding E).
+        "world_rules": args.world_rules,
         "models": {
+            "researcher": settings.researcher_model,
+            "embedder": settings.embedding_model,
             "planner": settings.planner_model,
             "plot": settings.plot_model,
             "writer": settings.writer_model,
         },
+        "max_research_steps": settings.max_research_steps,
         "seconds": round(time.monotonic() - started, 1),
         "note": "the run's request_id appears in run.log",
         **extra,
@@ -312,6 +342,48 @@ async def run_stages(
         index = iterations[task_name] = iterations.get(task_name, 0) + 1
         if isinstance(value, BaseModel):
             save_json(run_dir, f"{task_name}-{index}.json", value)
+
+    if args.stage == "research":
+        # Called directly, exactly as `--stage plot` calls the Plot Planner: this
+        # path stops before any competing artifact exists, so there is no second
+        # version of anything to confuse it with. The full run gets its grounding
+        # from the workflow as `research-1.json` instead.
+        agent, store = build_research_context()
+        grounding = await ResearcherNode(
+            agent=agent, brief=brief, max_steps=settings.max_research_steps
+        ).ainvoke()
+        kept = drop_unprovenanced(grounding, store)
+        save_json(run_dir, "research.json", kept)
+
+        print(f"\n{'=' * 66}\n  Research\n{'=' * 66}")
+        print(f"\nfacts ({len(kept.facts)}):")
+        for item in kept.facts:
+            print(f"  - {item.story_note}")
+            print(f"      from {item.chunk_id} ({item.source})")
+            print(f"      claim: {item.claim}")
+        print(f"\ntechniques ({len(kept.craft_devices)}):")
+        for craft in kept.craft_devices:
+            print(f"  - {craft.device}: {craft.how_to_use}")
+            print(f"      from {craft.chunk_id}")
+        dropped = (len(grounding.facts) - len(kept.facts)) + (
+            len(grounding.craft_devices) - len(kept.craft_devices)
+        )
+        print(f"\ndropped as unprovenanced: {dropped}")
+
+        save_json(
+            run_dir,
+            "meta.json",
+            build_meta(
+                args,
+                started,
+                outcome="ok",
+                stage_run="research",
+                facts=len(kept.facts),
+                craft_devices=len(kept.craft_devices),
+                dropped_unprovenanced=dropped,
+            ),
+        )
+        return 0
 
     # Planned once, and this is the outline the book is built from -- there is no
     # second planning call any more. That is what retires the artifact trap:

@@ -132,6 +132,13 @@ class Settings(BaseSettings):
         alias="WRITER_MODEL",
         description="Model used by the Writer agent",
     )
+    # Research runs before planning, so this is now the *first* model call in a
+    # book. A broken value here fails the cheapest path in the system.
+    researcher_model: str = Field(
+        default="gemini-3.5-flash",
+        alias="RESEARCHER_MODEL",
+        description="Model used by the Researcher agent",
+    )
     outline_critic_model: str = Field(
         default="gemini-3.5-flash-critic",
         alias="OUTLINE_CRITIC_MODEL",
@@ -179,6 +186,44 @@ class Settings(BaseSettings):
         ge=1,
         alias="MAX_REVIEWS_PER_PASS",
         description="Cap on findings a critic may return in one pass",
+    )
+
+    # --- Research and retrieval ------------------------------------------
+    # Names an entry in `embedding_configs`, not `llm_configs`: an embedder takes
+    # no messages and binds no output schema, so it cannot be built by
+    # `get_chat_model`. Two registries, two factories.
+    embedding_model: str = Field(
+        default="potion-base-8M",
+        alias="EMBEDDING_MODEL",
+        description="Model used to embed corpus chunks and search queries",
+    )
+    # A ceiling, not a target. The task 1 spike answered in a single turn -- both
+    # tools called in parallel, then done -- so this has never been approached.
+    # `0` skips research altogether, mirroring MAX_*_REVISIONS, which is also
+    # what makes a grounded/ungrounded A/B possible with no code change.
+    max_research_steps: int = Field(
+        default=4,
+        ge=0,
+        alias="MAX_RESEARCH_STEPS",
+        description=(
+            "How many reasoning steps the Researcher may take. 0 skips research."
+        ),
+    )
+    retrieval_top_k: int = Field(
+        default=5,
+        ge=1,
+        alias="RETRIEVAL_TOP_K",
+        description="Candidates each retrieval tool returns for the agent to judge",
+    )
+    # Anchored to the repo root rather than left relative, for the same reason
+    # `env_file` is: a relative default resolves against the *process* working
+    # directory, and an MCP client starts this server from wherever it likes. The
+    # failure that would cause is "no index found" while the index plainly
+    # exists, which is the least debuggable kind.
+    knowledge_root: Path = Field(
+        default=_PROJECT_ROOT / "data" / "knowledge",
+        alias="KNOWLEDGE_ROOT",
+        description="Directory holding the built knowledge index",
     )
 
     # --- Validators -----------------------------------------------------
@@ -279,6 +324,22 @@ class Settings(BaseSettings):
             # at Grok, defaulting the critic to Google makes the loop's one
             # Google call the most likely thing in the run to fail -- and a 503
             # there tells us nothing about whether the critic works.
+            # The researcher decides which tool to call, not what to write, so it
+            # wants near-determinism -- but not 0.0: an agent choosing among tools
+            # benefits from a little slack, and unlike a critic it has no
+            # empty-list stop signal that noise could corrupt. Exists as a Grok
+            # entry for the same reason the Grok critic does (rule 21): the
+            # defaults name Google while a working .env pins everything to Grok,
+            # and research is now the *first* call in a book.
+            "grok-3-mini-researcher": {
+                "identifier": "openai:grok-3-mini",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                    "temperature": 0.2,
+                    "max_retries": 3,
+                },
+            },
             "grok-3-mini-critic": {
                 "identifier": "openai:grok-3-mini",
                 "api_key_env_var": "XAI_API_KEY",
@@ -287,6 +348,37 @@ class Settings(BaseSettings):
                     "temperature": 0.0,
                     "max_retries": 3,
                 },
+            },
+        }
+
+    # --- Embedding registry ---------------------------------------------
+    @property
+    def embedding_configs(self) -> dict[str, dict[str, Any]]:
+        """Registry of available embedding models.
+
+        Deliberately separate from ``llm_configs`` rather than a section within
+        it. A chat model is built by ``get_chat_model``, takes messages and binds
+        an output schema; an embedder is built by ``get_embedder``, takes strings
+        and returns vectors. Sharing one registry would mean one factory had to
+        branch on which kind an entry was.
+
+        No ``api_key_env_var``, and that absence is the point: these models run
+        locally. Every Google call in this project's history has failed with a
+        503, and xAI has no embeddings endpoint at all -- so an embedder that
+        needed a credential would put the whole retrieval layer behind the least
+        reliable dependency we have.
+
+        ``dimensions`` is recorded because the store writes one ``.npy`` of that
+        width. Changing it silently makes an existing index unreadable rather
+        than merely different, so it is pinned and tested.
+        """
+        return {
+            # 256-dim static embeddings, distilled so inference is essentially
+            # numpy. Measured in the task 1 spike: 3/3 at rank 1 on fact,
+            # paraphrase and structural-craft queries, 3.6s to load.
+            "potion-base-8M": {
+                "identifier": "minishlab/potion-base-8M",
+                "dimensions": 256,
             },
         }
 

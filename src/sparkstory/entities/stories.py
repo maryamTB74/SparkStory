@@ -63,6 +63,17 @@ class Tone(StrEnum):
     HEARTWARMING = "heartwarming"  # kind, friendship-focused
 
 
+# A different axis from `Tone`, and the pair is easy to conflate. Tone is
+# register -- how the story feels. This is physics -- whether the world may be
+# broken. A gentle story can break physics; an adventurous one can be strictly
+# real, so neither implies the other.
+class WorldRules(StrEnum):
+    """How far the story's world must obey the real one."""
+
+    REALISTIC = "realistic"  # every retrieved fact holds
+    IMAGINATIVE = "imaginative"  # facts are detail; the premise may break them
+
+
 # Naming the structural roles explicitly gives the planner a vocabulary for
 # story shape, rather than leaving it to emit an undifferentiated list of events.
 class NarrativeFunction(StrEnum):
@@ -128,6 +139,24 @@ class StoryBrief(BaseModel):
     tone: Tone = Field(
         default=Tone.GENTLE,
         description="The emotional register the story should hold.",
+    )
+    # The default is IMAGINATIVE, and that is a behaviour change: a caller who
+    # supplies nothing gets different planning than before this field existed.
+    # Chosen from evidence rather than compatibility -- on the standing "fox who
+    # wants to visit the moon" premise with tone=magical, the realistic
+    # rendering planned three failed launches and resolved with the child
+    # holding a paper tube up to the Moon, while the ungrounded control let the
+    # rocket fly. Anything wanting the old behaviour asks for realistic.
+    world_rules: WorldRules = Field(
+        default=WorldRules.IMAGINATIVE,
+        description=(
+            "How far this story's world must obey the real one. Choose "
+            "'realistic' when getting the real world right is part of the "
+            "point, and the story should never contradict it. Choose "
+            "'imaginative' when the idea itself is impossible -- a fox who "
+            "flies to the Moon -- and real-world detail is there to make the "
+            "impossible parts feel believable."
+        ),
     )
     # page_count belongs to the finished book, not to the outline: beats are
     # mapped onto pages by a later stage. Keeping them uncoupled means changing

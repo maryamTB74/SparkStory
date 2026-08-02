@@ -32,9 +32,10 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
 from sparkstory.config import settings
+from sparkstory.entities.grounding import StoryGrounding
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.reviews import OutlineReviews
-from sparkstory.entities.stories import StoryBrief, StoryOutline
+from sparkstory.entities.stories import StoryBrief, StoryOutline, WorldRules
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.base import Node
 from sparkstory.utils.logging_utils import get_logger
@@ -125,6 +126,71 @@ def render_outline_reviews(reviews: OutlineReviews) -> str:
     return "\n".join(lines)
 
 
+def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
+    """Render research findings as extra instructions for the planner.
+
+    **Only ``story_note`` is rendered. ``claim`` never is**, and that is the
+    whole point of splitting the two fields. This planner's prompt already forbids
+    a character reciting facts, and handing it a fact is handing it something to
+    recite -- non-obvious rule 13, where the laziest way to satisfy an instruction
+    is the one that gets taken. A rule about the world cannot be pasted into a
+    story; a sentence about the Moon can.
+
+    Same reasoning applies to ``source``: attribution matters for checking a claim
+    afterwards, and means nothing to a story planner, so it stays out of the prompt.
+
+    ``world_rules`` decides how the facts are framed, and it is deliberately a
+    *required* argument: a default here could drift from ``StoryBrief``'s default
+    and the divergence would be invisible, since both produce a perfectly valid
+    prompt. Only the facts half branches -- a refrain works in any genre, so craft
+    devices render identically either way.
+
+    Returns an empty string when there is nothing, so a brief with no grounding
+    renders byte-identically to how it rendered before this feature existed --
+    which keeps the provider-side prompt-cache prefix intact.
+    """
+    if not grounding.facts and not grounding.craft_devices:
+        return ""
+
+    lines = [""]
+    if grounding.facts:
+        if world_rules is WorldRules.REALISTIC:
+            lines += [
+                "This story is set in the real world, and these things are true of it.",
+                "Do not state them, explain them, or have anyone mention them. "
+                "Let the story simply obey them:",
+            ]
+        else:
+            # Facts as texture, not law. The one-big-lie principle: accurate
+            # furniture is what makes the impossible thing believable, so the
+            # retrieved facts earn their place by furnishing the world rather
+            # than by policing it. "break as few as you can" is the spec's
+            # recommendation B as wording rather than machinery -- asking the
+            # planner to nominate its violation would be one more decision it
+            # could get wrong, and asking it to be sparing is free.
+            lines += [
+                "These things are true of the real world. Use them as detail, to "
+                "make the impossible parts feel real: a story is more believable, "
+                "not less, when everything around the magic is accurate. The "
+                "premise may break them -- a fox may fly to the Moon -- but break "
+                "as few as you can, and never break one by accident.",
+                "Do not state them, explain them, or have anyone mention them:",
+            ]
+        lines += [f"- {fact.story_note}" for fact in grounding.facts]
+
+    if grounding.craft_devices:
+        lines += [
+            "",
+            "Build the story so this can work when it is read aloud:",
+        ]
+        lines += [
+            f"- {device.device}: {device.how_to_use}"
+            for device in grounding.craft_devices
+        ]
+
+    return "\n".join(lines)
+
+
 def render_story_brief(brief: StoryBrief) -> str:
     """Render a brief as the human-message half of the planner prompt."""
     child = brief.child
@@ -172,9 +238,14 @@ class StoryPlannerNode(Node):
         model: Runnable[Any, Any],
         brief: StoryBrief,
         reviews: OutlineReviews | None = None,
+        grounding: StoryGrounding | None = None,
     ) -> None:
         super().__init__(model)
         self.brief = brief
+        # What research found, or None when research was skipped or failed. Travels
+        # in the human turn beside the brief rather than in the system prompt,
+        # which stays a static constant so the cached prefix survives.
+        self.grounding = grounding
         # The generator is also the editor: its
         # `edit_based_on_reviews` rebuilds `ArticleWriter` with `reviews=` rather
         # than calling a separate node. One prompt, one voice, and no second set
@@ -207,9 +278,15 @@ class StoryPlannerNode(Node):
         )
         logger.debug("Brief premise: %r for child %r", brief.premise, brief.child.name)
 
+        request = render_story_brief(brief)
+        if self.grounding is not None:
+            # No new constructor argument: the brief is already on the node, and
+            # world rules belong to the brief rather than to the renderer.
+            request += render_grounding(self.grounding, self.brief.world_rules)
+
         messages: list[Any] = [
             SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
-            HumanMessage(content=render_story_brief(brief)),
+            HumanMessage(content=request),
         ]
         if self.reviews is not None:
             # The previous draft is replayed as the model's *own* turn, following

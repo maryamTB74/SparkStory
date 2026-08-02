@@ -8,7 +8,10 @@ asserting on.
 import importlib
 import pkgutil
 
+import pytest
+
 import sparkstory.nodes
+from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.stories import (
     ChildProfile,
@@ -16,11 +19,13 @@ from sparkstory.entities.stories import (
     ReadingLevel,
     StoryBrief,
     StoryOutline,
+    WorldRules,
 )
 from sparkstory.nodes.plot_planner import PLOT_PLANNER_SYSTEM_PROMPT
 from sparkstory.nodes.story_planner import (
     OUTLINE_REVISION_PROMPT_TEMPLATE,
     STORY_PLANNER_SYSTEM_PROMPT,
+    render_grounding,
     render_story_brief,
 )
 from sparkstory.nodes.writer import (
@@ -237,3 +242,176 @@ class TestOutlineRevisionPrompt:
         assert "keep everything that was not criticised" in (
             OUTLINE_REVISION_PROMPT_TEMPLATE.lower()
         )
+
+
+class TestRenderGrounding:
+    """What research found, as the planner sees it.
+
+    The assertion that matters is ``test_the_claim_itself_is_never_rendered``. The
+    planner prompt already says "do not have someone recite facts about planets",
+    and the laziest way to satisfy "use what research found" is to have a character
+    recite it -- non-obvious rule 13. Splitting `claim` from `story_note` only
+    helps if the claim genuinely never reaches the prompt.
+    """
+
+    def test_renders_each_note(self) -> None:
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter or drift.",
+                        source="NASA -- Earth's Moon",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            WorldRules.REALISTIC,
+        )
+        assert "Nothing outdoors can flutter or drift." in rendered
+
+    @pytest.mark.parametrize("world_rules", list(WorldRules))
+    def test_the_claim_itself_is_never_rendered(self, world_rules: WorldRules) -> None:
+        """In neither mode. Imaginative treats facts as texture rather than law,
+        which is exactly the reading under which handing over the raw claim would
+        seem harmless -- so this is checked in both."""
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter or drift.",
+                        source="NASA -- Earth's Moon",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            world_rules,
+        )
+        assert "The Moon has no air." not in rendered
+
+    def test_attribution_is_never_rendered(self) -> None:
+        """A source matters for checking a claim later and means nothing to a story
+        planner, so it is not worth a single token of its attention."""
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter.",
+                        source="NASA -- Earth's Moon",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            WorldRules.REALISTIC,
+        )
+        assert "NASA" not in rendered
+        assert "moon#1" not in rendered
+
+    @pytest.mark.parametrize("world_rules", list(WorldRules))
+    def test_both_modes_forbid_stating_the_note_aloud(
+        self, world_rules: WorldRules
+    ) -> None:
+        """The load-bearing assertion of the whole feature.
+
+        Facts-as-texture is what reintroduces the recital trap that splitting
+        `claim` from `story_note` was built to prevent: once a fact is "detail
+        that makes the magic believable", reciting it reads as using it. This one
+        sentence is the only thing standing between texture and a character
+        delivering a science lecture, and it is deliberately the *same* string in
+        both branches so the two cannot drift apart.
+        """
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter.",
+                        source="NASA",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            world_rules,
+        )
+        assert "Do not state them" in rendered
+
+    def test_realistic_mode_is_unchanged(self) -> None:
+        """Today's text, verbatim, so nothing regresses for a realistic story."""
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter.",
+                        source="NASA",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            WorldRules.REALISTIC,
+        )
+        assert "This story is set in the real world" in rendered
+        assert "Let the story simply obey them" in rendered
+
+    def test_imaginative_mode_permits_breaking_a_fact_but_sparingly(self) -> None:
+        """Three things this wording has to do at once, each from a live failure.
+
+        Facts are *detail* rather than law; the premise may break them, because
+        the run this feature exists to fix refused to let a paper rocket fly; and
+        breaks should be few, which is the spec's recommendation B expressed as
+        wording rather than as machinery the planner could get wrong.
+        """
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter.",
+                        source="NASA",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            WorldRules.IMAGINATIVE,
+        )
+        assert "Use them as detail" in rendered
+        assert "The premise may break them" in rendered
+        assert "break as few as you can" in rendered
+        assert "Let the story simply obey them" not in rendered
+
+    @pytest.mark.parametrize("world_rules", list(WorldRules))
+    def test_craft_devices_render_identically_in_both_modes(
+        self, world_rules: WorldRules
+    ) -> None:
+        """A refrain works in any genre, so the mode must not touch this half."""
+        rendered = render_grounding(
+            StoryGrounding(
+                craft_devices=[
+                    CraftDevice(
+                        device="refrain",
+                        how_to_use="Repeat one line at each of the three attempts.",
+                        chunk_id="goose#1",
+                    )
+                ]
+            ),
+            world_rules,
+        )
+        assert "refrain" in rendered
+        assert "three attempts" in rendered
+
+    @pytest.mark.parametrize("world_rules", list(WorldRules))
+    def test_empty_grounding_renders_nothing_at_all(
+        self, world_rules: WorldRules
+    ) -> None:
+        """So a brief with no grounding produces a byte-identical prompt to the one
+        this project sent before research existed -- which is what keeps the
+        provider-side cached prefix, and every existing prompt test, intact. True
+        in both modes, or the mode itself would change an ungrounded prompt."""
+        assert render_grounding(StoryGrounding(), world_rules) == ""
+
+    def test_a_brief_with_no_grounding_is_unchanged(self, brief: StoryBrief) -> None:
+        assert render_story_brief(brief) + render_grounding(
+            StoryGrounding(), brief.world_rules
+        ) == (render_story_brief(brief))

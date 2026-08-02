@@ -13,6 +13,8 @@ from typing import Any
 
 import pytest
 
+from sparkstory.config import settings
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.reviews import (
     OutlineReview,
     OutlineReviewsOutput,
@@ -21,6 +23,7 @@ from sparkstory.entities.reviews import (
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.mcp.tools.plan_story import plan_story_tool
 from sparkstory.models.fake_model import FakeModel
+from sparkstory.retrieval.chunks import Chunk, SourceKind
 from sparkstory.workflows.plan_outline import run_outline_pipeline
 
 OUTLINE_FACTORY = "sparkstory.workflows.plan_outline.get_chat_model"
@@ -191,7 +194,7 @@ class TestRunOutlinePipeline:
         outline_fakes()
         seen: list[str] = []
         await run_outline_pipeline(brief, on_task_result=lambda n, _v: seen.append(n))
-        assert seen == ["plan_outline", "critique_outline"]
+        assert seen == ["research", "plan_outline", "critique_outline"]
 
 
 class TestPlanStoryToolRunsTheCritic:
@@ -217,3 +220,199 @@ class TestPlanStoryToolRunsTheCritic:
         assert len(fakes[StoryOutline].calls) == 2, (
             "the preview must revise, or a parent approves an uncritiqued plan"
         )
+
+
+# --- Research ------------------------------------------------------------
+RESEARCH_CONTEXT = "sparkstory.workflows.plan_outline.build_research_context"
+
+
+class _StubStore:
+    """Answers ``get`` and nothing else, which is all provenance filtering uses."""
+
+    def __init__(self, *chunk_ids: str) -> None:
+        self._chunks = {
+            chunk_id: Chunk(
+                chunk_id=chunk_id,
+                text="The Moon has no air.",
+                title="The Moon",
+                source="NASA -- Earth's Moon",
+                licence="public domain",
+                source_kind=SourceKind.FACT,
+            )
+            for chunk_id in chunk_ids
+        }
+
+    def get(self, chunk_id: str) -> Chunk | None:
+        return self._chunks.get(chunk_id)
+
+
+class _StubResearchAgent:
+    def __init__(self, result: Any) -> None:
+        self._result = result
+
+    async def ainvoke(self, payload: dict, **_: Any) -> dict:
+        if isinstance(self._result, Exception):
+            raise self._result
+        return {"structured_response": self._result, "messages": []}
+
+
+def _grounded_fact(chunk_id: str = "moon#1") -> GroundedFact:
+    return GroundedFact(
+        claim="The Moon has no air.",
+        story_note="Nothing outdoors can flutter or make a sound.",
+        source="NASA -- Earth's Moon",
+        chunk_id=chunk_id,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_research(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Stub the research seam for *every* test in this module.
+
+    Autouse, and that is a correctness requirement rather than convenience. Research
+    now runs before planning on the default path, so a test that only faked
+    ``get_chat_model`` would reach the real ``build_research_context`` -- loading
+    embedding weights from disk and attempting a live provider call, then failing
+    open so the test still *looked* fine. One such test took 25 seconds and quietly
+    broke the offline guarantee this suite has held since Session 1.
+
+    Patched once, reading a mutable holder, so ``fake_research`` can change the
+    result without a second ``setattr`` whose ordering against this one would depend
+    on fixture resolution order.
+    """
+    holder: dict[str, Any] = {"result": StoryGrounding(), "chunks": ("moon#1",)}
+    monkeypatch.setattr(
+        RESEARCH_CONTEXT,
+        lambda: (
+            _StubResearchAgent(holder["result"]),
+            _StubStore(*holder["chunks"]),
+        ),
+    )
+    return holder
+
+
+@pytest.fixture
+def fake_research(_stub_research: dict[str, Any]) -> Callable[..., None]:
+    """Override what the stubbed researcher returns for one test."""
+
+    def build(result: Any, known_chunks: tuple[str, ...] = ("moon#1",)) -> None:
+        _stub_research["result"] = result
+        _stub_research["chunks"] = known_chunks
+
+    return build
+
+
+class TestResearchRunsBeforePlanning:
+    async def test_grounding_is_reported_as_a_completed_task(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+    ) -> None:
+        """So the debug script writes research-1.json with no extra code."""
+        outline_fakes()
+        fake_research(StoryGrounding(facts=[_grounded_fact()]))
+
+        seen: dict[str, Any] = {}
+        await run_outline_pipeline(
+            brief, on_task_result=lambda n, v: seen.setdefault(n, v)
+        )
+
+        assert isinstance(seen["research"], StoryGrounding)
+        assert seen["research"].facts[0].chunk_id == "moon#1"
+
+    async def test_research_runs_first(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+    ) -> None:
+        """Order is the point of the whole session: a constraint discovered after
+        the plan exists cannot shape it."""
+        outline_fakes()
+        fake_research(StoryGrounding())
+
+        order: list[str] = []
+        await run_outline_pipeline(brief, on_task_result=lambda n, _v: order.append(n))
+        assert order[0] == "research"
+
+    async def test_unprovenanced_facts_are_dropped_before_planning(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+    ) -> None:
+        """An invented chunk id never reaches the planner, so a fabricated fact
+        cannot shape a story even once."""
+        outline_fakes()
+        fake_research(
+            StoryGrounding(
+                facts=[_grounded_fact("moon#1"), _grounded_fact("atlantis#9")]
+            )
+        )
+
+        seen: dict[str, Any] = {}
+        await run_outline_pipeline(
+            brief, on_task_result=lambda n, v: seen.setdefault(n, v)
+        )
+        assert [f.chunk_id for f in seen["research"].facts] == ["moon#1"]
+
+
+class TestResearchCanBeSwitchedOff:
+    async def test_zero_steps_skips_research_entirely(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """MAX_RESEARCH_STEPS=0 is what makes the grounded/ungrounded A/B possible
+        with no code change -- and it must skip the step, not run it with no
+        budget."""
+        outline_fakes()
+        fake_research(StoryGrounding(facts=[_grounded_fact()]))
+        monkeypatch.setattr(settings, "max_research_steps", 0)
+
+        seen: list[str] = []
+        await run_outline_pipeline(brief, on_task_result=lambda n, _v: seen.append(n))
+        assert "research" not in seen
+
+    async def test_zero_steps_still_produces_an_outline(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        outline_fakes()
+        monkeypatch.setattr(settings, "max_research_steps", 0)
+        assert await run_outline_pipeline(brief) == outline
+
+
+class TestResearchFailsOpen:
+    async def test_a_broken_researcher_still_yields_a_book(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """The decision recorded in the spec: fail closed on harm, open on
+        enrichment. Grounding is enrichment, so a provider failure here costs the
+        facts, not the story."""
+        outline_fakes()
+        fake_research(RuntimeError("provider exploded"))
+        assert await run_outline_pipeline(brief) == outline
+
+    async def test_a_missing_index_still_yields_a_book(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """Nobody has run the ingestion script. Everything is unprovenanced, so
+        everything is dropped, and the run continues."""
+        outline_fakes()
+        fake_research(StoryGrounding(facts=[_grounded_fact()]), known_chunks=())
+        assert await run_outline_pipeline(brief) == outline

@@ -11,6 +11,8 @@ was unreachable until a .env file declared the variable blank. .env files are
 gitignored, so the trigger was never in the repository.
 """
 
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr
 
@@ -73,9 +75,16 @@ class TestModelRegistry:
         }
         assert configured, "no *_model settings found -- the discovery broke"
         for name, value in configured.items():
-            assert value in settings.llm_configs, (
-                f"{name}={value!r} is not a key of llm_configs"
+            # `embedding_model` also ends in `_model` but names an entry in a
+            # different registry: an embedder takes no messages and binds no
+            # output schema, so it cannot live in `llm_configs`. Routed by name
+            # rather than skipped, so it stays covered.
+            registry = (
+                settings.embedding_configs
+                if name == "embedding_model"
+                else settings.llm_configs
             )
+            assert value in registry, f"{name}={value!r} is not in its registry"
 
     def test_every_entry_is_well_formed(self) -> None:
         for name, cfg in settings.llm_configs.items():
@@ -147,3 +156,80 @@ class TestCriticSettings:
         fresh = Settings(max_outline_revisions=0, max_prose_revisions=0)
         assert fresh.max_outline_revisions == 0
         assert fresh.max_prose_revisions == 0
+
+
+class TestEmbeddingRegistry:
+    """The second registry. Mirrors `llm_configs`, minus the credential."""
+
+    def test_the_default_embedder_exists(self) -> None:
+        fresh = Settings()
+        assert fresh.embedding_model == "potion-base-8M"
+        assert fresh.embedding_model in fresh.embedding_configs
+
+    def test_every_entry_is_well_formed(self) -> None:
+        for name, cfg in Settings().embedding_configs.items():
+            assert cfg.get("identifier"), f"{name} missing identifier"
+            assert cfg.get("dimensions"), f"{name} missing dimensions"
+
+    def test_no_entry_needs_an_api_key(self) -> None:
+        """A local model needs no credential, and that is the whole reason it was
+        chosen: every Google call in this project's history has failed, and xAI
+        has no embeddings endpoint. An entry that grew an `api_key_env_var` would
+        mean that property had quietly been given up."""
+        for name, cfg in Settings().embedding_configs.items():
+            assert "api_key_env_var" not in cfg, f"{name} requires a key"
+
+    def test_dimensions_match_the_model_that_was_measured(self) -> None:
+        """Pinned from the task 1 spike, which measured 256. The store writes
+        one .npy of this width, so a silent change would make an existing index
+        unreadable rather than merely different."""
+        assert Settings().embedding_configs["potion-base-8M"]["dimensions"] == 256
+
+
+class TestResearchSettings:
+    def test_defaults(self) -> None:
+        fresh = Settings()
+        assert fresh.max_research_steps == 4
+        assert fresh.retrieval_top_k == 5
+        assert fresh.knowledge_root.parts[-2:] == ("data", "knowledge")
+
+    def test_the_default_index_path_is_absolute(self) -> None:
+        """Non-obvious rules 4 and 6, in a new place. A relative default resolves
+        against the *process* working directory, and an MCP client launches this
+        server from wherever it likes -- so the failure would be "no index found"
+        while data/knowledge plainly has one. Anchored to the repo root instead."""
+        assert Settings().knowledge_root.is_absolute()
+
+    def test_an_explicit_root_is_respected(self) -> None:
+        """Whatever an operator sets wins, absolute or not: the anchoring is a
+        default, not a policy."""
+        assert Settings(knowledge_root=Path("/tmp/elsewhere")).knowledge_root == Path(
+            "/tmp/elsewhere"
+        )
+
+    def test_research_can_be_switched_off_entirely(self) -> None:
+        """0 skips research rather than running it with no budget, mirroring
+        MAX_*_REVISIONS. This is also what makes the A/B acceptance test possible
+        with no code change: one run grounded, one not, same premise."""
+        assert Settings(max_research_steps=0).max_research_steps == 0
+
+    def test_a_researcher_entry_exists_for_the_provider_in_use(self) -> None:
+        """Same reasoning as the critic entries: the defaults point at Google
+        while a working .env pins everything to Grok, and a stage that needs a
+        provider nothing else uses is the likeliest thing in a run to fail."""
+        configs = Settings().llm_configs
+        researcher_keys = {
+            cfg["api_key_env_var"]
+            for name, cfg in configs.items()
+            if name.endswith("-researcher")
+        }
+        assert "XAI_API_KEY" in researcher_keys
+
+    def test_every_researcher_entry_reuses_a_base_entry(self) -> None:
+        configs = Settings().llm_configs
+        for name, cfg in configs.items():
+            if not name.endswith("-researcher"):
+                continue
+            base = name.removesuffix("-researcher")
+            assert base in configs, f"{name} has no base entry {base!r}"
+            assert cfg["identifier"] == configs[base]["identifier"]

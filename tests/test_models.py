@@ -8,6 +8,7 @@ propagate silently into illustration and narration, where it costs real money.
 import pytest
 from pydantic import ValidationError
 
+from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
 from sparkstory.entities.stories import (
     CharacterSketch,
     ChildProfile,
@@ -17,6 +18,7 @@ from sparkstory.entities.stories import (
     StoryBeat,
     StoryBrief,
     StoryOutline,
+    WorldRules,
 )
 
 
@@ -73,6 +75,49 @@ class TestStoryBrief:
         b = StoryBrief(child=child, premise="a lost hat")
         assert b.must_include == []
         assert b.avoid == []
+
+    def test_world_rules_has_exactly_two_values(self) -> None:
+        """Two modes, not a genre taxonomy.
+
+        A third value would be config for a distinction nothing branches on
+        (Rule 3), and "mostly real with one licensed miracle" is wording inside
+        `imaginative` rather than a mode of its own. Asserting the exact set
+        makes adding one a deliberate conversation.
+        """
+        assert {rule.value for rule in WorldRules} == {"realistic", "imaginative"}
+
+    def test_world_rules_defaults_to_imaginative(self, child: ChildProfile) -> None:
+        """The default follows the product, and it is a behaviour change.
+
+        A caller who supplies no `world_rules` now gets different planning
+        behaviour than before this field existed. Most personalised picture
+        books are imaginative -- a talking fox is not realistic -- and the
+        grounded/ungrounded A/B run produced the weaker book under the
+        realistic rendering on this project's own standing premise.
+        """
+        assert (
+            StoryBrief(child=child, premise="a lost hat").world_rules
+            is WorldRules.IMAGINATIVE
+        )
+
+    def test_explicit_realistic_round_trips(self, child: ChildProfile) -> None:
+        """This field crosses the MCP boundary as JSON, so serialisation counts."""
+        brief = StoryBrief(
+            child=child, premise="a lost hat", world_rules=WorldRules.REALISTIC
+        )
+        assert (
+            StoryBrief.model_validate_json(brief.model_dump_json()).world_rules
+            is WorldRules.REALISTIC
+        )
+
+    def test_rejects_invented_world_rules(self, child: ChildProfile) -> None:
+        with pytest.raises(ValidationError):
+            StoryBrief(child=child, premise="a lost hat", world_rules="whimsical")
+
+    def test_world_rules_is_described_for_the_model(self) -> None:
+        """The description is prompt text: it reaches the planner and the schema."""
+        field = StoryBrief.model_json_schema()["properties"]["world_rules"]
+        assert field.get("description")
 
 
 class TestStoryOutline:
@@ -151,6 +196,9 @@ class TestSchemaIsPromptText:
             CharacterSketch,
             ChildProfile,
             StoryBrief,
+            StoryGrounding,
+            GroundedFact,
+            CraftDevice,
         ):
             schema = model.model_json_schema()
             defs = schema.get("$defs", {})
@@ -171,6 +219,13 @@ class TestSchemaIsPromptText:
             "later session",
             "spend tokens",
             "mutable object",
+            # Added with the grounding models, whose `#` comments discuss MCP
+            # tools, clients and provenance -- none of which is the researcher's
+            # business and all of which would read to it as part of the task.
+            "MCP",
+            "client",
+            "provenance",
+            "finding D",
         )
         for model in (
             StoryOutline,
@@ -178,6 +233,9 @@ class TestSchemaIsPromptText:
             CharacterSketch,
             StoryBeat,
             ChildProfile,
+            StoryGrounding,
+            GroundedFact,
+            CraftDevice,
         ):
             schema_text = str(model.model_json_schema())
             for term in leaked_terms:

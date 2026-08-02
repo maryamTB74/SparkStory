@@ -18,6 +18,16 @@ dependencies = [
     "langchain-google-genai>=4.3.2",
     "langchain-openai>=1.4.1",
     "langgraph>=1.0.3",
+    # Static embeddings: a distilled model that runs as numpy at inference time, so
+    # retrieval needs no API key, no network at query time and no GPU. Chosen over
+    # Gemini embeddings because every Google call in this project's history has
+    # failed, and over fastembed/sentence-transformers because it is the lightest
+    # of the three that resolve on 3.14. See the spec's deviations table.
+    "model2vec>=0.8.2",
+    # Transitive through model2vec, declared because retrieval/store.py imports it
+    # directly. An undeclared import that happens to be installed is a dependency
+    # bump away from breaking.
+    "numpy>=2.5.1",
     "pydantic-settings>=2.14.2",
 ]
 
@@ -59,6 +69,14 @@ testpaths = ["tests"]
 # asyncio_mode = "auto" so async tests need no per-test marker. Most of this
 # codebase is async; opting in individually is pure noise.
 asyncio_mode = "auto"
+# The default suite requires no network and no model weights, which has been true
+# since Session 1 and is worth keeping true. Retrieval quality tests need real
+# embeddings, so they are marked `corpus` and excluded here; `make test-corpus`
+# runs them. A `-m` on the command line overrides this one.
+addopts = ["-m", "not corpus"]
+markers = [
+    "corpus: needs the built knowledge index and real embedding weights",
+]
 filterwarnings = [
     # fastmcp's JWT provider imports the deprecated authlib.jose module.
     # Third-party, nothing we can fix, and it appears in every test run.

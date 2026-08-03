@@ -14,6 +14,7 @@ from sparkstory.entities.stories import (
     Pronouns,
     ReadingLevel,
     ScenePlan,
+    Story,
     StoryBeat,
     StoryBrief,
     StoryOutline,
@@ -160,3 +161,13 @@ def prose(page_plan: PagePlan) -> StoryProse:
             for page in page_plan.pages
         ]
     )
+
+
+@pytest.fixture
+def story(outline: StoryOutline, page_plan: PagePlan, prose: StoryProse) -> Story:
+    """A finished ten-page story, assembled from the fixtures above.
+
+    Composed rather than hand-written so it cannot drift from the plan and
+    prose fixtures the rest of the suite uses.
+    """
+    return Story(outline=outline, page_plan=page_plan, pages=prose.pages)

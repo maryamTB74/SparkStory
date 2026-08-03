@@ -29,6 +29,12 @@ dependencies = [
     # bump away from breaking.
     "numpy>=2.5.1",
     "pydantic-settings>=2.14.2",
+    # PDF assembly. Core rather than infrastructure by this project's own test:
+    # delete it and the app stops producing its output artifact, the same
+    # argument that keeps FastMCP and LangGraph core. Chosen over weasyprint,
+    # which needs Pango/cairo/GDK-Pixbuf as *system* libraries and would break
+    # both `uv sync` on a clean clone and Phase B's Docker image.
+    "reportlab>=4.2",
     # Web search. Off unless MAX_WEB_SEARCHES is raised, so
     # neither this nor firecrawl is imported on the default path.
     "langchain-perplexity>=0.1.1",

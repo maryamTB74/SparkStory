@@ -77,6 +77,7 @@ from sparkstory.entities.stories import (
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.researcher import ResearcherNode
+from sparkstory.renderers import render_pdf
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import configure_logging
 from sparkstory.workflows.plan_outline import (
@@ -172,6 +173,11 @@ def parse_args() -> argparse.Namespace:
         "--no-save",
         action="store_true",
         help="Print only; write nothing to disk.",
+    )
+    parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Also write story.pdf beside story.md. Ignored under --no-save.",
     )
     return parser.parse_args()
 
@@ -504,6 +510,10 @@ async def run_stages(
         (run_dir / "story.md").write_text(
             story_markdown(story, brief), encoding="utf-8"
         )
+        # Inside the guard deliberately: --no-save leaves run_dir None, and a
+        # PDF write outside it would crash on None / "story.pdf".
+        if args.pdf:
+            render_pdf(story, run_dir / "story.pdf")
 
     print(f"\n{'=' * 66}\n  {story.outline.title}\n{'=' * 66}")
     for scene, page in zip(story.page_plan.pages, story.pages, strict=True):

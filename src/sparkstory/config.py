@@ -110,6 +110,29 @@ class Settings(BaseSettings):
         alias="XAI_API_KEY",
         description="xAI key, used for Grok text generation",
     )
+    # Both are read only when max_web_searches > 0, so an installation that never
+    # raises that setting needs neither.
+    perplexity_api_key: SecretStr | None = Field(
+        default=None,
+        alias="PERPLEXITY_API_KEY",
+        description="Perplexity key, used for web search",
+    )
+    firecrawl_api_key: SecretStr | None = Field(
+        default=None,
+        alias="FIRECRAWL_API_KEY",
+        description="Firecrawl key, used to fetch a cited page for checking",
+    )
+    # A fallback, used only when one of the two above is unusable -- never
+    # because a search legitimately found nothing. Retrying an empty result on a
+    # second provider is pressure to invent, which is the failure finding I
+    # records: an instruction meant to stop invention stopped grounding instead,
+    # and the same lever pushed the other way would stop the empty answer being
+    # allowed at all.
+    tavily_api_key: SecretStr | None = Field(
+        default=None,
+        alias="TAVILY_API_KEY",
+        description="Tavily key, used as a fallback when the others fail",
+    )
 
     # --- Which model each task uses -------------------------------------
     # One field per agent. Values must be keys of `llm_configs` below.
@@ -225,9 +248,38 @@ class Settings(BaseSettings):
         alias="KNOWLEDGE_ROOT",
         description="Directory holding the built knowledge index",
     )
+    # Off by default, and that default is what keeps the test suite offline: at 0
+    # no web client is constructed and no key is read. Mirrors max_research_steps,
+    # where 0 also means "skip the stage" rather than "run it with no budget".
+    max_web_searches: int = Field(
+        default=0,
+        ge=0,
+        alias="MAX_WEB_SEARCHES",
+        description=(
+            "How many web searches research may run. 0 disables the web tool."
+        ),
+    )
+    # The only thing standing between a model-asserted URL and the book. The
+    # search provider hands back a URL the *model* wrote into a structured field,
+    # which is the same shape of fabrication that made this project overwrite
+    # `source` from the store rather than trust it; fetching the page is what
+    # turns that assertion into provenance. False exists so a test can switch the
+    # network off, so the default has to be the safe one.
+    verify_web_claims: bool = Field(
+        default=True,
+        alias="VERIFY_WEB_CLAIMS",
+        description="Fetch each cited page and confirm it supports the claim.",
+    )
 
     # --- Validators -----------------------------------------------------
-    @field_validator("google_api_key", "xai_api_key", mode="before")
+    @field_validator(
+        "google_api_key",
+        "xai_api_key",
+        "perplexity_api_key",
+        "firecrawl_api_key",
+        "tavily_api_key",
+        mode="before",
+    )
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         """Treat a blank environment variable as unset.
@@ -394,6 +446,9 @@ class Settings(BaseSettings):
         secrets: dict[str, SecretStr | None] = {
             "GOOGLE_API_KEY": self.google_api_key,
             "XAI_API_KEY": self.xai_api_key,
+            "PERPLEXITY_API_KEY": self.perplexity_api_key,
+            "FIRECRAWL_API_KEY": self.firecrawl_api_key,
+            "TAVILY_API_KEY": self.tavily_api_key,
         }
         secret = secrets.get(env_var)
         return secret.get_secret_value() if secret is not None else None

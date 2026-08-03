@@ -20,6 +20,8 @@ from sparkstory.retrieval.embed import FakeEmbedder
 from sparkstory.retrieval.hybrid import HybridIndex
 from sparkstory.retrieval.store import LocalVectorStore
 from sparkstory.retrieval.tools import NOTHING_FOUND, build_retrieval_tools
+from sparkstory.retrieval.web.ledger import WebLedger
+from sparkstory.retrieval.web.providers import WebResult
 
 CHUNKS = [
     ("moon#1", "The Moon has no air, so nothing can flutter.", SourceKind.FACT),
@@ -55,9 +57,62 @@ def tools_over(root: Path, chunks: list[Chunk] | None = None) -> dict:
     return {tool.name: tool for tool in build_retrieval_tools(HybridIndex(store=store))}
 
 
+def web_tools_over(root: Path, ledger: WebLedger, searcher=None, verifier=None) -> dict:
+    """Tools with the web one enabled, everything injected so nothing goes out."""
+    store = LocalVectorStore(root=root, embedder=FakeEmbedder(dimensions=256))
+    store.save(
+        [
+            Chunk(
+                chunk_id=cid,
+                text=text,
+                title="Moon" if kind is SourceKind.FACT else "Mother Goose",
+                source="NASA -- Earth's Moon"
+                if kind is SourceKind.FACT
+                else "Mother Goose (Project Gutenberg)",
+                licence="public domain",
+                source_kind=kind,
+            )
+            for cid, text, kind in CHUNKS
+        ]
+    )
+    return {
+        tool.name: tool
+        for tool in build_retrieval_tools(
+            HybridIndex(store=store),
+            ledger=ledger,
+            searcher=searcher,
+            verifier=verifier,
+        )
+    }
+
+
+async def _one_verified_source(query: str):
+    return [
+        WebResult(
+            url="https://example.org/submarines",
+            title="How submarines work",
+            text="A submarine sinks by letting water into its ballast tanks.",
+            query=query,
+            verified=True,
+        )
+    ]
+
+
 class TestToolShape:
     def test_builds_exactly_two_tools(self, tmp_path: Path) -> None:
         assert set(tools_over(tmp_path)) == {"search_facts", "search_craft"}
+
+    def test_the_web_tool_is_absent_without_a_ledger(self, tmp_path: Path) -> None:
+        """No ledger means the feature is off, and off must mean *not built*.
+
+        MAX_WEB_SEARCHES=0 is what keeps the suite offline, and a tool that
+        exists but refuses at call time would still have constructed a client.
+        """
+        assert "search_web" not in tools_over(tmp_path)
+
+    def test_the_web_tool_appears_when_enabled(self, tmp_path: Path) -> None:
+        tools = web_tools_over(tmp_path, WebLedger(), searcher=_one_verified_source)
+        assert "search_web" in tools
 
     def test_each_tool_describes_when_to_use_it(self, tmp_path: Path) -> None:
         """The description is prompt text: it is how the agent decides which index
@@ -171,3 +226,97 @@ class TestTopK:
             {"query": "moon", "top_k": 1}
         )
         assert result.count("id:") == 1
+
+
+class TestWebTool:
+    """The web tool, with search and verification injected.
+
+    Nothing here reaches the network. The live half -- that Perplexity answers in
+    this shape and that Firecrawl can read the pages it names -- is what task 12's
+    runs are for.
+    """
+
+    async def test_a_verified_source_enters_the_ledger(self, tmp_path: Path) -> None:
+        ledger = WebLedger()
+        tools = web_tools_over(tmp_path, ledger, searcher=_one_verified_source)
+        await tools["search_web"].ainvoke({"query": "how does a submarine sink"})
+        assert len(ledger) == 1
+        assert ledger.sources[0].url == "https://example.org/submarines"
+
+    async def test_the_result_shows_the_id_the_agent_must_copy(
+        self, tmp_path: Path
+    ) -> None:
+        """Rendered in the same `id:` shape as a corpus chunk, deliberately.
+
+        The Researcher's existing "copy each identifier exactly" instruction then
+        covers web results with no prompt change, and `web:1` cannot be confused
+        with `moon#1` by a reader or by a prefix test.
+        """
+        tools = web_tools_over(tmp_path, WebLedger(), searcher=_one_verified_source)
+        result = await tools["search_web"].ainvoke({"query": "submarines"})
+        assert "web:1" in result
+
+    async def test_an_unverified_source_is_not_offered(self, tmp_path: Path) -> None:
+        """The point of the whole feature.
+
+        A source that failed the fetch-and-check never reaches the agent, so it
+        cannot be cited -- rather than reaching it and being dropped later, which
+        would spend the agent's attention on something already known to be bad.
+        """
+
+        async def unverifiable(query: str):
+            return []
+
+        ledger = WebLedger()
+        tools = web_tools_over(tmp_path, ledger, searcher=unverifiable)
+        result = await tools["search_web"].ainvoke({"query": "submarines"})
+        assert result == NOTHING_FOUND
+        assert len(ledger) == 0
+
+    async def test_finding_nothing_uses_the_same_words_as_the_local_tools(
+        self, tmp_path: Path
+    ) -> None:
+        """One vocabulary for "nothing found", so the agent needs one rule."""
+
+        async def nothing(query: str):
+            return []
+
+        tools = web_tools_over(tmp_path, WebLedger(), searcher=nothing)
+        assert await tools["search_web"].ainvoke({"query": "x"}) == NOTHING_FOUND
+
+    def test_the_description_does_not_leak_our_machinery(self, tmp_path: Path) -> None:
+        """Same audit the other tools get, plus the words this feature adds.
+
+        "ledger" and "provenance" are ours, not the researcher's business, and
+        naming a vendor tells a children's-book researcher nothing while spending
+        its attention.
+        """
+        banned = (
+            "langchain",
+            "pydantic",
+            "json",
+            "schema",
+            "workflow",
+            "pipeline",
+            "vector",
+            "embedding",
+            "bm25",
+            "rubric",
+            "ledger",
+            "provenance",
+            "firecrawl",
+            "perplexity",
+        )
+        tools = web_tools_over(tmp_path, WebLedger(), searcher=_one_verified_source)
+        lowered = tools["search_web"].description.lower()
+        for term in banned:
+            assert term not in lowered, f"search_web leaks {term!r}"
+
+    async def test_ids_keep_counting_across_calls(self, tmp_path: Path) -> None:
+        """Two searches in one run must not both mint web:1."""
+        ledger = WebLedger()
+        tools = web_tools_over(tmp_path, ledger, searcher=_one_verified_source)
+        first = await tools["search_web"].ainvoke({"query": "a"})
+        second = await tools["search_web"].ainvoke({"query": "b"})
+        assert "web:1" in first
+        assert "web:2" in second

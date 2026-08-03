@@ -41,19 +41,29 @@ why clearly enough that they can fix it.
 
 Judge the plan against exactly two requirements.
 
-**Protagonist.** The book is written for one particular child, and that child is \
-the main character. They must want something, and the events of the story must \
-follow from what *they* do about it. A child who is present on every page but \
-desires nothing is not the main character -- they are a helper in someone else's \
-story, and that makes a personalised book markedly less personal. If the want \
-belongs to another character, say so.
+**Protagonist.** The book is written for one particular child, and that child \
+must *drive* it. They must want something, act on it, and the ending must turn on \
+what they did. A child who is present on every page but desires nothing is a \
+helper in someone else's story, and that makes a personalised book markedly less \
+personal. If the child is passive, say so.
+
+**When the parent's idea is about someone else, follow the parent.** A premise \
+like "an eagle who discovers a new planet" or "a fox who wants to visit the moon" \
+names another character on purpose, and rewriting it into a story about the child \
+alone gives the parent a book they did not ask for. In that case the child shares \
+the story: they want something of their own *within* it -- to help, to find out, \
+to fix -- and they are the one whose actions decide how it ends. That is enough. \
+Do not report a finding merely because another character also wants something.
+
+**What is never enough**, whoever the premise names: a child who only watches, \
+reacts, or is told what to do. A want the child is given rather than has. An \
+ending that would resolve identically with the child removed.
 
 Judge this against the **whole plan**, not the beats alone. Whose story it is runs \
 through the logline, the theme and every character description as well. A plan \
 whose beats have been adjusted so the child "decides" to help, while the logline \
-still describes helping and the theme is still about someone else's dream, has \
-not been fixed -- it has been patched, and it will read as someone else's story \
-to the child it was written for.
+still describes watching and the theme is still about someone else entirely, has \
+not been fixed -- it has been patched.
 
 **Earned resolution.** The ending must come from something the child does, \
 decides or realises. Not from a coincidence, not from something conveniently \

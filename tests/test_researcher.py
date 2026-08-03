@@ -221,3 +221,74 @@ class TestResearcherNode:
         agent = StubAgent(RuntimeError("provider exploded"))
         with pytest.raises(RuntimeError, match="provider exploded"):
             await ResearcherNode(agent=agent, brief=a_brief()).ainvoke()
+
+
+class TestWebSearchInstructions:
+    """Added with the web tool. The corpus is curated and free; the web is
+    neither, so preference is not a style choice."""
+
+    def test_the_collection_comes_first(self) -> None:
+        lowered = RESEARCHER_SYSTEM_PROMPT.lower()
+        assert "collection first" in lowered
+        assert "last resort" in lowered
+
+    def test_the_fact_budget_is_shared_across_sources(self) -> None:
+        """Three facts total, not three plus three.
+
+        `StoryGrounding.facts` caps at 3 and the cap is enforced by the schema,
+        so an agent that treats it as per-source has its extra facts rejected
+        with no explanation. Saying it plainly is cheaper than a validation error
+        the model cannot see.
+        """
+        assert "takes the place of" in RESEARCHER_SYSTEM_PROMPT.lower()
+
+    def test_the_finding_i_guards_all_survive(self) -> None:
+        """The prompt where under-grounding lived, checked rather than assumed.
+
+        Session 5's finding I was a prompt edit that stopped grounding entirely,
+        and Session 9's task 4 re-checked these for the same reason: this file is
+        one paragraph away from the wording that caused it.
+        """
+        lowered = RESEARCHER_SYSTEM_PROMPT.lower()
+        assert "empty" in lowered
+        assert "invent" in lowered
+        assert "search" in lowered
+        assert "note" in lowered
+
+
+class TestModeDoesNotChangeWhatIsWorthKeeping:
+    """Finding S. The mode decides how a note is *written*, never whether a fact
+    is worth keeping.
+
+    Task 4's wording said an imaginative story "is impossible on purpose" and
+    that a prohibition "is of no use here", which reads as *facts matter less*.
+    Live result: the same eagle brief retrieved one fact under `realistic` and
+    **zero** under `imaginative`, twice. The imaginative rendering then became
+    unreachable on that premise -- the branch cannot treat a fact as texture if
+    no fact arrives.
+
+    So the keep-or-drop criterion has to be stated once, mode-independently, and
+    the mode paragraph must be visibly about phrasing.
+    """
+
+    def test_the_keep_criterion_is_stated_once_and_is_mode_free(self) -> None:
+        """ "Would a child who knows the real thing notice?" is the whole test,
+        and it must not be qualified by world rules."""
+        prompt = RESEARCHER_SYSTEM_PROMPT
+        assert "would a child who knows the real" in prompt.lower()
+        # The criterion sentence must not mention either mode.
+        criterion = prompt.lower().split("would a child who knows the real")[1][:400]
+        assert "imaginative" not in criterion
+        assert "realistic" not in criterion
+
+    def test_the_mode_paragraph_says_it_changes_wording_not_selection(self) -> None:
+        lowered = RESEARCHER_SYSTEM_PROMPT.lower()
+        assert "the same facts matter in both" in lowered
+
+    def test_an_impossible_premise_does_not_excuse_finding_nothing(self) -> None:
+        """The specific failure: 'the story is impossible anyway, so nothing can
+        be got wrong'. An eagle on an airless world is exactly when the fact
+        matters most -- it is what the story has to decide to break."""
+        lowered = RESEARCHER_SYSTEM_PROMPT.lower()
+        assert "impossible" in lowered
+        assert "still" in lowered

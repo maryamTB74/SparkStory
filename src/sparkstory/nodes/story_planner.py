@@ -101,9 +101,14 @@ the beats that work should survive unless a fix genuinely requires changing them
 One exception, and it matters: **a protagonist problem cannot be fixed in one \
 beat.** Whose story it is runs through the logline, the theme, every character \
 description and every beat at once. If that is the finding, change all of them. A \
-plan whose logline still says the child is helping someone else reach their dream \
-has not been fixed, however the beats now read -- and making the child "decide" to \
-help is not the same as giving the child a want.
+plan where the child only watches has not been fixed however the beats now read, \
+and making the child "decide" to help is not the same as giving the child \
+something to do.
+
+Fix it by making the child *act*, not by removing the other character. If the \
+parent's idea is about an eagle or a fox, that character stays and keeps wanting \
+what it wants -- the child needs a want of their own alongside it, and the ending \
+has to turn on what the child does.
 
 Return the complete plan, not a description of what you changed."""
 
@@ -183,6 +188,16 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
             "",
             "Build the story so this can work when it is read aloud:",
         ]
+        # Finding Q. Handed a "repeat a short line" device beside a note, the
+        # cheapest way to satisfy both is to repeat the note -- and the eagle run
+        # did exactly that, putting "Wings need air to push against" in three
+        # beats verbatim. A repeated line is prose, so it has to come from the
+        # story; nothing else forbade taking it from the grounding.
+        lines.append(
+            "A line that repeats must be built from the story's own words -- "
+            "something a character does or says. Never repeat anything written "
+            "above, and never describe the technique instead of using it."
+        )
         lines += [
             f"- {device.device}: {device.how_to_use}"
             for device in grounding.craft_devices

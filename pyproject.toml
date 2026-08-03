@@ -29,6 +29,17 @@ dependencies = [
     # bump away from breaking.
     "numpy>=2.5.1",
     "pydantic-settings>=2.14.2",
+    # Web search. Off unless MAX_WEB_SEARCHES is raised, so
+    # neither this nor firecrawl is imported on the default path.
+    "langchain-perplexity>=0.1.1",
+    # Fetches a cited page so the claim can be checked against it. The search
+    # provider returns a URL the *model* wrote; fetching is what turns that into
+    # provenance rather than an assertion.
+    "firecrawl>=4.3.6",
+    # Fallback search, used only when Perplexity is unusable. Its URLs come from
+    # the API response rather than from a model, which is why it can also stand
+    # in for verification when Firecrawl itself is the thing that is down.
+    "tavily-python>=0.7.12",
 ]
 
 [project.scripts]

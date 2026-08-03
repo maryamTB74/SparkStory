@@ -25,18 +25,56 @@ right, but a fact could still misread its source. Judging that needs a model, an
 model judging a model is the next session's problem.
 """
 
+from typing import TYPE_CHECKING
+
 from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
 from sparkstory.retrieval.chunks import SourceKind
 from sparkstory.retrieval.store import LocalVectorStore
+from sparkstory.retrieval.web.ledger import WEB_ID_PREFIX
 from sparkstory.utils.logging_utils import get_logger
+
+if TYPE_CHECKING:
+    from sparkstory.retrieval.web.ledger import WebLedger
 
 logger = get_logger(__name__)
 
 
+def _keep_web_fact(item: GroundedFact, ledger: WebLedger | None) -> GroundedFact | None:
+    """Decide a web-cited fact, mirroring the corpus rules one for one."""
+    if ledger is None:
+        logger.warning(
+            "dropping fact citing the web %r with no sources consulted: %r",
+            item.chunk_id,
+            item.claim,
+        )
+        return None
+
+    source = ledger.get(item.chunk_id)
+    if source is None:
+        logger.warning(
+            "dropping fact citing unknown source %r: %r", item.chunk_id, item.claim
+        )
+        return None
+
+    if not source.verified:
+        # Present but unchecked. This is what makes VERIFY_WEB_CLAIMS=false safe
+        # to offer: the source is recorded honestly and refused here, rather than
+        # quietly grounding a book on something nothing confirmed.
+        logger.warning(
+            "dropping fact citing an unchecked source %r: %s", item.chunk_id, source.url
+        )
+        return None
+
+    # `source` is ours to state, not the model's -- same rule as the store.
+    return item.model_copy(update={"source": source.url})
+
+
 def drop_unprovenanced(
-    grounding: StoryGrounding, store: LocalVectorStore
+    grounding: StoryGrounding,
+    store: LocalVectorStore,
+    ledger: WebLedger | None = None,
 ) -> StoryGrounding:
-    """Return grounding containing only what ``store`` can vouch for.
+    """Return grounding containing only what ``store`` or ``ledger`` can vouch for.
 
     The input is left untouched, so a run artifact can record what the agent
     actually returned and a later reader can see what was dropped.
@@ -44,13 +82,30 @@ def drop_unprovenanced(
     Args:
         grounding: What the Researcher returned.
         store: The index the retrieval tools searched.
+        ledger: Web sources this run fetched and checked, when the web tool was
+            enabled. ``None`` means it was off, in which case **a web id resolves
+            to nothing and the fact is dropped** -- an agent that invented one
+            gets the same treatment as an invented chunk id.
 
     Returns:
         A new :class:`StoryGrounding`. Either list may come back empty, which is a
         legitimate result rather than a failure.
+
+    A web fact is held to the same standard as a corpus one, deliberately. The id
+    is resolved rather than trusted, and ``source`` is overwritten from the
+    record, so "where did this come from?" has one answer of one strength rather
+    than a strong answer for the corpus and a weaker one for the web. A web
+    source additionally has to be **verified** -- present in the ledger is not
+    enough, because ``VERIFY_WEB_CLAIMS=false`` records sources it never checked.
     """
     kept_facts: list[GroundedFact] = []
     for item in grounding.facts:
+        if item.chunk_id.startswith(WEB_ID_PREFIX):
+            kept = _keep_web_fact(item, ledger)
+            if kept is not None:
+                kept_facts.append(kept)
+            continue
+
         chunk = store.get(item.chunk_id)
         if chunk is None:
             logger.warning(
@@ -71,6 +126,15 @@ def drop_unprovenanced(
 
     kept_devices: list[CraftDevice] = []
     for craft in grounding.craft_devices:
+        if craft.chunk_id.startswith(WEB_ID_PREFIX):
+            # A category error, like a craft chunk cited as a fact. Read-aloud
+            # technique comes from the curated collection; a web page is not one.
+            logger.warning(
+                "dropping craft device citing the web %r: %r",
+                craft.chunk_id,
+                craft.device,
+            )
+            continue
         chunk = store.get(craft.chunk_id)
         if chunk is None:
             logger.warning(

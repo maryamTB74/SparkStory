@@ -14,7 +14,7 @@ gitignored, so the trigger was never in the repository.
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from sparkstory.config import Settings, settings
 
@@ -212,6 +212,74 @@ class TestResearchSettings:
         MAX_*_REVISIONS. This is also what makes the A/B acceptance test possible
         with no code change: one run grounded, one not, same premise."""
         assert Settings(max_research_steps=0).max_research_steps == 0
+
+
+class TestWebSearchSettings:
+    """The web tool is off unless asked for, and verified unless asked otherwise.
+
+    Both defaults are load-bearing rather than tidy, and each is here because
+    getting it wrong would be invisible.
+    """
+
+    def test_web_search_is_off_by_default(self) -> None:
+        """This default is what keeps the suite offline.
+
+        At 0 no client is constructed and no key is read, so the whole test suite
+        keeps the no-network property it has held since Session 1. A default of
+        anything else would make every test that reaches research a live call --
+        which non-obvious rule 25 already caught once, when a test that faked only
+        `get_chat_model` reached a real provider and still looked like it passed.
+
+        Asserted against the **field default**, not against `Settings()`. A bare
+        `Settings()` reads `.env`, so this test used to assert "*this machine's*
+        .env does not enable web search" -- which is ambient, not a property of
+        the code, and it duly broke the moment a real `.env` set MAX_WEB_SEARCHES.
+        The schema default is the thing worth pinning.
+        """
+        assert Settings.model_fields["max_web_searches"].default == 0
+
+    def test_web_search_accepts_a_budget(self) -> None:
+        assert Settings(max_web_searches=3).max_web_searches == 3
+
+    def test_web_search_rejects_a_negative_budget(self) -> None:
+        with pytest.raises(ValidationError):
+            Settings(max_web_searches=-1)
+
+    def test_claims_are_verified_by_default(self) -> None:
+        """The only check on a model-asserted URL, so the default must be safe.
+
+        The search provider returns a URL the *model* wrote into a structured
+        field -- exactly the shape of fabrication that made this project overwrite
+        `source` from the store rather than trust it. Fetching the page is what
+        turns that assertion into provenance, so `False` exists for tests and must
+        never be what a caller gets by accident.
+        """
+        assert Settings.model_fields["verify_web_claims"].default is True
+
+    def test_verification_can_be_disabled(self) -> None:
+        assert Settings(verify_web_claims=False).verify_web_claims is False
+
+    @pytest.mark.parametrize("field", ["perplexity_api_key", "firecrawl_api_key"])
+    def test_blank_web_keys_normalise_to_none(self, field: str) -> None:
+        """Non-obvious rule 3, for each new key separately.
+
+        `FIRECRAWL_API_KEY=` arrives as `""`, not as absent, and pydantic would
+        build `SecretStr('')` -- which is not None, so every `is not None` check
+        downstream reports the credential as configured. Adding a field to the
+        `_blank_to_none` validator is the edit most easily forgotten, so there is
+        one test per key rather than one covering both.
+        """
+        assert getattr(Settings(**{field: "   "}), field) is None
+
+    @pytest.mark.parametrize(
+        ("env_var", "field"),
+        [
+            ("PERPLEXITY_API_KEY", "perplexity_api_key"),
+            ("FIRECRAWL_API_KEY", "firecrawl_api_key"),
+        ],
+    )
+    def test_api_key_for_resolves_the_web_keys(self, env_var: str, field: str) -> None:
+        assert Settings(**{field: "k"}).api_key_for(env_var) == "k"
 
     def test_a_researcher_entry_exists_for_the_provider_in_use(self) -> None:
         """Same reasoning as the critic entries: the defaults point at Google

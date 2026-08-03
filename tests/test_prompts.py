@@ -21,6 +21,7 @@ from sparkstory.entities.stories import (
     StoryOutline,
     WorldRules,
 )
+from sparkstory.nodes.outline_critic import OUTLINE_CRITIC_SYSTEM_PROMPT
 from sparkstory.nodes.plot_planner import PLOT_PLANNER_SYSTEM_PROMPT
 from sparkstory.nodes.story_planner import (
     OUTLINE_REVISION_PROMPT_TEMPLATE,
@@ -415,3 +416,101 @@ class TestRenderGrounding:
         assert render_story_brief(brief) + render_grounding(
             StoryGrounding(), brief.world_rules
         ) == (render_story_brief(brief))
+
+
+class TestCraftDeviceIsNotAFactInDisguise:
+    """Finding Q. A repeated line must come from the story, never from a note.
+
+    The eagle run handed the planner a `repetition` device ("repeat a short line
+    about wings and air") alongside a note ("Wings need air to push against").
+    The cheapest way to satisfy both is to repeat the note, and beats 3, 4 and 6
+    each contained that sentence verbatim. Nothing forbade it.
+
+    This is finding J's second appearance and its worse form: Session 5's planner
+    *described* the device, this one used the wrong text *as* the device.
+    """
+
+    @pytest.mark.parametrize("world_rules", list(WorldRules))
+    def test_a_repeated_line_must_use_the_story_s_own_words(
+        self, world_rules: WorldRules
+    ) -> None:
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Wings need air to push against.",
+                        source="NASA",
+                        chunk_id="moon#1",
+                    )
+                ],
+                craft_devices=[
+                    CraftDevice(
+                        device="repetition",
+                        how_to_use="Repeat a short line after each try.",
+                        chunk_id="goose#1",
+                    )
+                ],
+            ),
+            world_rules,
+        )
+        assert "the story's own words" in rendered
+
+    def test_the_instruction_is_absent_when_there_are_no_devices(self) -> None:
+        """Rule 3's shape, applied to prompt text: an instruction about repeating
+        a line is noise in a prompt that was given no device to repeat."""
+        rendered = render_grounding(
+            StoryGrounding(
+                facts=[
+                    GroundedFact(
+                        claim="The Moon has no air.",
+                        story_note="Nothing outdoors can flutter.",
+                        source="NASA",
+                        chunk_id="moon#1",
+                    )
+                ]
+            ),
+            WorldRules.REALISTIC,
+        )
+        assert "the story's own words" not in rendered
+
+
+class TestProtagonistYieldsToThePremise:
+    """The rubric must not overrule the parent's own idea.
+
+    The eagle brief ("an eagle who discover a new planet") produced the same
+    single `protagonist` finding three times and hit the cap, because the rubric
+    demanded the want belong to the child while the premise named an eagle. The
+    compromise made the eagle an "experiment visitor", which reads oddly and is
+    not what was asked for.
+
+    **The floor stays.** Rule 19: every instruction that relaxes a constraint is
+    a licence to under-fix, and the obvious under-fix here is a passive child --
+    the exact defect the rubric was created for (Session 2 finding 7). So the
+    relaxation is about *exclusivity of the want*, never about the child acting.
+    """
+
+    def test_a_premise_naming_another_character_is_respected(self) -> None:
+        lowered = OUTLINE_CRITIC_SYSTEM_PROMPT.lower()
+        assert "follow the parent" in lowered
+        assert "do not report a finding merely because another character" in lowered
+
+    def test_the_child_must_still_drive_the_story(self) -> None:
+        """The floor. Sharing the story is allowed; watching it is not."""
+        lowered = OUTLINE_CRITIC_SYSTEM_PROMPT.lower()
+        assert "what is never enough" in lowered
+        assert "only watches" in lowered
+
+    def test_the_ending_must_still_turn_on_the_child(self) -> None:
+        """The one test that cannot be satisfied by a bystander."""
+        lowered = OUTLINE_CRITIC_SYSTEM_PROMPT.lower()
+        assert "would resolve identically with the child removed" in lowered
+
+    def test_the_revision_prompt_does_not_tell_the_planner_to_delete_the_premise(
+        self,
+    ) -> None:
+        """Otherwise the two prompts fight: the critic now permits a shared
+        story while the reviser is still told to move the want wholesale, and
+        the planner would keep deleting the eagle to satisfy it."""
+        lowered = OUTLINE_REVISION_PROMPT_TEMPLATE.lower()
+        assert "not by removing the other character" in lowered

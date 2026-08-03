@@ -140,6 +140,24 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--max-web-searches",
+        type=int,
+        default=None,
+        help=(
+            "Override MAX_WEB_SEARCHES for this run. 0 disables the web tool "
+            "entirely, which is the default."
+        ),
+    )
+    parser.add_argument(
+        "--no-verify-web",
+        action="store_true",
+        help=(
+            "Skip fetching each cited page. Leaves every web URL unchecked, so "
+            "the facts citing them are dropped as unprovenanced -- useful only "
+            "for seeing what search returned before verification."
+        ),
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="DEBUG logging, which includes the rendered prompts.",
@@ -238,10 +256,27 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
             "writer": settings.writer_model,
         },
         "max_research_steps": settings.max_research_steps,
+        # Read from settings rather than from args, so an override on the command
+        # line and one in .env are recorded identically -- a run's artifacts have
+        # to say what actually happened, not what was typed.
+        "max_web_searches": settings.max_web_searches,
+        "verify_web_claims": settings.verify_web_claims,
         "seconds": round(time.monotonic() - started, 1),
         "note": "the run's request_id appears in run.log",
         **extra,
     }
+
+
+def _as_jsonable(value: object) -> object:
+    """Last-resort encoder for values json does not know.
+
+    Pydantic models nested inside a plain dict, chiefly. Raises for anything
+    else rather than stringifying it, because a silently str()-ed object in an
+    artifact reads as data and is not.
+    """
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    raise TypeError(f"cannot serialise {type(value).__name__}")
 
 
 def save_json(run_dir: Path | None, name: str, payload: BaseModel | dict) -> None:
@@ -251,7 +286,11 @@ def save_json(run_dir: Path | None, name: str, payload: BaseModel | dict) -> Non
     text = (
         payload.model_dump_json(indent=2)
         if isinstance(payload, BaseModel)
-        else json.dumps(payload, indent=2)
+        # `default=` rather than a bare dumps: a dict whose *values* are models
+        # -- web_sources.json is `{"sources": [WebSource, ...]}` -- is not
+        # serialisable otherwise, and the failure lands at the live run because
+        # nothing here is unit tested.
+        else json.dumps(payload, indent=2, default=_as_jsonable)
     )
     (run_dir / name).write_text(text + "\n", encoding="utf-8")
 
@@ -292,6 +331,15 @@ async def main() -> int:
     configure_logging()
     if args.debug:
         logging.getLogger("sparkstory").setLevel(logging.DEBUG)
+
+    # Applied to the live settings object before anything reads it, so the flags
+    # behave exactly as the environment variables would. Mutating settings is
+    # acceptable here and nowhere else: this script *is* the operator, and the
+    # alternative is threading two more arguments through every stage.
+    if args.max_web_searches is not None:
+        settings.max_web_searches = args.max_web_searches
+    if args.no_verify_web:
+        settings.verify_web_claims = False
 
     brief = build_brief(args)
     run_dir = None if args.no_save else make_run_dir(args.out_dir, brief)
@@ -348,12 +396,17 @@ async def run_stages(
         # path stops before any competing artifact exists, so there is no second
         # version of anything to confuse it with. The full run gets its grounding
         # from the workflow as `research-1.json` instead.
-        agent, store = build_research_context()
+        agent, store, ledger = build_research_context()
         grounding = await ResearcherNode(
             agent=agent, brief=brief, max_steps=settings.max_research_steps
         ).ainvoke()
-        kept = drop_unprovenanced(grounding, store)
+        kept = drop_unprovenanced(grounding, store, ledger=ledger)
         save_json(run_dir, "research.json", kept)
+        if ledger is not None:
+            # What the web was asked and what came back, including sources that
+            # failed verification -- a run whose artifacts do not record what
+            # happened is not evidence (Session 9, finding M).
+            save_json(run_dir, "web_sources.json", {"sources": ledger.sources})
 
         print(f"\n{'=' * 66}\n  Research\n{'=' * 66}")
         print(f"\nfacts ({len(kept.facts)}):")

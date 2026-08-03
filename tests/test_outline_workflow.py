@@ -9,6 +9,7 @@ model factory, and the test fails for a reason that looks nothing like the cause
 """
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -24,6 +25,7 @@ from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.mcp.tools.plan_story import plan_story_tool
 from sparkstory.models.fake_model import FakeModel
 from sparkstory.retrieval.chunks import Chunk, SourceKind
+from sparkstory.workflows import plan_outline as _plan_outline
 from sparkstory.workflows.plan_outline import run_outline_pipeline
 
 OUTLINE_FACTORY = "sparkstory.workflows.plan_outline.get_chat_model"
@@ -225,6 +227,10 @@ class TestPlanStoryToolRunsTheCritic:
 # --- Research ------------------------------------------------------------
 RESEARCH_CONTEXT = "sparkstory.workflows.plan_outline.build_research_context"
 
+# Captured before any fixture can replace it, so the construction tests below
+# can call the genuine builder without depending on autouse ordering.
+REAL_BUILD_CONTEXT = _plan_outline.build_research_context
+
 
 class _StubStore:
     """Answers ``get`` and nothing else, which is all provenance filtering uses."""
@@ -280,12 +286,19 @@ def _stub_research(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     result without a second ``setattr`` whose ordering against this one would depend
     on fixture resolution order.
     """
-    holder: dict[str, Any] = {"result": StoryGrounding(), "chunks": ("moon#1",)}
+    holder: dict[str, Any] = {
+        "result": StoryGrounding(),
+        "chunks": ("moon#1",),
+        # None means the web tool was never built, which is the default and what
+        # every test in this module should see unless it says otherwise.
+        "ledger": None,
+    }
     monkeypatch.setattr(
         RESEARCH_CONTEXT,
         lambda: (
             _StubResearchAgent(holder["result"]),
             _StubStore(*holder["chunks"]),
+            holder["ledger"],
         ),
     )
     return holder
@@ -416,3 +429,73 @@ class TestResearchFailsOpen:
         outline_fakes()
         fake_research(StoryGrounding(facts=[_grounded_fact()]), known_chunks=())
         assert await run_outline_pipeline(brief) == outline
+
+
+class TestWebLedgerConstruction:
+    """Whether the web half is built at all, asserted on construction.
+
+    Deliberately not "does the tool refuse when disabled". A tool that exists and
+    declines has already constructed a client and read a key, which is exactly
+    what MAX_WEB_SEARCHES=0 is supposed to prevent -- and what keeps this suite
+    offline. The question is whether it was *built*.
+
+    Uses `REAL_BUILD_CONTEXT`, captured at import before the autouse stub can
+    replace it, rather than trying to unpatch -- which would depend on fixture
+    resolution order between two autouse fixtures and fail confusingly when it
+    lost. It never invokes anything: it inspects what came back, and both the
+    model factory and the agent builder are replaced, so no provider is reached
+    and no weights are loaded.
+    """
+
+    def test_no_ledger_and_no_web_tool_by_default(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from sparkstory.config import settings as live
+        from sparkstory.workflows import plan_outline as module
+
+        monkeypatch.setattr(live, "max_web_searches", 0)
+        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
+        monkeypatch.setattr(
+            module, "build_researcher_agent", lambda model, tools: tools
+        )
+
+        _tools, _store, ledger = REAL_BUILD_CONTEXT()
+        assert ledger is None
+        assert "search_web" not in {t.name for t in _tools}
+
+    def test_a_ledger_and_the_tool_appear_when_enabled(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from sparkstory.config import settings as live
+        from sparkstory.workflows import plan_outline as module
+
+        monkeypatch.setattr(live, "max_web_searches", 3)
+        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
+        monkeypatch.setattr(
+            module, "build_researcher_agent", lambda model, tools: tools
+        )
+
+        _tools, _store, ledger = REAL_BUILD_CONTEXT()
+        assert ledger is not None
+        assert "search_web" in {t.name for t in _tools}
+
+    def test_each_run_gets_its_own_ledger(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Run-scoped ids. A shared ledger would let one run's web:1 resolve
+        against another run's page -- wrong in the most plausible way."""
+        from sparkstory.config import settings as live
+        from sparkstory.workflows import plan_outline as module
+
+        monkeypatch.setattr(live, "max_web_searches", 3)
+        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
+        monkeypatch.setattr(
+            module, "build_researcher_agent", lambda model, tools: tools
+        )
+
+        _a, _b, first = REAL_BUILD_CONTEXT()
+        _c, _d, second = REAL_BUILD_CONTEXT()
+        assert first is not second

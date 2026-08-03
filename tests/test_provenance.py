@@ -19,6 +19,7 @@ from sparkstory.retrieval.chunks import Chunk, SourceKind
 from sparkstory.retrieval.embed import FakeEmbedder
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.retrieval.store import LocalVectorStore
+from sparkstory.retrieval.web.ledger import WebLedger, WebSource
 
 
 def built_store(root: Path) -> LocalVectorStore:
@@ -183,3 +184,103 @@ class TestDoesNotMutateItsInput:
         original = StoryGrounding(facts=[fact(source="wrong")], craft_devices=[])
         drop_unprovenanced(original, built_store(tmp_path))
         assert original.facts[0].source == "wrong"
+
+
+class TestWebProvenance:
+    """A web source is kept or dropped by the same rule as a corpus chunk.
+
+    That symmetry is the point. `drop_unprovenanced` already makes a fabricated
+    corpus citation unreachable rather than merely detectable, by resolving the
+    id and overwriting `source` from the store. A web fact gets the identical
+    treatment against the ledger -- so "where did this come from?" has one answer
+    with one strength, rather than a strong answer for the corpus and a weaker
+    one for the web.
+    """
+
+    def _ledger(self, verified: bool = True) -> WebLedger:
+        ledger = WebLedger()
+        ledger.add(
+            WebSource(
+                url="https://example.org/submarines",
+                title="How submarines work",
+                text="A submarine sinks by letting water into its ballast tanks.",
+                query="how does a submarine sink",
+                verified=verified,
+            )
+        )
+        return ledger
+
+    def test_a_verified_web_fact_is_kept(self, tmp_path: Path) -> None:
+        kept = drop_unprovenanced(
+            StoryGrounding(facts=[fact(chunk_id="web:1")]),
+            built_store(tmp_path),
+            ledger=self._ledger(),
+        )
+        assert len(kept.facts) == 1
+
+    def test_attribution_is_overwritten_from_the_ledger(self, tmp_path: Path) -> None:
+        """Same rule as the store, for the same reason: `source` is not the
+        model's to state. A plausible fabrication would survive any check that
+        only looked for *a* source, so the record is authoritative."""
+        kept = drop_unprovenanced(
+            StoryGrounding(
+                facts=[fact(chunk_id="web:1", source="Encyclopaedia Britannica, 2019")]
+            ),
+            built_store(tmp_path),
+            ledger=self._ledger(),
+        )
+        assert kept.facts[0].source == "https://example.org/submarines"
+
+    def test_an_unknown_web_id_is_dropped(self, tmp_path: Path) -> None:
+        kept = drop_unprovenanced(
+            StoryGrounding(facts=[fact(chunk_id="web:9")]),
+            built_store(tmp_path),
+            ledger=self._ledger(),
+        )
+        assert kept.facts == []
+
+    def test_an_unverified_source_is_dropped(self, tmp_path: Path) -> None:
+        """The load-bearing one.
+
+        A source in the ledger but never checked -- because VERIFY_WEB_CLAIMS was
+        off, or because the fetch was skipped -- must not ground a book. This is
+        what makes the skip flag safe to exist: an unverified source is recorded
+        honestly and then refused here.
+        """
+        kept = drop_unprovenanced(
+            StoryGrounding(facts=[fact(chunk_id="web:1")]),
+            built_store(tmp_path),
+            ledger=self._ledger(verified=False),
+        )
+        assert kept.facts == []
+
+    def test_a_web_id_is_dropped_when_there_is_no_ledger(self, tmp_path: Path) -> None:
+        """The web tool was off, so nothing can vouch for a web id. An agent that
+        invented one gets it dropped rather than trusted."""
+        kept = drop_unprovenanced(
+            StoryGrounding(facts=[fact(chunk_id="web:1")]), built_store(tmp_path)
+        )
+        assert kept.facts == []
+
+    def test_a_craft_device_may_not_cite_the_web(self, tmp_path: Path) -> None:
+        """Same category error the fact/craft split already rejects. Craft comes
+        from the curated collection; a web page is not a read-aloud technique."""
+        kept = drop_unprovenanced(
+            StoryGrounding(craft_devices=[device(chunk_id="web:1")]),
+            built_store(tmp_path),
+            ledger=self._ledger(),
+        )
+        assert kept.craft_devices == []
+
+    def test_corpus_facts_still_resolve_when_a_ledger_is_present(
+        self, tmp_path: Path
+    ) -> None:
+        """The two must not interfere: a run with a ledger still grounds normally
+        in the corpus."""
+        kept = drop_unprovenanced(
+            StoryGrounding(facts=[fact(chunk_id="moon#1")]),
+            built_store(tmp_path),
+            ledger=self._ledger(),
+        )
+        assert len(kept.facts) == 1
+        assert kept.facts[0].source == "NASA -- Earth's Moon"

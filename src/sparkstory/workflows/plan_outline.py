@@ -32,6 +32,7 @@ from sparkstory.retrieval.hybrid import HybridIndex
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.retrieval.store import LocalVectorStore
 from sparkstory.retrieval.tools import build_retrieval_tools
+from sparkstory.retrieval.web.ledger import WebLedger
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.retries import RETRY_POLICY
 from sparkstory.workflows.reviews import draft_score, drop_unroutable_outline_reviews
@@ -41,11 +42,12 @@ from sparkstory.workflows.validation import validate_outline
 logger = get_logger(__name__)
 
 
-def build_research_context() -> tuple[Any, LocalVectorStore]:
-    """Build the research agent and the store its tools search.
+def build_research_context() -> tuple[Any, LocalVectorStore, WebLedger | None]:
+    """Build the research agent, the store its tools search, and the web ledger.
 
-    Returned together because the store is needed twice: the tools search it, and
-    provenance filtering asks it whether a cited chunk exists.
+    Returned together because each is needed twice: the tools search the store and
+    write to the ledger, and provenance filtering asks both whether a cited id
+    exists.
 
     A named function rather than inline construction so tests can replace the whole
     research half in one patch -- the same seam shape as ``get_chat_model`` in this
@@ -54,16 +56,24 @@ def build_research_context() -> tuple[Any, LocalVectorStore]:
     Built per call rather than cached. The index is 58 chunks, so re-reading it
     costs a file read, while caching it would serve a stale index after a re-ingest
     without anything saying so. Model weights *are* cached, inside ``get_embedder``.
+
+    **The ledger is ``None`` unless ``MAX_WEB_SEARCHES`` is above zero**, and that
+    is what switches the whole web feature off: no ledger means
+    ``build_retrieval_tools`` does not build the tool, so no client is constructed
+    and no key is read. Per call rather than module-level for the same reason its
+    ids are run-scoped -- a shared ledger would let one run's ``web:1`` resolve
+    against another run's page.
     """
     store = LocalVectorStore(
         root=settings.knowledge_root,
         embedder=get_embedder(settings.embedding_model),
     )
+    ledger = WebLedger() if settings.max_web_searches > 0 else None
     agent = build_researcher_agent(
         model=get_chat_model(settings.researcher_model),
-        tools=build_retrieval_tools(HybridIndex(store=store)),
+        tools=build_retrieval_tools(HybridIndex(store=store), ledger=ledger),
     )
-    return agent, store
+    return agent, store, ledger
 
 
 @task(retry_policy=RETRY_POLICY)
@@ -88,11 +98,11 @@ async def research(request_id: str, brief: StoryBrief) -> StoryGrounding:
         settings.researcher_model,
         settings.max_research_steps,
     )
-    agent, store = build_research_context()
+    agent, store, ledger = build_research_context()
     grounding = await ResearcherNode(
         agent=agent, brief=brief, max_steps=settings.max_research_steps
     ).ainvoke()
-    return drop_unprovenanced(grounding, store)
+    return drop_unprovenanced(grounding, store, ledger=ledger)
 
 
 @task(retry_policy=RETRY_POLICY)

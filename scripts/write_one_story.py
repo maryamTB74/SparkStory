@@ -65,6 +65,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from sparkstory.config import settings
+from sparkstory.entities.illustration import ArtStatus
 from sparkstory.entities.stories import (
     ChildProfile,
     Pronouns,
@@ -80,6 +81,7 @@ from sparkstory.nodes.researcher import ResearcherNode
 from sparkstory.renderers import render_pdf
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import configure_logging
+from sparkstory.workflows.illustrate import run_illustration_pipeline
 from sparkstory.workflows.plan_outline import (
     build_research_context,
     run_outline_pipeline,
@@ -178,6 +180,17 @@ def parse_args() -> argparse.Namespace:
         "--pdf",
         action="store_true",
         help="Also write story.pdf beside story.md. Ignored under --no-save.",
+    )
+    parser.add_argument(
+        "--illustrate",
+        action="store_true",
+        help=(
+            "Draw a reference portrait per character, then one picture per page, "
+            "into the run directory. The most expensive flag here by a wide "
+            "margin -- roughly one image per page plus one per character. "
+            "Implies --pdf, since the pictures exist to go in the book. Ignored "
+            "under --no-save, because the images need somewhere to live."
+        ),
     )
     return parser.parse_args()
 
@@ -282,6 +295,13 @@ def _as_jsonable(value: object) -> object:
     """
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
+    # `StoryArt` carries `Path` values, and a dict of models containing paths is
+    # the shape the illustration stage streams. Finding P is why this is here
+    # rather than discovered live: the same class of bug -- a value json cannot
+    # encode -- killed a run *after* the search had been paid for, and images
+    # cost considerably more than a search.
+    if isinstance(value, Path):
+        return str(value)
     raise TypeError(f"cannot serialise {type(value).__name__}")
 
 
@@ -506,14 +526,36 @@ async def run_stages(
     # threads an outline in too.
     story = await run_story_pipeline(brief, outline, on_task_result=save_iteration)
     save_json(run_dir, "story.json", story)
+
+    # Illustration comes before the PDF, since the PDF is what the pictures go in.
+    # `art` stays None when the flag is off or nothing is being saved, and
+    # `render_pdf(story, path, None)` is exactly the text-only book -- so there is
+    # one render call, not one per branch.
+    art = None
+    if args.illustrate and run_dir is not None:
+        art = await run_illustration_pipeline(
+            brief, story, run_dir, on_task_result=save_iteration
+        )
+        save_json(run_dir, "art.json", art)
+        drawn = sum(1 for item in art.pages if item.status is not ArtStatus.FAILED)
+        print(f"\nillustrated {drawn}/{len(art.pages)} pages")
+        # Printed rather than left in the artifact, because it is the one thing
+        # about this stage that a person reading the terminal needs to know: a
+        # book whose pictures were not reference-conditioned may show the same
+        # character three different ways.
+        print(f"fully conditioned: {art.fully_conditioned}")
+        for item in art.portraits + art.pages:
+            if item.status is not ArtStatus.CONDITIONED:
+                print(f"  {item.key}: {item.status.value} -- {item.detail}")
+
     if run_dir is not None:
         (run_dir / "story.md").write_text(
             story_markdown(story, brief), encoding="utf-8"
         )
         # Inside the guard deliberately: --no-save leaves run_dir None, and a
         # PDF write outside it would crash on None / "story.pdf".
-        if args.pdf:
-            render_pdf(story, run_dir / "story.pdf")
+        if args.pdf or args.illustrate:
+            render_pdf(story, run_dir / "story.pdf", art)
 
     print(f"\n{'=' * 66}\n  {story.outline.title}\n{'=' * 66}")
     for scene, page in zip(story.page_plan.pages, story.pages, strict=True):

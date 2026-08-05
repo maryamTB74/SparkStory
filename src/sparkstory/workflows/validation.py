@@ -16,7 +16,14 @@ the design: a story quietly missing its climax is far worse than a visible error
 """
 
 from sparkstory.entities.exceptions import StoryStructureError
-from sparkstory.entities.stories import PagePlan, StoryBrief, StoryOutline, StoryProse
+from sparkstory.entities.illustration import IllustrationPlan
+from sparkstory.entities.stories import (
+    PagePlan,
+    Story,
+    StoryBrief,
+    StoryOutline,
+    StoryProse,
+)
 
 
 def validate_outline(brief: StoryBrief, outline: StoryOutline) -> None:
@@ -110,3 +117,55 @@ def validate_prose(page_plan: PagePlan, prose: StoryProse) -> None:
     blank = [p.page_number for p in prose.pages if not p.text.strip()]
     if blank:
         raise StoryStructureError(f"Pages {blank} have no text.")
+
+
+def validate_illustration_plan(story: Story, plan: IllustrationPlan) -> None:
+    """Check an illustration plan covers the book it was asked to illustrate.
+
+    The same gap as everywhere else in this module: ``IllustrationPlan`` validates
+    its own shape and knows nothing about the story. ``pages`` permits 1 to 24
+    entries, so a six-page book receiving three pictures is a *valid*
+    ``IllustrationPlan`` -- and the failure is invisible, because illustration fails
+    soft. Three missing pictures and three pages the Director simply never planned
+    both render as blank frames, and only this check tells them apart.
+
+    That distinction is the whole reason this exists. Everything else about a
+    missing picture is recorded in ``StoryArt`` and degrades gracefully; a plan that
+    never covered the page cannot be recorded there, because nothing ever tried to
+    draw it.
+
+    **This replaced a ``MAX_IMAGES_PER_BOOK`` setting.** That setting was
+    unreachable: the image count is derived, not chosen -- one picture per page plus
+    one portrait per character -- and ``StoryBrief`` already caps pages at 24 while
+    ``IllustrationPlan`` caps characters at 6, so a valid brief can never exceed 30.
+    A second cap over a quantity the schema already bounds is the trap non-obvious
+    rule 11 describes, and Rule 3 rejects config for a limit that cannot bind. What
+    was worth keeping was the structural check, which belongs here and raises.
+
+    Raises:
+        StoryStructureError: the planned pages do not match the story's exactly,
+            including duplicates and omissions, or a page names a character the
+            plan never described.
+    """
+    written = [page.page_number for page in story.pages]
+    planned = [page.page_number for page in plan.pages]
+
+    if planned != written:
+        raise StoryStructureError(
+            f"Illustration plan covers pages {planned} but the book has {written}."
+        )
+
+    # A page naming a character with no appearance would be drawn from the prompt
+    # alone while looking conditioned in the artifact -- finding U's failure mode,
+    # which is that identity silently stops travelling. Caught here rather than
+    # tolerated, because the Director wrote both halves and disagreeing with itself
+    # is a structural error, not a degraded provider.
+    described = {character.name for character in plan.characters}
+    unknown = sorted(
+        {name for page in plan.pages for name in page.characters_present} - described
+    )
+    if unknown:
+        raise StoryStructureError(
+            f"Illustration plan puts {unknown} in a picture without describing "
+            f"them. Described characters: {sorted(described)}."
+        )

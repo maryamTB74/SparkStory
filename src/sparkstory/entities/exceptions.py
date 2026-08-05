@@ -23,10 +23,10 @@ Subclasses raised by a specific layer live with that layer:
 ``models/exceptions.py`` holds the ones ``models/get_model.py`` raises. Only the
 shared bases live here, so ``entities`` depends on nothing.
 
-Siblings intended for later sessions -- a ``ProviderError`` for upstream failures
-once retry and fallback exist, and a ``GenerationError`` for output that fails
-validation once the evaluator-optimizer loop can act on it -- are deliberately
-not declared yet. Nothing raises them today, and empty classes are speculation.
+A ``ProviderError`` for upstream chat failures, once retry and fallback exist, is
+still deliberately not declared: nothing raises it today, and empty classes are
+speculation. ``ImageGenerationError`` below was in that category until Session 6,
+when image generation gave it a caller -- which is the bar Rule 3 sets.
 """
 
 
@@ -70,4 +70,37 @@ class UnsafeContentError(SparkStoryError):
     it means the system worked and the answer is no. That distinction is why the
     tool layer translates it for the client instead of letting it propagate as an
     unhandled failure.
+    """
+
+
+class ImageGenerationError(SparkStoryError):
+    """An image provider was reached and did not return a usable image.
+
+    A 503, a rate limit, a timeout, a provider-refused prompt, or a response
+    whose bytes are not an image. Transient by assumption, so unlike every other
+    error here it **is** retried -- see ``workflows/retries.py``.
+
+    Deliberately a sibling of ``ConfigurationError`` rather than a child. No
+    operator fixes a 503 by editing ``.env``, and the tool layer must not offer a
+    client a configuration message for it. Configuration failures in the image
+    seam are ``ImageConfigurationError`` instead.
+
+    Illustration fails **soft**: the workflow catches this per image and leaves
+    that page's frame blank rather than destroying a finished book. So this being
+    raised is a normal, expected event, not a run-ending one -- which is the
+    opposite of ``UnsafeContentError`` above. What must never happen quietly is a
+    *portrait* failing, because that silently removes reference conditioning from
+    every page a character appears on; that is recorded in the artifact.
+    """
+
+
+class ImageConfigurationError(ConfigurationError):
+    """An image model cannot be built: unknown model id, or a missing API key.
+
+    A ``ConfigurationError`` subclass, and the placement is load-bearing rather
+    than tidy. ``mcp/tools/`` translates only ``ConfigurationError`` into a
+    ``ToolError``, so an unset ``XAI_API_KEY`` raised as anything else would reach
+    a client as an opaque internal error instead of a sentence naming the variable
+    to set. Inheriting also picks up the existing ``_retry_on`` exclusion, so a
+    missing key cannot be retried three times the way ``GOOGLE_API_KEY`` was.
     """

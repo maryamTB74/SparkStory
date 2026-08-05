@@ -9,6 +9,7 @@ from langgraph.types import RetryPolicy, default_retry_on
 
 from sparkstory.entities.exceptions import (
     ConfigurationError,
+    ImageGenerationError,
     StoryStructureError,
     UnsafeContentError,
 )
@@ -40,9 +41,21 @@ def _retry_on(exc: Exception) -> bool:
 
     Listed explicitly rather than excluding ``SparkStoryError`` wholesale: an
     upstream ``ProviderError``, when one exists, *should* be retried.
+
+    ``ImageGenerationError``
+        The first error here that **is** retried, and it is named explicitly rather
+        than left to fall through. A 503 or a rate limit from an image endpoint is
+        exactly what a retry is for. It would already be retried by the fall-through
+        below, but rule 10 exists because that fall-through is a trap -- it returns
+        ``True`` for everything it does not recognise, so silence here would be
+        indistinguishable from an oversight. ``ImageConfigurationError`` is a
+        ``ConfigurationError`` and so is excluded above; a missing key is not
+        transient.
     """
     if isinstance(exc, ConfigurationError | StoryStructureError | UnsafeContentError):
         return False
+    if isinstance(exc, ImageGenerationError):
+        return True
     return default_retry_on(exc)
 
 

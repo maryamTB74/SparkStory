@@ -238,6 +238,38 @@ class Settings(BaseSettings):
         alias="RETRIEVAL_TOP_K",
         description="Candidates each retrieval tool returns for the agent to judge",
     )
+
+    # --- Illustration ----------------------------------------------------
+    # Names an entry in `image_configs`, not `llm_configs`: an image model takes a
+    # prompt and returns bytes, so it cannot be built by `get_chat_model`. Three
+    # registries, three factories.
+    illustrator_model: str = Field(
+        default="grok-image",
+        alias="ILLUSTRATOR_MODEL",
+        description="Model used to draw reference portraits and page pictures",
+    )
+    # The *planning* half runs on a chat model, because deciding how a book looks
+    # is a writing task. Named separately from `illustrator_model` so the cheap
+    # decision and the expensive drawing can be moved independently -- and it
+    # defaults to Grok rather than Google for the reason rule 21 exists: three
+    # stages have already died on a Google default while .env pinned everything
+    # else to xAI.
+    illustration_director_model: str = Field(
+        default="grok-3-mini",
+        alias="ILLUSTRATION_DIRECTOR_MODEL",
+        description="Model that decides the style bible and each page's picture",
+    )
+    # There is deliberately no `max_images_per_book`. One was written and removed:
+    # the image count is *derived*, not chosen -- one picture per page plus one
+    # portrait per character -- and `StoryBrief` already caps pages at 24 while
+    # `IllustrationPlan` caps characters at 6, so no valid brief can exceed 30. A
+    # setting defaulted above a bound the schema already enforces can never fire,
+    # and lowering it would reject a valid brief with "illustrate a shorter book"
+    # after the book is already written. Rule 3 rejects config for a limit that
+    # cannot bind; the structural half became `validate_illustration_plan`.
+    # Illustration is turned off by not calling it -- the separate tool *is* the
+    # switch.
+    #
     # Anchored to the repo root rather than left relative, for the same reason
     # `env_file` is: a relative default resolves against the *process* working
     # directory, and an MCP client starts this server from wherever it likes. The
@@ -431,6 +463,62 @@ class Settings(BaseSettings):
             "potion-base-8M": {
                 "identifier": "minishlab/potion-base-8M",
                 "dimensions": 256,
+            },
+        }
+
+    # --- Image registry --------------------------------------------------
+    @property
+    def image_configs(self) -> dict[str, dict[str, Any]]:
+        """Registry of available image-generation models.
+
+        The third registry, and separate from the other two for the reason they
+        are separate from each other: an image model takes a prompt and returns
+        bytes, so it is built by ``get_image_model`` and shares no construction
+        step with either a chat model or an embedder.
+
+        Unlike ``embedding_configs`` these do need a credential, and it is
+        deliberately xAI's. Open item 3 records that a successful Google
+        generation has never completed in this project -- only a 503 -- while
+        every live-verified stage here has gone through xAI. Putting the most
+        expensive and most failure-prone stage in the system behind the least
+        reliable provider available would be a choice against the evidence.
+
+        ``base_url`` travels in ``params`` exactly as it does for ``grok-*`` chat
+        entries: xAI's image endpoints are OpenAI-compatible, which is the same
+        fact that let chat reach it with no new dependency.
+
+        **There is no ``seed``**, and that is the provider's constraint rather than
+        an omission. xAI abstracts seeds away server-side, and ``quality``,
+        ``size`` and ``style`` are unsupported too. This retires the "stored with
+        its prompt and seed" half of CLAUDE.md's consistency layer 1 -- the
+        multi-image edit endpoint replaces it, and is the stronger tool anyway: a
+        seed reproduces an identical image, not the same character in a new pose,
+        which is what every page after the first needs.
+        """
+        return {
+            # Two entries, and the ids were read from `models.list()` on a real
+            # key rather than from documentation: a web search asserted
+            # `grok-2-image`, which this account cannot see at all. A wrong
+            # identifier fails at the first live call and nowhere earlier, after
+            # the whole planning stage has been paid for.
+            "grok-image": {
+                "identifier": "grok-imagine-image",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                },
+            },
+            # The slower, better-looking sibling. A separate entry rather than a
+            # parameter, exactly as `grok-3-mini-critic` is separate from
+            # `grok-3-mini`: the registry's job is to make swapping a model a
+            # config change, and a book is worth spending more on than a portrait
+            # test run.
+            "grok-image-quality": {
+                "identifier": "grok-imagine-image-quality",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                },
             },
         }
 

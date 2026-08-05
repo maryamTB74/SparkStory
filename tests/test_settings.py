@@ -74,16 +74,21 @@ class TestModelRegistry:
             if name.endswith("_model")
         }
         assert configured, "no *_model settings found -- the discovery broke"
+        # Three registries, three factories, and the routing is by name because
+        # every one of these fields ends in `_model` while naming entries in
+        # different places. An embedder takes no messages and binds no output
+        # schema; an image model takes a prompt and returns bytes. Routed rather
+        # than skipped, so each stays covered.
+        #
+        # `illustration_director_model` deliberately falls through to
+        # `llm_configs`: deciding how a book looks is a writing task, so the
+        # Director is a chat model. Only the thing that *draws* is an image model.
+        other_registries = {
+            "embedding_model": settings.embedding_configs,
+            "illustrator_model": settings.image_configs,
+        }
         for name, value in configured.items():
-            # `embedding_model` also ends in `_model` but names an entry in a
-            # different registry: an embedder takes no messages and binds no
-            # output schema, so it cannot live in `llm_configs`. Routed by name
-            # rather than skipped, so it stays covered.
-            registry = (
-                settings.embedding_configs
-                if name == "embedding_model"
-                else settings.llm_configs
-            )
+            registry = other_registries.get(name, settings.llm_configs)
             assert value in registry, f"{name}={value!r} is not in its registry"
 
     def test_every_entry_is_well_formed(self) -> None:
@@ -91,6 +96,24 @@ class TestModelRegistry:
             assert "identifier" in cfg, f"{name} missing identifier"
             assert ":" in cfg["identifier"], f"{name} identifier needs provider prefix"
             assert cfg["api_key_env_var"], f"{name} missing api_key_env_var"
+
+    def test_every_image_entry_is_well_formed(self) -> None:
+        """Same guard for the image registry, with one deliberate difference.
+
+        No `provider:model` prefix is required. `init_chat_model` parses that form;
+        the image seam posts to a URL and sends the identifier verbatim, so a
+        prefix here would be sent to xAI as part of the model name.
+        """
+        assert settings.image_configs, "the image registry must not be empty"
+        for name, cfg in settings.image_configs.items():
+            assert "identifier" in cfg, f"{name} missing identifier"
+            assert ":" not in cfg["identifier"], (
+                f"{name} identifier is sent verbatim, so it takes no provider prefix"
+            )
+            assert cfg["api_key_env_var"], f"{name} missing api_key_env_var"
+            assert "base_url" in cfg.get("params", {}), (
+                f"{name} needs a base_url -- there is no default provider here"
+            )
 
     def test_no_entry_mixes_exclusive_thinking_params(self) -> None:
         """thinking_budget is Gemini 2.5; thinking_level is Gemini 3.x."""

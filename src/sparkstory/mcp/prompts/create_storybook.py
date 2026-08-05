@@ -73,6 +73,19 @@ book is built from it.
 
 It makes several model calls and takes noticeably longer than `plan_story`.
 
+**Step 6 - Offer to illustrate it.**
+
+Once the book is written, ask whether the user wants pictures. Do not illustrate
+without asking: it is the slowest and most expensive step by a wide margin, roughly one
+image per page plus one for each character.
+
+If they say yes, call `illustrate_story` with the brief, the story exactly as
+`write_story` returned it, and a directory to write the images into. Then tell them
+where the images were written, and say plainly whether `fully_conditioned` came back
+true. If it is false, some pictures were not drawn from the character portraits, so the
+same character may not look the same on every page - the `detail` on each item says
+what happened.
+
 **If a tool fails**
 
 Report the error message as written, say that you are stopping, and ask the user how to

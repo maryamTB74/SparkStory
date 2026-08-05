@@ -6,7 +6,7 @@ so anything it needs travels in a single typed mapping.
 
 from typing import TypedDict
 
-from sparkstory.entities.stories import StoryBrief, StoryOutline
+from sparkstory.entities.stories import Story, StoryBrief, StoryOutline
 
 
 class StoryWorkflowInput(TypedDict):
@@ -39,3 +39,23 @@ class OutlineWorkflowInput(TypedDict):
 
     request_id: str
     brief: StoryBrief
+
+
+class IllustrationWorkflowInput(TypedDict):
+    """What ``illustration_workflow`` is invoked with.
+
+    ``story`` is a *finished* book and is never modified. Illustration is a
+    separate entrypoint precisely so a failure here cannot damage prose that
+    already passed both critics.
+
+    ``directory`` is a ``str`` rather than a ``Path``, and that is not cosmetic:
+    this mapping is a workflow input, so a checkpointer has to serialise it. A
+    ``Path`` survives an in-memory saver and fails against a SQLite one, which is
+    the kind of defect that appears only once resumable runs arrive. The tasks
+    rebuild a ``Path`` at the point of use.
+    """
+
+    request_id: str
+    brief: StoryBrief
+    story: Story
+    directory: str

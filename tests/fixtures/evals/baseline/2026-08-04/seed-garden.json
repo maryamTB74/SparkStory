@@ -1,0 +1,50 @@
+{
+  "name": "eval-seed-garden",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.75,
+    "question_ending_ratio": 0.875,
+    "words_per_page": 18.75,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": {
+    "delight": 1.0,
+    "showing": 0.25,
+    "momentum": 1.0,
+    "reasons": {
+      "delight": [
+        "p1: The sinking and settling create a gentle rhythm with the closing question inviting repetition.",
+        "p2: Rhythmic flow of water and tipping creates sound interest with the repeated question.",
+        "p3: Repetitive tipping and soaking build a quiet rhythm ending in a question.",
+        "p4: The repeated phrase 'Press and lift' adds rhythmic appeal.",
+        "p5: Repetition of 'Press and lift' creates a pattern worth repeating.",
+        "p6: The finger tracing and repeated 'Press and lift' offer tactile rhythm.",
+        "p7: The image of the green tip lifting soil creates visual surprise.",
+        "p8: The phrase 'the garden holds it steady' offers a satisfying poetic close."
+      ],
+      "showing": [
+        "p1: No feeling is conveyed; the text only describes actions and poses a question.",
+        "p2: No feeling is conveyed through action or speech.",
+        "p3: No feeling is conveyed; only actions and a question appear.",
+        "p4: No feeling is conveyed through the described actions.",
+        "p5: No feeling is conveyed; actions and a question only.",
+        "p6: No feeling is conveyed through the actions described.",
+        "p7: Noor watching the movement conveys quiet attention through action.",
+        "p8: Resting a hand beside the sprout conveys gentle care through action."
+      ],
+      "momentum": [
+        "p1: The question leaves open what comes next.",
+        "p2: The question leaves open whether the water reaches the seed.",
+        "p3: The question leaves open what follows the water.",
+        "p4: The question leaves open whether the press changes anything.",
+        "p5: The question leaves open what the soil will show.",
+        "p6: The question leaves open what will push through next.",
+        "p7: The question leaves open what now stands in the garden.",
+        "p8: The final image of the steady plant closes the book satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null
+}

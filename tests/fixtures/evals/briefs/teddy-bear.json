@@ -1,0 +1,15 @@
+{
+  "child": {
+    "name": "Sam",
+    "age": 3,
+    "pronouns": "he/him",
+    "reading_level": "pre_reader",
+    "interests": ["teddy bears", "trains"]
+  },
+  "premise": "a lost teddy bear who finds the way home",
+  "tone": "heartwarming",
+  "world_rules": "imaginative",
+  "page_count": 8,
+  "must_include": [],
+  "avoid": []
+}

@@ -1,0 +1,15 @@
+{
+  "child": {
+    "name": "Maryam",
+    "age": 5,
+    "pronouns": "she/her",
+    "reading_level": "early_reader",
+    "interests": ["foxes", "the night sky"]
+  },
+  "premise": "a fox who wants to visit the moon",
+  "tone": "magical",
+  "world_rules": "imaginative",
+  "page_count": 8,
+  "must_include": ["a paper rocket"],
+  "avoid": []
+}

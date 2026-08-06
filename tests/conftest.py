@@ -4,6 +4,8 @@ Fixtures build objects explicitly rather than reading from ``.env`` so tests do
 not depend on whatever happens to be configured on the machine running them.
 """
 
+from collections.abc import Callable
+
 import pytest
 
 from sparkstory.entities.stories import (
@@ -171,3 +173,65 @@ def story(outline: StoryOutline, page_plan: PagePlan, prose: StoryProse) -> Stor
     prose fixtures the rest of the suite uses.
     """
     return Story(outline=outline, page_plan=page_plan, pages=prose.pages)
+
+
+@pytest.fixture
+def book_factory() -> Callable[..., Story]:
+    """Builds a ``Story`` from page texts, for tests that measure one.
+
+    A factory rather than a fixture because the eval metrics are *about* the exact
+    words on the page, so each test needs its own book. The ``story`` fixture
+    above is the opposite: one fixed book shared by tests that only need a valid
+    one.
+    """
+
+    def build(page_texts: list[str], beat_summaries: list[str] | None = None) -> Story:
+        summaries = beat_summaries or [
+            f"Something happens in beat {i + 1}, at some length." for i in range(4)
+        ]
+        built_outline = StoryOutline(
+            title="A Title",
+            logline="One sentence that captures the whole story here.",
+            theme="a theme worth exploring",
+            characters=[
+                CharacterSketch(
+                    name="Kit",
+                    role="main character",
+                    description="A child who wonders.",
+                )
+            ],
+            beats=[
+                StoryBeat(
+                    position=i + 1,
+                    function=NarrativeFunction.SETUP,
+                    title=f"Beat {i + 1}",
+                    summary=summary,
+                )
+                for i, summary in enumerate(summaries)
+            ],
+        )
+        # Padded to `PagePlan`'s floor of 4 regardless of how many pages of prose
+        # a test needs. Nothing being measured reads the plan -- `beats_per_page`
+        # divides by the prose pages -- so the padding cannot affect a result.
+        built_plan = PagePlan(
+            pages=[
+                ScenePlan(
+                    page_number=i + 1,
+                    beat_position=1,
+                    setting="a garden",
+                    visual_action="Kit looks up, eyes wide",
+                    emotional_shift="curiosity",
+                )
+                for i in range(max(4, len(page_texts)))
+            ]
+        )
+        return Story(
+            outline=built_outline,
+            page_plan=built_plan,
+            pages=[
+                StoryPage(page_number=i + 1, text=text)
+                for i, text in enumerate(page_texts)
+            ],
+        )
+
+    return build

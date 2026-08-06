@@ -1,0 +1,50 @@
+{
+  "name": "eval-submarine",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.625,
+    "question_ending_ratio": 0.125,
+    "words_per_page": 25.5,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": {
+    "delight": 0.625,
+    "showing": 1.0,
+    "momentum": 0.875,
+    "reasons": {
+      "delight": [
+        "p1: The closing question creates a sense of wonder worth repeating.",
+        "p2: The page only reports Ada's actions and conclusion.",
+        "p3: The submarine shooting back up delivers a quick visual surprise.",
+        "p4: The page simply narrates the decision to move locations.",
+        "p5: Water splashed into the tub creates a vivid sensory image.",
+        "p6: The page reports the steps of preparing the weight without rhythmic or surprising language.",
+        "p7: Down went the submarine and bobbed straight up has bouncy rhythm and exclamation.",
+        "p8: Eyes widened at the rise and fall offers a quiet visual moment worth lingering on."
+      ],
+      "showing": [
+        "p1: The question reveals curiosity through Ada's own words rather than naming the feeling.",
+        "p2: Leaning closer then standing tall conveys determination through movement.",
+        "p3: The result that nothing stayed where wanted shows frustration through outcome.",
+        "p4: Being sure the tub will serve conveys confidence through her action and thought.",
+        "p5: Placing the submarine and thinking shows quiet planning without naming emotion.",
+        "p6: Clipping the bag and hoping it will pull shows purposeful intent through action.",
+        "p7: Cheering at the sight conveys joy through Ada's immediate reaction.",
+        "p8: Eyes widening shows amazement through physical reaction rather than naming it."
+      ],
+      "momentum": [
+        "p1: The unanswered question leaves the problem open.",
+        "p2: The need to find a testing place begins a new step.",
+        "p3: The failed attempt leaves the core problem unresolved.",
+        "p4: Walking toward the bathroom door starts the next attempt.",
+        "p5: Wondering what could make it sink and rise opens the invention phase.",
+        "p6: The setup is complete and ready for the test to begin.",
+        "p7: The successful test and cheer close the experiment on a complete note.",
+        "p8: The final image of success and wonder closes the book satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null
+}

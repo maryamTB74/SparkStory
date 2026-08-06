@@ -1,0 +1,15 @@
+{
+  "child": {
+    "name": "Ada",
+    "age": 6,
+    "pronouns": "she/her",
+    "reading_level": "early_reader",
+    "interests": ["submarines", "oceans"]
+  },
+  "premise": "an eagle who discovers a new planet and tries to live there",
+  "tone": "adventurous",
+  "world_rules": "realistic",
+  "page_count": 8,
+  "must_include": ["a bathtub experiment"],
+  "avoid": []
+}

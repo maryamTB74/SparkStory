@@ -1,0 +1,223 @@
+{
+  "outline": {
+    "title": "Ada and the No-Air Planet",
+    "logline": "Ada meets an eagle who lands in her bathtub ocean and cannot fly, then helps it find a new way to move using her submarine toy.",
+    "theme": "trying a different way when the first one will not work",
+    "characters": [
+      {
+        "name": "Ada",
+        "role": "main character",
+        "description": "A six-year-old girl who wants to explore the ocean in her bathtub with her toy submarine."
+      },
+      {
+        "name": "Finn",
+        "role": "gentle visitor",
+        "description": "An eagle who wants to live on the new planet but must learn what works when there is no air."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Bathtub ocean",
+        "summary": "Eli lands on a new world and looks around at the still, grey ground.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "The eagle arrives",
+        "summary": "He tries to lift off and cannot, and does not understand why.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "First try to fly",
+        "summary": "Ada fills the tub and drops in her toy, watching it settle.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "rising_action",
+        "title": "Second try to fly",
+        "summary": "Eli watches the toy sink and rise, and something occurs to him.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "midpoint",
+        "title": "The bathtub experiment",
+        "summary": "He folds his wings and tries the water, and it holds him up.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "climax",
+        "title": "Finn tries the new way",
+        "summary": "He paddles the length of the pool while Ada counts out loud.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "position": 7,
+        "function": "resolution",
+        "title": "Together on the planet",
+        "summary": "The two of them race, and Eli wins by the length of a wing.",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "warm bathtub",
+        "visual_action": "Ada pushes submarine through tub water",
+        "emotional_shift": "Ada feels excited to explore",
+        "page_turn_hook": "who joins the ocean",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "warm bathtub",
+        "visual_action": "Finn splashes down beside submarine",
+        "emotional_shift": "Ada notices the new visitor",
+        "page_turn_hook": "what Finn wants",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 3,
+        "setting": "warm bathtub",
+        "visual_action": "Finn flaps hard above water then drops",
+        "emotional_shift": "Ada sees first try fail",
+        "page_turn_hook": "will another try work",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 4,
+        "setting": "tub edge",
+        "visual_action": "Finn tries again from edge and sinks lower",
+        "emotional_shift": "Ada watches effort fade",
+        "page_turn_hook": "how else can he move",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 5,
+        "setting": "warm bathtub",
+        "visual_action": "Ada pushes submarine under then lets it rise and glide",
+        "emotional_shift": "Ada decides to show a new way",
+        "page_turn_hook": "will Finn copy the toy",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 6,
+        "setting": "warm bathtub",
+        "visual_action": "Finn folds wings and lets water hold him",
+        "emotional_shift": "Finn notices water can support",
+        "page_turn_hook": "what happens when he moves",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 6,
+        "setting": "warm bathtub",
+        "visual_action": "Finn paddles forward like the submarine",
+        "emotional_shift": "Finn feels the new way working",
+        "page_turn_hook": "who will sail together",
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 7,
+        "setting": "warm bathtub",
+        "visual_action": "Ada steers beside Finn in slow circles",
+        "emotional_shift": "Ada feels happy sharing the planet",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Ada",
+          "Finn"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "The wind rose over the ridge."
+    },
+    {
+      "page_number": 2,
+      "text": "Eli tilted one wing and fell."
+    },
+    {
+      "page_number": 3,
+      "text": "The water held him for a moment."
+    },
+    {
+      "page_number": 4,
+      "text": "Ada leaned over the tub."
+    },
+    {
+      "page_number": 5,
+      "text": "The wings folded in tight."
+    },
+    {
+      "page_number": 6,
+      "text": "Something moved under the surface."
+    },
+    {
+      "page_number": 7,
+      "text": "The morning came back slowly."
+    },
+    {
+      "page_number": 8,
+      "text": "They floated together at last."
+    }
+  ]
+}

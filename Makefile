@@ -16,7 +16,7 @@ QA_PATHS := src tests scripts
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus run ci-local clean
+        fix check test test-fast test-corpus score-books run ci-local clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -63,6 +63,10 @@ test-fast: ## Run tests, stopping at the first failure
 
 test-corpus: ## Run retrieval quality tests (needs a built index)
 	$(PYTEST) -m corpus || [ $$? -eq 5 ]
+
+
+score-books: ## Score every past run on the computed metrics (free, no network)
+	uv run python scripts/run_evals.py --from-run outputs --all --no-judge
 
 # --- Run -----------------------------------------------------------------
 

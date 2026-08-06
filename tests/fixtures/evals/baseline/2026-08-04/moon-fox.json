@@ -1,0 +1,50 @@
+{
+  "name": "eval-moon-fox",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 1.0,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 17.75,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": {
+    "delight": 0.625,
+    "showing": 0.875,
+    "momentum": 0.875,
+    "reasons": {
+      "delight": [
+        "p1: The image of the fox lifting its nose to the moon creates a quiet, repeatable visual moment.",
+        "p2: The line “Paper can carry the fox there” offers a surprising, imaginative phrase worth repeating.",
+        "p3: The page simply reports gathering paper and the fox watching.",
+        "p4: The repeated rhythm of “fold by fold” gives the sentence a gentle, memorable sound.",
+        "p5: The image of the rocket rising with the fox and the phrase “her idea fly” create a surprising lift.",
+        "p6: The page reports the rocket landing and the fox stepping out.",
+        "p7: The page reports Maryam picturing the scene.",
+        "p8: The closing image of stars holding every wish offers a poetic, satisfying line."
+      ],
+      "showing": [
+        "p1: Maryam’s watching and the fox’s action convey quiet attention without naming any feeling.",
+        "p2: Stepping back and reaching for the sheet show her idea forming through action.",
+        "p3: The fox sitting close and watching the sheets conveys interest through posture.",
+        "p4: The fox sitting very still shows focused attention through stillness.",
+        "p5: The gentle push and watching the rocket rise show her intent through action.",
+        "p6: The fox stepping out under the quiet sky shows arrival through movement.",
+        "p7: The phrase “the way she hoped” names her feeling outright.",
+        "p8: Maryam watching the fox step out again conveys quiet fulfillment through repeated action."
+      ],
+      "momentum": [
+        "p1: The shared gaze at the moon opens the possibility of connection or story.",
+        "p2: Reaching for the first sheet begins the making process.",
+        "p3: Gathering sheets leaves the next fold or shape open.",
+        "p4: Folding is still in progress, so the shape is not yet complete.",
+        "p5: The rocket has left the ground, so its destination remains open.",
+        "p6: The fox now stands on the moon, inviting what happens next.",
+        "p7: The page closes on a completed mental picture with nothing left open.",
+        "p8: The final image of stars holding wishes closes the book with a sense of completion."
+      ]
+    }
+  },
+  "judge_error": null
+}

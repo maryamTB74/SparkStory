@@ -172,6 +172,16 @@ class Settings(BaseSettings):
         alias="PROSE_CRITIC_MODEL",
         description="Model used by the Prose Critic agent",
     )
+    # Read only by the offline eval harness, never during a story run: a
+    # measurement that could change a book would not be a measurement of it. On a
+    # critic entry at temperature 0.0 for the same reason the critics are -- a
+    # judge that answers differently on identical input turns a regression signal
+    # into noise.
+    judge_model: str = Field(
+        default="gemini-3.5-flash-critic",
+        alias="JUDGE_MODEL",
+        description="Model used by the offline book judge",
+    )
 
     # --- Evaluator-optimizer loop budgets --------------------------------
     # Two knobs which separates how many review->edit rounds

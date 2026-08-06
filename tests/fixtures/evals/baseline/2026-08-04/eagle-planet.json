@@ -1,0 +1,50 @@
+{
+  "name": "eval-eagle-planet",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.875,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 18.5,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": {
+    "delight": 0.5,
+    "showing": 0.875,
+    "momentum": 1.0,
+    "reasons": {
+      "delight": [
+        "p1: The page reports observations without rhythm, surprise, or a repeatable line.",
+        "p2: The line 'The ocean waits as his home' offers a poetic image worth repeating.",
+        "p3: The page simply reports failed attempts without sound play or surprise.",
+        "p4: The text reports events without rhythm or memorable phrasing.",
+        "p5: Watching air 'rise and slide' creates a gentle visual rhythm.",
+        "p6: The repetition in 'Closer and closer it travels' gives a pleasing rhythm.",
+        "p7: The page reports the action without sound or visual surprise.",
+        "p8: The line 'The sea works for him at last' delivers a satisfying closing phrase."
+      ],
+      "showing": [
+        "p1: Ada drawing nearer shows curiosity through action rather than naming the feeling.",
+        "p2: Diving straight down conveys eagerness through action.",
+        "p3: Beating wings harder shows effort through visible action.",
+        "p4: Ada wonders names her thought directly.",
+        "p5: Setting up the jar and watching conveys thought through actions.",
+        "p6: Carrying the jar shows purposeful intent through action.",
+        "p7: Ada waiting shows anticipation through posture and stillness.",
+        "p8: Pushing and holding his place shows success through action."
+      ],
+      "momentum": [
+        "p1: The eagle landing and Ada noticing opens a new situation.",
+        "p2: The dive begins an action whose outcome remains unknown.",
+        "p3: The eagle's continued struggle leaves the next step open.",
+        "p4: Ada's wondering begins a problem-solving thread.",
+        "p5: The trapped air sets up an experiment whose result is pending.",
+        "p6: The air pocket approaching the water leaves the outcome open.",
+        "p7: The air pocket opening near the eagle leaves the result unresolved.",
+        "p8: The eagle finally using the air pocket closes the story satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null
+}

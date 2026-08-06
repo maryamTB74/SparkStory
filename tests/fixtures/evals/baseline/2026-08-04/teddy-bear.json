@@ -1,0 +1,50 @@
+{
+  "name": "eval-teddy-bear",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.375,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 13.375,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": {
+    "delight": 0.25,
+    "showing": 0.5,
+    "momentum": 0.5,
+    "reasons": {
+      "delight": [
+        "p1: The page reports a quiet scene without rhythm, surprise, or a repeatable line.",
+        "p2: The page reports events without sound play or visual surprise.",
+        "p3: The page states actions without rhythmic or surprising language.",
+        "p4: The page reports the ride without memorable sound or image.",
+        "p5: The colored landscape offers visual pleasure worth lingering on.",
+        "p6: The sun joining the colored scene creates a pleasing visual moment.",
+        "p7: The page reports the reunion without rhythmic or surprising phrasing.",
+        "p8: The page reports the ending without sound play or surprise."
+      ],
+      "showing": [
+        "p1: Holding close and sitting together convey closeness through action.",
+        "p2: Sam reaching in and stopping shows sudden concern through action.",
+        "p3: No action or speech reveals an inner feeling.",
+        "p4: Watching the tree does not convey a specific feeling.",
+        "p5: No action or speech reveals how Ted feels.",
+        "p6: The page lists sights without conveying feeling.",
+        "p7: Sam picking Ted up shows relief and care through action.",
+        "p8: The tight hug conveys affection through action."
+      ],
+      "momentum": [
+        "p1: The scene settles with no open question or new beginning.",
+        "p2: Ted slipping creates an unresolved incident.",
+        "p3: Ted boarding the next train leaves the separation unresolved.",
+        "p4: The page ends on the completed act of watching.",
+        "p5: The page closes on continued watching.",
+        "p6: The page ends on a static list of images.",
+        "p7: The reunion begins and invites the next page.",
+        "p8: Home waiting provides a satisfying close to the story."
+      ]
+    }
+  },
+  "judge_error": null
+}

@@ -1,0 +1,15 @@
+{
+  "child": {
+    "name": "Noor",
+    "age": 4,
+    "pronouns": "they/them",
+    "reading_level": "pre_reader",
+    "interests": ["gardens", "worms"]
+  },
+  "premise": "a child who plants a seed and waits for it to grow",
+  "tone": "gentle",
+  "world_rules": "realistic",
+  "page_count": 8,
+  "must_include": [],
+  "avoid": []
+}

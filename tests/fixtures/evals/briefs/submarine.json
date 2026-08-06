@@ -1,0 +1,15 @@
+{
+  "child": {
+    "name": "Ada",
+    "age": 6,
+    "pronouns": "she/her",
+    "reading_level": "developing",
+    "interests": ["submarines", "oceans"]
+  },
+  "premise": "a child who wants to know how a submarine sinks and rises",
+  "tone": "adventurous",
+  "world_rules": "realistic",
+  "page_count": 8,
+  "must_include": ["a bathtub experiment"],
+  "avoid": []
+}

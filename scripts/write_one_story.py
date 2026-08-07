@@ -61,6 +61,7 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -404,6 +405,14 @@ async def run_stages(
     started: float,
 ) -> int:
     """Run up to the requested stage, printing and saving as each completes."""
+    # One id for the whole run, minted here rather than inside either pipeline.
+    # `--stage all` runs two entrypoints, and left to themselves they mint one id
+    # each -- correct for the MCP path, where they are separate tool calls that
+    # may be minutes apart, but it means one book produces two traces that
+    # nothing can join. This script is a single operator action, so it knows the
+    # two stages belong together and the pipelines cannot.
+    request_id = str(uuid4())
+
     # One numbered file per completed task, shared by both pipelines so the
     # numbering runs straight through a run. The revision loops live inside the
     # entrypoints, so a returned Story shows only the drafts that survived --
@@ -468,7 +477,9 @@ async def run_stages(
     # second planning call any more. That is what retires the artifact trap:
     # `outline.json` used to come from a throwaway plan while the book came from
     # another, so the two disagreed and the disagreement looked like a bug. Twice.
-    outline = await run_outline_pipeline(brief, on_task_result=save_iteration)
+    outline = await run_outline_pipeline(
+        brief, on_task_result=save_iteration, request_id=request_id
+    )
 
     print(f"\n{'=' * 66}\n  {outline.title}\n  {outline.logline}\n{'=' * 66}")
     print(f"\nTheme: {outline.theme}\n")
@@ -524,7 +535,9 @@ async def run_stages(
     # Built from the outline above -- the same object, not a re-plan. This path
     # now exercises the workflow exactly as the MCP tool does, because the tool
     # threads an outline in too.
-    story = await run_story_pipeline(brief, outline, on_task_result=save_iteration)
+    story = await run_story_pipeline(
+        brief, outline, on_task_result=save_iteration, request_id=request_id
+    )
     save_json(run_dir, "story.json", story)
 
     # Illustration comes before the PDF, since the PDF is what the pictures go in.

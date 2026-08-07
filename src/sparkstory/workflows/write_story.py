@@ -42,6 +42,7 @@ from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.prose_critic import ProseCriticNode
 from sparkstory.nodes.writer import WriterNode
+from sparkstory.observability.tracing import build_handler
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.retries import RETRY_POLICY
 from sparkstory.workflows.reviews import (
@@ -227,6 +228,8 @@ async def run_story_pipeline(
     brief: StoryBrief,
     outline: StoryOutline,
     on_task_result: Callable[[str, Any], None] | None = None,
+    *,
+    request_id: str | None = None,
 ) -> Story:
     """Write a complete story from a brief and an approved plan.
 
@@ -245,6 +248,11 @@ async def run_story_pipeline(
             indistinguishable from one that passed first time. Optional, and
             nothing on the MCP path passes it: an operator debugging a run wants
             every iteration, a client wants the book.
+        request_id: Identifies this run in the logs and, when tracing is on, as
+            the Opik thread id. Pass the same value ``run_outline_pipeline``
+            received to make one book one thread. The MCP path passes nothing:
+            a client's ``write_story`` call is its own run, and may carry an
+            outline this server never planned.
 
     Raises:
         MissingAPIKeyError: a configured model's API key is not set.
@@ -254,7 +262,7 @@ async def run_story_pipeline(
         UnsafeContentError: a safety finding survived every rewrite, so no book
             is returned.
     """
-    request_id = str(uuid4())
+    request_id = request_id or str(uuid4())
     logger.info(
         "[%s] writing story: age=%d level=%s tone=%s pages=%d",
         request_id,
@@ -269,9 +277,13 @@ async def run_story_pipeline(
     # tool exercises. `stream_mode="updates"` yields one mapping per completed
     # task, keyed by task name; the entrypoint's own return arrives the same way.
     story: Story | None = None
+    # See run_outline_pipeline: one attachment covers every task beneath it, and
+    # a None handler is filtered out rather than passed into the callback list.
+    tracer = build_handler(request_id, tags=["write_story"])
     async for update in STORY_WORKFLOW.astream(
         StoryWorkflowInput(request_id=request_id, brief=brief, outline=outline),
         stream_mode="updates",
+        config={"callbacks": [t for t in [tracer] if t is not None]},
     ):
         for name, value in update.items():
             if isinstance(value, Story):

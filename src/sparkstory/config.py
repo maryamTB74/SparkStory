@@ -313,6 +313,30 @@ class Settings(BaseSettings):
         description="Fetch each cited page and confirm it supports the claim.",
     )
 
+    # --- Opik (observability) --------------------------------------------
+    # Off by default, and that default is what keeps the other three fields
+    # Rule 3-compliant: they gate code that exists rather than a hypothetical.
+    opik_enabled: bool = Field(
+        default=False,
+        alias="OPIK_ENABLED",
+        description="Send traces to Opik. Off by default",
+    )
+    opik_api_key: SecretStr | None = Field(
+        default=None,
+        alias="OPIK_API_KEY",
+        description="Opik key, read only when OPIK_ENABLED is true",
+    )
+    opik_workspace: str | None = Field(
+        default=None,
+        alias="OPIK_WORKSPACE",
+        description="Opik workspace holding the project",
+    )
+    opik_project_name: str = Field(
+        default="sparkstory",
+        alias="OPIK_PROJECT_NAME",
+        description="Opik project name traces are grouped under",
+    )
+
     # --- Validators -----------------------------------------------------
     @field_validator(
         "google_api_key",
@@ -320,6 +344,7 @@ class Settings(BaseSettings):
         "perplexity_api_key",
         "firecrawl_api_key",
         "tavily_api_key",
+        "opik_api_key",
         mode="before",
     )
     @classmethod

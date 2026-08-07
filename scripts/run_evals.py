@@ -37,6 +37,7 @@ from sparkstory.evals.metrics.judge import BookJudge
 from sparkstory.evals.metrics.types import BookScorecard
 from sparkstory.evals.scorecard import score_book
 from sparkstory.models.get_model import get_chat_model
+from sparkstory.observability.dataset import experiment_config, upload_fixture_briefs
 from sparkstory.utils.logging_utils import configure_logging
 from sparkstory.workflows.plan_outline import run_outline_pipeline
 from sparkstory.workflows.write_story import run_story_pipeline
@@ -92,6 +93,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("outputs"),
         help="where --fixtures writes its runs",
+    )
+    parser.add_argument(
+        "--opik",
+        action="store_true",
+        help="upload the fixture briefs to Opik and record the run there",
     )
     return parser.parse_args()
 
@@ -166,6 +172,11 @@ async def generate_and_score(
                 value.model_dump_json(indent=2) + "\n", encoding="utf-8"
             )
 
+    # Following the course, which tags its evaluation runs separately so a
+    # measurement is distinguishable from a real book. The pipelines build their
+    # own tracers; this records which fixture the spans underneath belong to.
+    logger.info("eval run for fixture %r", name)
+
     outline = await run_outline_pipeline(brief, on_task_result=capture)
     story = await run_story_pipeline(brief, outline)
 
@@ -219,6 +230,22 @@ def print_table(cards: list[BookScorecard]) -> None:
 async def main() -> int:
     args = parse_args()
     configure_logging()
+
+    # Before anything is generated. An upload that fails after a fixture run has
+    # paid for five books would be the expensive way to learn a key is missing,
+    # and finding P is the worked example: the untested script died at the live
+    # run, after the search had already been paid for.
+    if args.opik:
+        if not args.fixtures:
+            print("--opik applies to --fixtures runs only")
+            return 1
+        try:
+            count = upload_fixture_briefs()
+        except RuntimeError as error:
+            print(f"--opik: {error}")
+            return 1
+        print(f"uploaded {count} briefs to Opik")
+        logger.info("experiment config: %s", experiment_config())
 
     targets: list[tuple[str, Path]] = []
     if args.fixtures:

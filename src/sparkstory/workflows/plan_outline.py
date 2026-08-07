@@ -27,6 +27,7 @@ from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.outline_critic import OutlineCriticNode
 from sparkstory.nodes.researcher import ResearcherNode, build_researcher_agent
 from sparkstory.nodes.story_planner import StoryPlannerNode
+from sparkstory.observability.tracing import build_handler
 from sparkstory.retrieval.embed import get_embedder
 from sparkstory.retrieval.hybrid import HybridIndex
 from sparkstory.retrieval.provenance import drop_unprovenanced
@@ -255,6 +256,8 @@ OUTLINE_WORKFLOW = build_outline_workflow()
 async def run_outline_pipeline(
     brief: StoryBrief,
     on_task_result: Callable[[str, Any], None] | None = None,
+    *,
+    request_id: str | None = None,
 ) -> StoryOutline:
     """Plan a story's structure and revise it until a critic approves.
 
@@ -267,6 +270,13 @@ async def run_outline_pipeline(
         on_task_result: Called with ``(task_name, result)`` as each ``@task``
             completes, including every loop iteration. Optional, and nothing on
             the MCP path passes it.
+        request_id: Identifies this run in the logs and, when tracing is on, as
+            the Opik thread id. Supply it to join this call to a later
+            ``run_story_pipeline`` as one book -- which only a caller that knows
+            both stages belong together may do. The MCP path passes nothing and
+            gets a fresh id, because ``plan_story`` and ``write_story`` are
+            separate tool calls that may be minutes apart and may not even
+            concern the same outline.
 
     Raises:
         MissingAPIKeyError: a configured model's API key is not set.
@@ -274,7 +284,7 @@ async def run_outline_pipeline(
         StoryStructureError: the planner produced more beats than the brief has
             pages, and could not be talked out of it.
     """
-    request_id = str(uuid4())
+    request_id = request_id or str(uuid4())
     logger.info(
         "[%s] planning outline: age=%d level=%s pages=%d",
         request_id,
@@ -289,9 +299,16 @@ async def run_outline_pipeline(
     # mistake a task result for the final answer -- and hand every intermediate
     # draft to on_task_result as if it were the finished plan.
     outline: StoryOutline | None = None
+    # One attachment per pipeline: LangGraph propagates callbacks down the
+    # runnable tree, so every @task and every node call beneath this is covered
+    # without touching any of them. `build_handler` returns None when tracing is
+    # off, and a None inside the callback list is an AttributeError in the middle
+    # of a paid run, so it is filtered rather than passed through.
+    tracer = build_handler(request_id, tags=["plan_outline"])
     async for update in OUTLINE_WORKFLOW.astream(
         OutlineWorkflowInput(request_id=request_id, brief=brief),
         stream_mode="updates",
+        config={"callbacks": [t for t in [tracer] if t is not None]},
     ):
         for name, value in update.items():
             if name == "outline_workflow":

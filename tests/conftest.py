@@ -26,6 +26,23 @@ from sparkstory.entities.stories import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _tracing_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force Opik off for every test, whatever the developer's .env says.
+
+    Autouse and unconditional, because the failure it prevents is invisible from
+    inside the suite. The workflow tests invoke a pipeline 37 times, each
+    minting a fresh ``request_id``; with ``OPIK_ENABLED=true`` in a .env that is
+    37 threads uploaded per suite run, and it produced hundreds in a real
+    project before anyone connected the two.
+
+    This is non-obvious rule 25 again -- a test that fakes only the model still
+    reaches a real service, because the seam it forgot is a different one. The
+    tests that need tracing on set it themselves, after this fixture runs.
+    """
+    monkeypatch.setattr("sparkstory.config.settings.opik_enabled", False)
+
+
 @pytest.fixture
 def child() -> ChildProfile:
     return ChildProfile(

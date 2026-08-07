@@ -46,6 +46,7 @@ dependencies = [
     # the API response rather than from a model, which is why it can also stand
     # in for verification when Firecrawl itself is the thing that is down.
     "tavily-python>=0.7.12",
+    "opik>=2.2.18",
 ]
 
 [project.scripts]

@@ -324,3 +324,46 @@ class TestWebSearchSettings:
             base = name.removesuffix("-researcher")
             assert base in configs, f"{name} has no base entry {base!r}"
             assert cfg["identifier"] == configs[base]["identifier"]
+
+
+class TestOpikSettings:
+    def test_opik_is_disabled_by_default(self) -> None:
+        """Opik is infrastructure, so the app must be unchanged when nobody
+        asked for it. This default is also what makes the other three fields
+        Rule 3-compliant: they gate code rather than describe a hypothetical.
+
+        Asserted against the **field defaults**, following
+        `test_web_search_is_off_by_default` below. A bare `Settings()` reads
+        `.env`, so it would assert "*this machine's* .env does not enable Opik"
+        -- ambient rather than a property of the code. This test was written
+        that way and broke the moment a real .env set OPIK_ENABLED=true, which
+        is the same trap that row already records.
+        """
+        fields = Settings.model_fields
+        assert fields["opik_enabled"].default is False
+        assert fields["opik_api_key"].default is None
+        assert fields["opik_workspace"].default is None
+        assert fields["opik_project_name"].default == "sparkstory"
+
+    def test_blank_opik_key_normalises_to_none(self) -> None:
+        """Non-obvious rule 3, for this key specifically.
+
+        `OPIK_API_KEY=` arrives as `""` rather than as absent, and pydantic would
+        build `SecretStr('')` -- which is not None, so `configure()` would treat
+        it as configured and fail at the first span instead of degrading to
+        "tracing off". One test per key, following the web-key convention above,
+        because adding a field to `_blank_to_none` is the edit most easily
+        forgotten.
+        """
+        assert Settings(opik_api_key="   ").opik_api_key is None
+
+    def test_a_real_opik_key_survives(self) -> None:
+        s = Settings(opik_api_key="a-real-key")
+        assert isinstance(s.opik_api_key, SecretStr)
+        assert s.opik_api_key.get_secret_value() == "a-real-key"
+
+    def test_the_opik_key_is_masked_in_a_repr(self) -> None:
+        """Same guarantee every other credential gets: an accidental
+        `logger.info(settings)` must not leak it."""
+        s = Settings(opik_api_key="super-secret-value")
+        assert "super-secret-value" not in repr(s)

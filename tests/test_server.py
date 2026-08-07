@@ -8,7 +8,7 @@ separate from ``main``.
 import pytest
 from fastmcp import Client
 
-from sparkstory.mcp.server import create_server
+from sparkstory.mcp.server import _build_parser, create_server, main
 
 
 class TestToolRegistration:
@@ -213,3 +213,113 @@ class TestPromptContent:
         """The one instruction here with a real-world cost if ignored."""
         assert "pronouns" in text
         assert "Never infer" in text
+
+
+class TestTransportSelection:
+    """Which transport ``main`` serves on, and what reaches ``FastMCP.run``.
+
+    None of this proves HTTP transport actually serves MCP -- that needs a real
+    client against a real port and is deliberately left to a live run. What these
+    do protect is the wiring: the default, and whether host and port are forwarded.
+    """
+
+    def test_default_transport_is_stdio(self) -> None:
+        """The regression with the widest blast radius.
+
+        ``uv run sparkstory`` with no arguments is how ``.mcp.json.sample``, the
+        assignment's client config and ``make run`` all launch this. The course
+        defaults to http, so "align with the course" is a plausible future edit --
+        and its symptom would be every existing client hanging rather than an
+        error. This test makes that edit fail loudly instead.
+        """
+        assert _build_parser().parse_args([]).transport == "stdio"
+
+    @pytest.mark.parametrize("argv", [["--transport", "http"], ["-t", "http"]])
+    def test_http_can_be_requested(self, argv: list[str]) -> None:
+        assert _build_parser().parse_args(argv).transport == "http"
+
+    @pytest.mark.parametrize("rejected", ["sse", "streamable-http", "grpc"])
+    def test_only_two_transports_are_offered(self, rejected: str) -> None:
+        """``sse`` is deprecated and ``streamable-http`` is a synonym for ``http``.
+
+        FastMCP accepts all four. Offering four names for three behaviours invites
+        someone to pick the deprecated one, so the restriction is deliberate --
+        and this test is what makes lifting it a conscious act.
+        """
+        with pytest.raises(SystemExit):
+            _build_parser().parse_args(["--transport", rejected])
+
+    def test_stdio_path_passes_no_host_or_port(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """stdio has no address, and passing one would be a silent no-op."""
+        captured: dict[str, object] = {}
+        monkeypatch.setattr(
+            "sparkstory.mcp.server.FastMCP.run",
+            lambda self, **kwargs: captured.update(kwargs),
+        )
+        monkeypatch.setattr("sys.argv", ["sparkstory"])
+
+        main()
+
+        assert "host" not in captured
+        assert "port" not in captured
+        assert captured["show_banner"] is False
+
+    def test_http_path_forwards_host_and_port_from_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The test that actually exercises the mechanism.
+
+        ``run(transport="http", host=..., port=...)`` forwards through
+        ``**transport_kwargs``, which is why uvicorn is neither imported nor
+        declared as a dependency. If that forwarding breaks, the server binds
+        FastMCP's own defaults instead of the configured ones -- and the
+        parser-level tests above would still pass, because the flag parsed fine.
+        """
+        captured: dict[str, object] = {}
+        monkeypatch.setattr(
+            "sparkstory.mcp.server.FastMCP.run",
+            lambda self, **kwargs: captured.update(kwargs),
+        )
+        # String form, matching tests/test_observability_tracing.py: it patches the
+        # attribute on the settings module itself, so it holds regardless of how a
+        # module reached `settings`.
+        monkeypatch.setattr("sparkstory.config.settings.server_host", "0.0.0.0")
+        monkeypatch.setattr("sparkstory.config.settings.server_port", 9123)
+        monkeypatch.setattr("sys.argv", ["sparkstory", "--transport", "http"])
+
+        main()
+
+        assert captured["transport"] == "http"
+        assert captured["host"] == "0.0.0.0"
+        assert captured["port"] == 9123
+        assert captured["show_banner"] is False
+
+
+class TestStdoutStaysSilent:
+    """Non-obvious rule 2, as an executable check rather than a comment.
+
+    Under stdio transport stdout carries JSON-RPC, so a single stray ``print``
+    corrupts the protocol into a JSON parse error that looks nothing like its
+    cause. This is not hypothetical: the course's own ``research_agent_part_3``
+    prints its startup banner to stdout and *then* falls through to
+    ``mcp.run(transport="stdio")`` in its else branch. It gets away with it
+    because http is its default; ours is stdio, so the same code would break
+    ``make run``.
+    """
+
+    def test_starting_on_stdio_writes_nothing_to_stdout(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(
+            "sparkstory.mcp.server.FastMCP.run", lambda self, **kwargs: None
+        )
+        monkeypatch.setattr("sys.argv", ["sparkstory"])
+
+        main()
+
+        assert capsys.readouterr().out == "", (
+            "something wrote to stdout before the stdio transport started; "
+            "that corrupts JSON-RPC"
+        )

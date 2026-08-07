@@ -81,6 +81,21 @@ class Settings(BaseSettings):
         description="Server version advertised to MCP clients",
     )
 
+    # --- HTTP transport -------------------------------------------------
+    server_host: str = Field(
+        default="127.0.0.1",
+        alias="SERVER_HOST",
+        description="Interface the HTTP transport binds to",
+    )
+    # `int` rather than `str` so pydantic rejects SERVER_PORT=abc at startup with
+    # a field error naming the variable, instead of it surfacing as a TypeError
+    # from inside the ASGI server.
+    server_port: int = Field(
+        default=8000,
+        alias="SERVER_PORT",
+        description="Port the HTTP transport listens on",
+    )
+
     # --- Logging --------------------------------------------------------
     # Split levels: ours vs third-party. See utils/logging_utils.py for why.
     log_level: str = Field(

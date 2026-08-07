@@ -1,0 +1,67 @@
+# What never enters the build context.
+#
+# Written before the Dockerfile deliberately. The context is read on the first
+# build, and the `.env` rule below is the only irreversible mistake available
+# here: pre-commit refuses to commit `.env` to git, but nothing guards a build
+# context, and a key baked into an image layer survives deleting the file.
+
+# --- Credentials -----------------------------------------------------------
+.env
+.env.local
+.env.*
+!.env.sample
+
+# --- Host-specific Python --------------------------------------------------
+# The image builds its own venv from uv.lock. This one holds absolute host paths
+# and is also the largest thing in the context by far, so excluding it is what
+# makes a rebuild fast.
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- Tool caches -----------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Version control -------------------------------------------------------
+# Nothing in the build reads history.
+.git/
+.gitignore
+.pre-commit-config.yaml
+
+# --- Generated output ------------------------------------------------------
+# Gitignored and disposable. Also: every run directory holds a real child's
+# name, which is personal data about a minor. It must not be copied into an
+# image that could be pushed to a registry.
+outputs/
+
+# --- Real persistence ------------------------------------------------------
+# Gitignored, and deliberately *mounted* rather than copied -- see the volumes
+# in docker-compose.yml. Baking a knowledge index into the image would make it
+# stale the moment the corpus changed, with nothing to reveal it.
+data/
+
+# --- Not needed at runtime -------------------------------------------------
+docs/
+Makefile
+
+# README.md and LICENSE are deliberately NOT excluded, despite being unused at
+# runtime. `pyproject.toml` references both -- `readme = "README.md"` and
+# `license-files = ["LICENSE"]` -- so `uv sync` fails to build the project
+# without them. The first two builds of this image failed on exactly this, once
+# per file. The rule to carry forward: exclusions here must be judged against
+# what the *build* reads, not only what the runtime needs.
+
+# The committed corpus is an *ingestion* input, and ingestion is an offline step
+# run on the host. Excluding it means the container reads a pre-built index from
+# the mounted data/ volume and cannot re-ingest. That is the intended split for
+# now; item 9 of the infrastructure spec moves the index into Postgres and
+# retires the question.
+corpus/
+
+# Tests are not shipped. `make ci-local` runs on the host and in CI, not in the
+# runtime image -- an image that can run its own tests needs the dev group
+# installed, which is a larger image for no runtime benefit.
+tests/

@@ -1,0 +1,73 @@
+# Local Docker is the deployment target for now -- see
+# docs/superpowers/specs/2026-08-05-infrastructure-design.md, item 8, which is
+# deferred with no cloud host chosen.
+#
+
+services:
+  sparkstory:
+    build: .
+    container_name: sparkstory
+    environment:
+      # Set HERE rather than as the application default, and that split is the
+      # point. `Settings.server_host` defaults to 127.0.0.1 because this server
+      # authenticates nobody and spends real API keys on every tool call, so a
+      # network-reachable default would be an exposure nobody notices. Overriding
+      # it in a file you can read makes publishing the port a deliberate act.
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_LEVEL_DEPENDENCIES: ${LOG_LEVEL_DEPENDENCIES:-WARNING}
+
+      # Credentials pass through from the host `.env`, which compose reads
+      # automatically. No values appear here and no defaults are supplied: an
+      # empty string is normalised to None by the settings validator, so a
+      # missing key produces a targeted error naming the variable rather than a
+      # confusing auth failure.
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      XAI_API_KEY: ${XAI_API_KEY}
+
+      # Every model var, and this block is not optional padding.
+      PLANNER_MODEL: ${PLANNER_MODEL:-gemini-3.5-flash}
+      PLOT_MODEL: ${PLOT_MODEL:-gemini-3.5-flash}
+      WRITER_MODEL: ${WRITER_MODEL:-gemini-3.5-flash}
+      RESEARCHER_MODEL: ${RESEARCHER_MODEL:-gemini-3.5-flash}
+      OUTLINE_CRITIC_MODEL: ${OUTLINE_CRITIC_MODEL:-gemini-3.5-flash-critic}
+      PROSE_CRITIC_MODEL: ${PROSE_CRITIC_MODEL:-gemini-3.5-flash-critic}
+
+      # Retrieval. EMBEDDING_MODEL names an entry in a *different* registry from
+      # the model vars above.
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-potion-base-8M}
+      MAX_RESEARCH_STEPS: ${MAX_RESEARCH_STEPS:-4}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+
+      # MAX_WEB_SEARCHES and OPIK_ENABLED are deliberately absent. Both default
+      # to off, and Rule 3 says config for a path this container is not
+      # exercising should not be written before it is. Add them, with their
+      # keys, when a container run needs to search the web or trace.
+
+    ports:
+      - "${SERVER_PORT:-8000}:8000"
+
+    volumes:
+      # Carries two things, and the second is easy to miss: the committed
+      # knowledge index AND the HuggingFace weight cache, because the Dockerfile
+      # points HF_HOME at /app/data/.hf-cache. Without this mount, model2vec
+      # re-downloads ~59 MB into a container that then throws it away -- and if it
+      # cannot, retrieval returns nothing *silently*, because store.py treats an
+      # absent index as "return nothing" by design.
+      - ./data:/app/data
+      # Provisional. Today only scripts/write_one_story.py writes here and the
+      # MCP tools write nothing, so this mount matters for `docker compose run`
+      # rather than for the served path. It becomes load-bearing at item 3 of the
+      # Phase B roadmap, when artifact writing moves out of the script.
+      - ./outputs:/app/outputs
+
+    # Deliberately no `restart: unless-stopped` -- this is a container started by
+    # hand for local use, and a restart loop on a misconfigured key would hide the
+    # error rather than surface it.
+    #
+    # Deliberately no `./src:/app/src:ro` bind mount for hot reload
+    # It reintroduces exactly the host/container divergence the
+    # image exists to remove: the mounted source would run against the image's
+    # frozen dependency set, so a code change requiring a new package would fail
+    # in a way that looks like a code bug.

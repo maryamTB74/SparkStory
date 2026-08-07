@@ -1,0 +1,80 @@
+# Continuous integration.
+#
+# Two jobs, and both run the same Makefile targets used locally. That is the
+# lesson's own principle: "CI should run the exact same commands you run
+# locally." `QA_PATHS := src tests scripts` is defined once, in the Makefile;
+# duplicating those paths into this file is what makes CI and local drift.
+#
+# NO SECRETS, and that is deliberate rather than an omission. The 649 offline
+# tests were verified to pass under `env -i` -- no .env, no keys, which is what a
+# runner is. So a green run here is *evidence* that the suite is still offline. A
+# single API key in this file would destroy that signal, because a test could
+# then quietly start depending on the network and nothing would reveal it.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A second push to the same branch makes the first run's result irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: format + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # --only-dev installs ruff and pytest WITHOUT the ~70 runtime packages,
+      # which takes ~2s against ~90s for a full sync (model2vec, opik and
+      # langchain-google-genai are the bulk of it). Safe here because linting
+      # never imports the application.
+      #
+      # It is NOT safe for the tests job below: --only-dev actively *removes*
+      # runtime packages from an existing venv, so a shared environment would
+      # break. Separate jobs run on separate runners, so they cannot interfere.
+      - run: uv sync --only-dev --frozen
+
+      # --no-sync so ruff cannot silently trigger a full dependency install and
+      # erase the point of the step above.
+      - run: uv run --no-sync ruff format --check src tests scripts
+      - run: uv run --no-sync ruff check src tests scripts
+
+  tests:
+    name: tests (offline)
+    runs-on: ubuntu-latest
+    env:
+      # opik registers itself as a pytest plugin -- verified with
+      # `pytest --trace-config`, which reports
+      # "PLUGIN registered: opik.plugins.pytest.hooks". So it loads in every test
+      # run regardless of OPIK_ENABLED, and without this it would attempt to
+      # report results to a backend that has no credentials here.
+      OPIK_TRACK_DISABLE: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # Full sync, NOT --only-dev: the tests import the application, so they need
+      # the runtime dependencies as well as pytest.
+      - run: uv sync --frozen
+
+      # `make test` and not a raw pytest invocation, so the excluded markers stay
+      # defined in one place. pyproject.toml sets addopts = ["-m", "not corpus"],
+      # which is what keeps the 8 retrieval-quality tests out: they need real
+      # embedding weights (a ~59 MB download) and a built index, and they have
+      # their own target, `make test-corpus`.
+      - run: make test

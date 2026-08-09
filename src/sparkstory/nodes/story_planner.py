@@ -147,14 +147,14 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
     ``world_rules`` decides how the facts are framed, and it is deliberately a
     *required* argument: a default here could drift from ``StoryBrief``'s default
     and the divergence would be invisible, since both produce a perfectly valid
-    prompt. Only the facts half branches -- a refrain works in any genre, so craft
-    devices render identically either way.
+    Only the facts half exists now: the craft corpus, and with it the device half
+    of this renderer, was removed.
 
     Returns an empty string when there is nothing, so a brief with no grounding
     renders byte-identically to how it rendered before this feature existed --
     which keeps the provider-side prompt-cache prefix intact.
     """
-    if not grounding.facts and not grounding.craft_devices:
+    if not grounding.facts:
         return ""
 
     lines = [""]
@@ -183,25 +183,11 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
             ]
         lines += [f"- {fact.story_note}" for fact in grounding.facts]
 
-    if grounding.craft_devices:
-        lines += [
-            "",
-            "Build the story so this can work when it is read aloud:",
-        ]
-        # Finding Q. Handed a "repeat a short line" device beside a note, the
-        # cheapest way to satisfy both is to repeat the note -- and the eagle run
-        # did exactly that, putting "Wings need air to push against" in three
-        # beats verbatim. A repeated line is prose, so it has to come from the
-        # story; nothing else forbade taking it from the grounding.
-        lines.append(
-            "A line that repeats must be built from the story's own words -- "
-            "something a character does or says. Never repeat anything written "
-            "above, and never describe the technique instead of using it."
-        )
-        lines += [
-            f"- {device.device}: {device.how_to_use}"
-            for device in grounding.craft_devices
-        ]
+    # The craft-device block used to render here, and it carried the fix for
+    # finding Q: a repeated line must be built from the story's own words, because
+    # handed a "repeat a short line" device beside a story_note the cheapest way to
+    # satisfy both is to repeat the note -- which the eagle run did, verbatim, in
+    # three beats. That instruction went with the devices it constrained.
 
     return "\n".join(lines)
 

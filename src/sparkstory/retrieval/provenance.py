@@ -27,9 +27,9 @@ model judging a model is the next session's problem.
 
 from typing import TYPE_CHECKING
 
-from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.retrieval.chunks import SourceKind
-from sparkstory.retrieval.store import LocalVectorStore
+from sparkstory.retrieval.protocol import ChunkStore
 from sparkstory.retrieval.web.ledger import WEB_ID_PREFIX
 from sparkstory.utils.logging_utils import get_logger
 
@@ -71,7 +71,7 @@ def _keep_web_fact(item: GroundedFact, ledger: WebLedger | None) -> GroundedFact
 
 def drop_unprovenanced(
     grounding: StoryGrounding,
-    store: LocalVectorStore,
+    store: ChunkStore,
     ledger: WebLedger | None = None,
 ) -> StoryGrounding:
     """Return grounding containing only what ``store`` or ``ledger`` can vouch for.
@@ -124,43 +124,8 @@ def drop_unprovenanced(
         # point of the step; only attribution is ours to correct.
         kept_facts.append(item.model_copy(update={"source": chunk.source}))
 
-    kept_devices: list[CraftDevice] = []
-    for craft in grounding.craft_devices:
-        if craft.chunk_id.startswith(WEB_ID_PREFIX):
-            # A category error, like a craft chunk cited as a fact. Read-aloud
-            # technique comes from the curated collection; a web page is not one.
-            logger.warning(
-                "dropping craft device citing the web %r: %r",
-                craft.chunk_id,
-                craft.device,
-            )
-            continue
-        chunk = store.get(craft.chunk_id)
-        if chunk is None:
-            logger.warning(
-                "dropping craft device citing unknown chunk %r: %r",
-                craft.chunk_id,
-                craft.device,
-            )
-            continue
-        if chunk.source_kind is not SourceKind.CRAFT:
-            logger.warning(
-                "dropping craft device citing a %s chunk %r",
-                chunk.source_kind.value,
-                craft.chunk_id,
-            )
-            continue
-        kept_devices.append(craft)
-
-    dropped = (len(grounding.facts) - len(kept_facts)) + (
-        len(grounding.craft_devices) - len(kept_devices)
-    )
+    dropped = len(grounding.facts) - len(kept_facts)
     if dropped:
-        logger.info(
-            "provenance: kept %d fact(s) and %d device(s), dropped %d",
-            len(kept_facts),
-            len(kept_devices),
-            dropped,
-        )
+        logger.info("provenance: kept %d fact(s), dropped %d", len(kept_facts), dropped)
 
-    return StoryGrounding(facts=kept_facts, craft_devices=kept_devices)
+    return StoryGrounding(facts=kept_facts)

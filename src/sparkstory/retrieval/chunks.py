@@ -31,12 +31,20 @@ from pydantic import BaseModel, Field
 class SourceKind(StrEnum):
     """Which index a chunk belongs to.
 
-    Exactly two, because each retrieval tool pins one. A third value would be
-    reachable by no tool, i.e. a chunk nothing could ever find.
+    **One member, since craft was dropped.** There were two -- ``FACT`` and
+    ``CRAFT`` -- with one retrieval tool pinning each, and the split was a
+    deliberate design: it made index selection *observable*, because "did the
+    Researcher consult craft for a premise with no factual spine?" was answered by
+    which tool appeared in the log rather than by reading a paragraph.
+
+    The enum survives the removal rather than being replaced by a bare string,
+    for two reasons. The corpus layout maps a directory to a kind, so ingestion
+    needs something to map *to*; and a stored ``source_kind`` column plus a
+    filtering query are much easier to extend than to reintroduce. A second kind
+    is one member and one directory away.
     """
 
     FACT = "fact"
-    CRAFT = "craft"
 
 
 def chunk_id_for(file_stem: str, ordinal: int) -> str:

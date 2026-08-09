@@ -4,9 +4,39 @@
 #
 
 services:
+  # pgvector/pgvector:pg16 rather than the course's postgres:16-alpine, because
+  # `vector(n)` is not a type without the extension. Same Postgres 16 underneath.
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sparkstory-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sparkstory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sparkstory_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-sparkstory}
+    ports:
+      # Published so `make migrate` and `make ingest` can reach it from the host.
+      # Ingestion is an offline step run on the host, not in the container --
+      # lesson 9's offline/online split.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Named volume, not a bind mount: this is real persistence, and a bind mount
+      # into the repo would put a database inside a git working tree.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # The server must not start before Postgres accepts connections. Without the
+      # gate the first query fails intermittently -- the worst kind of failure,
+      # because it passes on a warm cache and fails on a cold start.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sparkstory}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   sparkstory:
     build: .
     container_name: sparkstory
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       # Set HERE rather than as the application default, and that split is the
       # point. `Settings.server_host` defaults to 127.0.0.1 because this server
@@ -33,6 +63,12 @@ services:
       RESEARCHER_MODEL: ${RESEARCHER_MODEL:-gemini-3.5-flash}
       OUTLINE_CRITIC_MODEL: ${OUTLINE_CRITIC_MODEL:-gemini-3.5-flash-critic}
       PROSE_CRITIC_MODEL: ${PROSE_CRITIC_MODEL:-gemini-3.5-flash-critic}
+
+      # `postgres` is the compose network hostname, NOT localhost -- inside the
+      # container localhost is the container itself. This is why the value here
+      # differs from the DATABASE_URL a host-side `make migrate` uses, which
+      # reaches the same database through the published port.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sparkstory}:${POSTGRES_PASSWORD:-sparkstory_dev_password}@postgres:5432/${POSTGRES_DB:-sparkstory}
 
       # Retrieval. EMBEDDING_MODEL names an entry in a *different* registry from
       # the model vars above.
@@ -71,3 +107,8 @@ services:
     # image exists to remove: the mounted source would run against the image's
     # frozen dependency set, so a code change requiring a new package would fail
     # in a way that looks like a code bug.
+
+volumes:
+  # Named rather than a bind mount into the repo: this is the corpus index and,
+  # later, real book data. `docker compose down` keeps it; `down -v` destroys it.
+  postgres_data:

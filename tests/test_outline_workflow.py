@@ -454,7 +454,11 @@ class TestWebLedgerConstruction:
         from sparkstory.workflows import plan_outline as module
 
         monkeypatch.setattr(live, "max_web_searches", 0)
-        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        # These tests are about the ledger, not about retrieval, so the store
+        # is stubbed rather than pointed at a real database. Before the move to
+        # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
+        # index; `build_store` now needs DATABASE_URL, which a runner has not got.
+        monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools
@@ -471,7 +475,11 @@ class TestWebLedgerConstruction:
         from sparkstory.workflows import plan_outline as module
 
         monkeypatch.setattr(live, "max_web_searches", 3)
-        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        # These tests are about the ledger, not about retrieval, so the store
+        # is stubbed rather than pointed at a real database. Before the move to
+        # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
+        # index; `build_store` now needs DATABASE_URL, which a runner has not got.
+        monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools
@@ -490,7 +498,11 @@ class TestWebLedgerConstruction:
         from sparkstory.workflows import plan_outline as module
 
         monkeypatch.setattr(live, "max_web_searches", 3)
-        monkeypatch.setattr(live, "knowledge_root", tmp_path)
+        # These tests are about the ledger, not about retrieval, so the store
+        # is stubbed rather than pointed at a real database. Before the move to
+        # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
+        # index; `build_store` now needs DATABASE_URL, which a runner has not got.
+        monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools

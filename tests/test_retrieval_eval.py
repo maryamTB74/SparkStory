@@ -28,8 +28,7 @@ import pytest
 from sparkstory.config import settings
 from sparkstory.retrieval.chunks import SourceKind
 from sparkstory.retrieval.embed import get_embedder
-from sparkstory.retrieval.hybrid import HybridIndex
-from sparkstory.retrieval.store import LocalVectorStore
+from sparkstory.retrieval.pg_store import PgVectorStore, build_store
 
 pytestmark = pytest.mark.corpus
 
@@ -52,12 +51,6 @@ LABELLED: list[tuple[str, str, SourceKind]] = [
     ("why does the flash come before the bang?", "weather#5", SourceKind.FACT),
     ("could you stand on a cloud?", "weather#6", SourceKind.FACT),
     ("when are foxes awake?", "foxes#1", SourceKind.FACT),
-    (
-        "a rhyme that repeats its first line at the end",
-        "mother-goose#1",
-        SourceKind.CRAFT,
-    ),
-    ("a pattern where the hero tries three times", "mother-goose#3", SourceKind.CRAFT),
     # Exact-term queries. Added after the first measurement showed fusion merely
     # *tying* vector-only -- because every query above is a paraphrase, which is
     # where keyword search is weakest by construction, so the set could not see
@@ -65,8 +58,6 @@ LABELLED: list[tuple[str, str, SourceKind]] = [
     # actually issues: the live runs produced "moon no atmosphere",
     # "repetition for early readers", "fox physical features".
     ("moon no atmosphere", "moon#1", SourceKind.FACT),
-    ("cumulative repetition", "mother-goose#4", SourceKind.CRAFT),
-    ("call and response", "mother-goose#5", SourceKind.CRAFT),
     ("snow crystals six sides", "weather#4", SourceKind.FACT),
     ("tadpole grows legs", "animals#6", SourceKind.FACT),
 ]
@@ -80,20 +71,31 @@ MINIMUM_HIT_RATE_AT_1 = 0.75
 
 
 @pytest.fixture(scope="module")
-def index() -> HybridIndex:
-    store = LocalVectorStore(
-        root=settings.knowledge_root,
-        embedder=get_embedder(settings.embedding_model),
+def index() -> PgVectorStore:
+    """The store under test, skipped rather than failed when no database is up.
+
+    Skipping is the right behaviour here for the same reason the `corpus` marker
+    exists: these tests need a running Postgres holding an ingested corpus, which
+    a plain `make test` has not got. A hard failure would make the default suite
+    depend on a service.
+    """
+    if not settings.database_url:
+        pytest.skip(
+            "DATABASE_URL is not set; start one with `docker compose up -d postgres`"
+        )
+    store = build_store(
+        settings.database_url,
+        get_embedder(settings.embedding_model),
+        settings.embedding_model,
     )
     if not store.is_built:
         pytest.skip(
-            f"No index at {settings.knowledge_root}. "
-            "Build it: uv run python scripts/ingest_knowledge.py"
+            f"No corpus in {store.table.name}. Build it: make migrate && make ingest"
         )
-    return HybridIndex(store=store)
+    return store
 
 
-def _hits_at(index: HybridIndex, top_k: int = 3) -> tuple[int, list[str]]:
+def _hits_at(index: PgVectorStore, top_k: int = 3) -> tuple[int, list[str]]:
     """Return how many queries found their target in the top ``top_k``, and misses."""
     found = 0
     missed: list[str] = []
@@ -108,7 +110,7 @@ def _hits_at(index: HybridIndex, top_k: int = 3) -> tuple[int, list[str]]:
 
 
 class TestHitRate:
-    def test_hit_rate_at_3_holds(self, index: HybridIndex) -> None:
+    def test_hit_rate_at_3_holds(self, index: PgVectorStore) -> None:
         found, missed = _hits_at(index, top_k=3)
         rate = found / len(LABELLED)
         # Printed rather than only asserted: the number is the point, and a run
@@ -118,7 +120,7 @@ class TestHitRate:
             print(f"  MISS {line}")
         assert rate >= MINIMUM_HIT_RATE, f"hit-rate@3 fell to {rate:.2f}"
 
-    def test_hit_rate_at_1_holds(self, index: HybridIndex) -> None:
+    def test_hit_rate_at_1_holds(self, index: PgVectorStore) -> None:
         """Reported as well as @3 because **@3 saturates on this corpus.** Both
         retrievers score 20/20 there, so the number cannot move and cannot detect a
         regression. @1 has room: it is where the first measurement was able to tell
@@ -136,23 +138,23 @@ class TestHitRate:
         regression from noise."""
         assert len(LABELLED) >= 15
 
-    def test_every_expected_chunk_actually_exists(self, index: HybridIndex) -> None:
+    def test_every_expected_chunk_actually_exists(self, index: PgVectorStore) -> None:
         """A typo in an expected id would make a query permanently unsatisfiable,
         and the suite would read that as a retrieval problem forever."""
         missing = [
             expected
             for _query, expected, _kind in LABELLED
-            if index.store.get(expected) is None
+            if index.get(expected) is None
         ]
         assert not missing, f"labelled ids not in the corpus: {missing}"
 
     def test_expected_chunks_are_in_the_index_they_are_labelled_for(
-        self, index: HybridIndex
+        self, index: PgVectorStore
     ) -> None:
         wrong = [
             expected
             for _query, expected, kind in LABELLED
-            if (chunk := index.store.get(expected)) and chunk.source_kind is not kind
+            if (chunk := index.get(expected)) and chunk.source_kind is not kind
         ]
         assert not wrong, f"labelled with the wrong kind: {wrong}"
 
@@ -167,7 +169,7 @@ class TestHybridBeatsEitherHalf:
     """
 
     def test_fusion_is_at_least_as_good_as_vectors_alone(
-        self, index: HybridIndex
+        self, index: PgVectorStore
     ) -> None:
         """Compared **at top-1**, and that is the whole lesson of this test's
         history. Measured at top-3 first, where both retrievers score 20/20 and the
@@ -182,7 +184,9 @@ class TestHybridBeatsEitherHalf:
                 expected
                 in [
                     hit.chunk.chunk_id
-                    for hit in index.store.search(query, source_kind=kind, top_k=top_k)
+                    for hit in index.search_vectors_only(
+                        query, source_kind=kind, top_k=top_k
+                    )
                 ]
                 for query, expected, kind in LABELLED
             )
@@ -198,7 +202,7 @@ class TestHybridBeatsEitherHalf:
 
 class TestTheCorpusIsReachable:
     def test_no_fact_chunk_is_unreachable_by_its_own_text(
-        self, index: HybridIndex
+        self, index: PgVectorStore
     ) -> None:
         """A chunk that cannot be retrieved even by its own words is dead weight:
         it costs tokens at build time and can never ground anything. Uses each
@@ -206,14 +210,14 @@ class TestTheCorpusIsReachable:
         therefore the one worth having.
         """
         unreachable = []
-        for chunk in index.store.chunks:
+        for chunk in index.chunks:
             hits = index.search(chunk.text, source_kind=chunk.source_kind, top_k=3)
             if chunk.chunk_id not in [hit.chunk.chunk_id for hit in hits]:
                 unreachable.append(chunk.chunk_id)
         assert not unreachable, f"unreachable chunks: {unreachable}"
 
 
-def test_the_index_matches_the_committed_corpus(index: HybridIndex) -> None:
+def test_the_index_matches_the_committed_corpus(index: PgVectorStore) -> None:
     """Catches a stale index -- the corpus changed and nobody re-ingested.
 
     Without this, `make test-corpus` would measure yesterday's index and pass while
@@ -222,6 +226,6 @@ def test_the_index_matches_the_committed_corpus(index: HybridIndex) -> None:
     from sparkstory.retrieval.ingest import load_corpus
 
     corpus = load_corpus(Path(__file__).resolve().parents[1] / "corpus")
-    assert len(corpus) == len(index.store.chunks), (
+    assert len(corpus) == len(index.chunks), (
         "index is stale -- re-run: uv run python scripts/ingest_knowledge.py"
     )

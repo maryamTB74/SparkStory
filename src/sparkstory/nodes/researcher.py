@@ -250,9 +250,5 @@ class ResearcherNode:
             )
             return StoryGrounding()
 
-        logger.info(
-            "Research found %d fact(s) and %d technique(s)",
-            len(grounding.facts),
-            len(grounding.craft_devices),
-        )
+        logger.info("Research found %d fact(s)", len(grounding.facts))
         return grounding

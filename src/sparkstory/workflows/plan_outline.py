@@ -29,9 +29,8 @@ from sparkstory.nodes.researcher import ResearcherNode, build_researcher_agent
 from sparkstory.nodes.story_planner import StoryPlannerNode
 from sparkstory.observability.tracing import build_handler
 from sparkstory.retrieval.embed import get_embedder
-from sparkstory.retrieval.hybrid import HybridIndex
+from sparkstory.retrieval.pg_store import PgVectorStore, build_store
 from sparkstory.retrieval.provenance import drop_unprovenanced
-from sparkstory.retrieval.store import LocalVectorStore
 from sparkstory.retrieval.tools import build_retrieval_tools
 from sparkstory.retrieval.web.ledger import WebLedger
 from sparkstory.utils.logging_utils import get_logger
@@ -43,7 +42,7 @@ from sparkstory.workflows.validation import validate_outline
 logger = get_logger(__name__)
 
 
-def build_research_context() -> tuple[Any, LocalVectorStore, WebLedger | None]:
+def build_research_context() -> tuple[Any, PgVectorStore, WebLedger | None]:
     """Build the research agent, the store its tools search, and the web ledger.
 
     Returned together because each is needed twice: the tools search the store and
@@ -65,14 +64,19 @@ def build_research_context() -> tuple[Any, LocalVectorStore, WebLedger | None]:
     ids are run-scoped -- a shared ledger would let one run's ``web:1`` resolve
     against another run's page.
     """
-    store = LocalVectorStore(
-        root=settings.knowledge_root,
-        embedder=get_embedder(settings.embedding_model),
+    store = build_store(
+        settings.database_url,
+        get_embedder(settings.embedding_model),
+        settings.embedding_model,
     )
     ledger = WebLedger() if settings.max_web_searches > 0 else None
     agent = build_researcher_agent(
         model=get_chat_model(settings.researcher_model),
-        tools=build_retrieval_tools(HybridIndex(store=store), ledger=ledger),
+        # The store goes straight to the tools -- there is no HybridIndex wrapper
+        # any more, because fusing a vector ranking with a keyword ranking now
+        # happens inside one SQL statement rather than in Python over a corpus
+        # loaded into memory.
+        tools=build_retrieval_tools(store, ledger=ledger),
     )
     return agent, store, ledger
 

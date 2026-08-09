@@ -449,13 +449,7 @@ async def run_stages(
             print(f"  - {item.story_note}")
             print(f"      from {item.chunk_id} ({item.source})")
             print(f"      claim: {item.claim}")
-        print(f"\ntechniques ({len(kept.craft_devices)}):")
-        for craft in kept.craft_devices:
-            print(f"  - {craft.device}: {craft.how_to_use}")
-            print(f"      from {craft.chunk_id}")
-        dropped = (len(grounding.facts) - len(kept.facts)) + (
-            len(grounding.craft_devices) - len(kept.craft_devices)
-        )
+        dropped = len(grounding.facts) - len(kept.facts)
         print(f"\ndropped as unprovenanced: {dropped}")
 
         save_json(
@@ -467,7 +461,6 @@ async def run_stages(
                 outcome="ok",
                 stage_run="research",
                 facts=len(kept.facts),
-                craft_devices=len(kept.craft_devices),
                 dropped_unprovenanced=dropped,
             ),
         )

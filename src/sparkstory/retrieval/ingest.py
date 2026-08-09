@@ -26,7 +26,9 @@ _REQUIRED_FIELDS = ("title", "source", "licence")
 
 #: Directory name -> the kind of every chunk inside it. The directory *is* the
 #: metadata, so there is no per-file field that can contradict it.
-_KIND_DIRECTORIES = {"facts": SourceKind.FACT, "craft": SourceKind.CRAFT}
+#: One entry since the craft corpus was dropped. A second kind is one directory
+#: and one SourceKind member away.
+_KIND_DIRECTORIES = {"facts": SourceKind.FACT}
 
 
 class CorpusError(SparkStoryError):
@@ -102,8 +104,8 @@ def parse_corpus_file(path: Path, source_kind: SourceKind) -> list[Chunk]:
 def load_corpus(corpus_root: Path) -> list[Chunk]:
     """Read every corpus file under ``corpus_root`` into chunks.
 
-    A missing ``facts/`` or ``craft/`` directory is fine -- a corpus with only one
-    kind is legitimate, and the tool for the other kind simply finds nothing.
+    A missing ``facts/`` directory is fine and yields an empty corpus, which the
+    store reports as "no results" rather than as an error.
 
     Raises:
         CorpusError: a file is malformed, or two chunks share an id. Ids must be

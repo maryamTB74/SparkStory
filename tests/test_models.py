@@ -8,7 +8,7 @@ propagate silently into illustration and narration, where it costs real money.
 import pytest
 from pydantic import ValidationError
 
-from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.stories import (
     CharacterSketch,
     ChildProfile,
@@ -198,7 +198,6 @@ class TestSchemaIsPromptText:
             StoryBrief,
             StoryGrounding,
             GroundedFact,
-            CraftDevice,
         ):
             schema = model.model_json_schema()
             defs = schema.get("$defs", {})
@@ -235,7 +234,6 @@ class TestSchemaIsPromptText:
             ChildProfile,
             StoryGrounding,
             GroundedFact,
-            CraftDevice,
         ):
             schema_text = str(model.model_json_schema())
             for term in leaked_terms:

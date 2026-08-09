@@ -11,7 +11,7 @@ import pkgutil
 import pytest
 
 import sparkstory.nodes
-from sparkstory.entities.grounding import CraftDevice, GroundedFact, StoryGrounding
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.stories import (
     ChildProfile,
@@ -383,26 +383,6 @@ class TestRenderGrounding:
         assert "Let the story simply obey them" not in rendered
 
     @pytest.mark.parametrize("world_rules", list(WorldRules))
-    def test_craft_devices_render_identically_in_both_modes(
-        self, world_rules: WorldRules
-    ) -> None:
-        """A refrain works in any genre, so the mode must not touch this half."""
-        rendered = render_grounding(
-            StoryGrounding(
-                craft_devices=[
-                    CraftDevice(
-                        device="refrain",
-                        how_to_use="Repeat one line at each of the three attempts.",
-                        chunk_id="goose#1",
-                    )
-                ]
-            ),
-            world_rules,
-        )
-        assert "refrain" in rendered
-        assert "three attempts" in rendered
-
-    @pytest.mark.parametrize("world_rules", list(WorldRules))
     def test_empty_grounding_renders_nothing_at_all(
         self, world_rules: WorldRules
     ) -> None:
@@ -416,63 +396,6 @@ class TestRenderGrounding:
         assert render_story_brief(brief) + render_grounding(
             StoryGrounding(), brief.world_rules
         ) == (render_story_brief(brief))
-
-
-class TestCraftDeviceIsNotAFactInDisguise:
-    """Finding Q. A repeated line must come from the story, never from a note.
-
-    The eagle run handed the planner a `repetition` device ("repeat a short line
-    about wings and air") alongside a note ("Wings need air to push against").
-    The cheapest way to satisfy both is to repeat the note, and beats 3, 4 and 6
-    each contained that sentence verbatim. Nothing forbade it.
-
-    This is finding J's second appearance and its worse form: Session 5's planner
-    *described* the device, this one used the wrong text *as* the device.
-    """
-
-    @pytest.mark.parametrize("world_rules", list(WorldRules))
-    def test_a_repeated_line_must_use_the_story_s_own_words(
-        self, world_rules: WorldRules
-    ) -> None:
-        rendered = render_grounding(
-            StoryGrounding(
-                facts=[
-                    GroundedFact(
-                        claim="The Moon has no air.",
-                        story_note="Wings need air to push against.",
-                        source="NASA",
-                        chunk_id="moon#1",
-                    )
-                ],
-                craft_devices=[
-                    CraftDevice(
-                        device="repetition",
-                        how_to_use="Repeat a short line after each try.",
-                        chunk_id="goose#1",
-                    )
-                ],
-            ),
-            world_rules,
-        )
-        assert "the story's own words" in rendered
-
-    def test_the_instruction_is_absent_when_there_are_no_devices(self) -> None:
-        """Rule 3's shape, applied to prompt text: an instruction about repeating
-        a line is noise in a prompt that was given no device to repeat."""
-        rendered = render_grounding(
-            StoryGrounding(
-                facts=[
-                    GroundedFact(
-                        claim="The Moon has no air.",
-                        story_note="Nothing outdoors can flutter.",
-                        source="NASA",
-                        chunk_id="moon#1",
-                    )
-                ]
-            ),
-            WorldRules.REALISTIC,
-        )
-        assert "the story's own words" not in rendered
 
 
 class TestProtagonistYieldsToThePremise:

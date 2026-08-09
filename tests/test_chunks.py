@@ -87,4 +87,4 @@ class TestSourceKind:
     def test_has_exactly_the_two_kinds_the_tools_pin(self) -> None:
         """Each retrieval tool pins one kind. A third value would be reachable by
         neither tool, which is a chunk nothing can ever find."""
-        assert {kind.value for kind in SourceKind} == {"fact", "craft"}
+        assert {kind.value for kind in SourceKind} == {"fact"}

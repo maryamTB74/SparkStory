@@ -24,6 +24,8 @@ from sparkstory.entities.stories import (
     StoryProse,
     Tone,
 )
+from sparkstory.retrieval.chunks import Chunk, SourceKind
+from sparkstory.retrieval.types import SearchHit
 
 
 @pytest.fixture(autouse=True)
@@ -252,3 +254,70 @@ def book_factory() -> Callable[..., Story]:
         )
 
     return build
+
+
+# --- A store for tests that are not about retrieval -------------------------
+#
+# `LocalVectorStore` used to serve this purpose by accident: file-backed, so a
+# test could build one under tmp_path and get a working store with no service.
+# Postgres removed that, and most tests that used it -- the provenance filter,
+# the tool-rendering layer -- do not care how ranking works. They care that a
+# store holds chunks, resolves an id, and returns hits.
+#
+# Same seam as FakeModel and FakeEmbedder, one level out: a real implementation
+# of the Protocol with the interesting part removed. Ranking is lexical overlap,
+# deliberately not a claim about relevance -- anything measuring retrieval
+# quality belongs in test_retrieval_eval.py, against the real store.
+class FakeChunkStore:
+    """Chunks in a list, searched by counting shared words."""
+
+    def __init__(self, chunks: list[Chunk] | None = None) -> None:
+        self._chunks = list(chunks or [])
+
+    def save(self, chunks: list[Chunk]) -> None:
+        self._chunks = list(chunks)
+
+    @property
+    def is_built(self) -> bool:
+        return bool(self._chunks)
+
+    @property
+    def chunks(self) -> list[Chunk]:
+        return list(self._chunks)
+
+    def get(self, chunk_id: str) -> Chunk | None:
+        return next((c for c in self._chunks if c.chunk_id == chunk_id), None)
+
+    def search(
+        self,
+        query: str,
+        source_kind: SourceKind | None = None,
+        top_k: int = 5,
+    ) -> list[SearchHit]:
+        """Rank by how many query words a chunk contains.
+
+        Filtering happens before scoring, matching the real store -- a test that
+        asserts a kind filter works must exercise the same ordering of operations.
+        """
+        wanted = set(query.lower().split())
+        candidates = [
+            chunk
+            for chunk in self._chunks
+            if source_kind is None or chunk.source_kind is source_kind
+        ]
+        scored = [
+            (len(wanted & set(chunk.embed_text.lower().split())), chunk)
+            for chunk in candidates
+        ]
+        # Ties break on insertion order, so a test's expectations stay stable.
+        ranked = sorted(scored, key=lambda pair: -pair[0])
+        # Every candidate is returned up to top_k, including zero-overlap ones.
+        # The real store does the same -- a vector search always ranks the whole
+        # filtered set and returns top_k of it, however weak the match. Dropping
+        # zero-scoring chunks here made the fake *stricter* than the thing it
+        # stands in for, which surfaced as a tool returning one candidate where
+        # the payload tests reasonably expect several.
+        return [
+            SearchHit(chunk=chunk, similarity=float(score))
+            for score, chunk in ranked[:top_k]
+        ]

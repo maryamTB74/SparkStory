@@ -15,10 +15,9 @@ paragraph.
 
 from pathlib import Path
 
+from conftest import FakeChunkStore
+
 from sparkstory.retrieval.chunks import Chunk, SourceKind
-from sparkstory.retrieval.embed import FakeEmbedder
-from sparkstory.retrieval.hybrid import HybridIndex
-from sparkstory.retrieval.store import LocalVectorStore
 from sparkstory.retrieval.tools import NOTHING_FOUND, build_retrieval_tools
 from sparkstory.retrieval.web.ledger import WebLedger
 from sparkstory.retrieval.web.providers import WebResult
@@ -26,17 +25,11 @@ from sparkstory.retrieval.web.providers import WebResult
 CHUNKS = [
     ("moon#1", "The Moon has no air, so nothing can flutter.", SourceKind.FACT),
     ("moon#2", "The Moon's gravity is weaker than Earth's.", SourceKind.FACT),
-    (
-        "goose#1",
-        "Refrain: one line comes back unchanged every time round.",
-        SourceKind.CRAFT,
-    ),
-    ("goose#2", "Three attempts, the third one working.", SourceKind.CRAFT),
 ]
 
 
 def tools_over(root: Path, chunks: list[Chunk] | None = None) -> dict:
-    store = LocalVectorStore(root=root, embedder=FakeEmbedder(dimensions=256))
+    store = FakeChunkStore()
     store.save(
         chunks
         if chunks is not None
@@ -54,12 +47,12 @@ def tools_over(root: Path, chunks: list[Chunk] | None = None) -> dict:
             for cid, text, kind in CHUNKS
         ]
     )
-    return {tool.name: tool for tool in build_retrieval_tools(HybridIndex(store=store))}
+    return {tool.name: tool for tool in build_retrieval_tools(store)}
 
 
 def web_tools_over(root: Path, ledger: WebLedger, searcher=None, verifier=None) -> dict:
     """Tools with the web one enabled, everything injected so nothing goes out."""
-    store = LocalVectorStore(root=root, embedder=FakeEmbedder(dimensions=256))
+    store = FakeChunkStore()
     store.save(
         [
             Chunk(
@@ -78,7 +71,7 @@ def web_tools_over(root: Path, ledger: WebLedger, searcher=None, verifier=None) 
     return {
         tool.name: tool
         for tool in build_retrieval_tools(
-            HybridIndex(store=store),
+            store,
             ledger=ledger,
             searcher=searcher,
             verifier=verifier,
@@ -100,7 +93,7 @@ async def _one_verified_source(query: str):
 
 class TestToolShape:
     def test_builds_exactly_two_tools(self, tmp_path: Path) -> None:
-        assert set(tools_over(tmp_path)) == {"search_facts", "search_craft"}
+        assert set(tools_over(tmp_path)) == {"search_facts"}
 
     def test_the_web_tool_is_absent_without_a_ledger(self, tmp_path: Path) -> None:
         """No ledger means the feature is off, and off must mean *not built*.
@@ -172,43 +165,24 @@ class TestPayload:
         assert result.count("id:") >= 2
 
 
-class TestEachToolPinsItsOwnIndex:
-    def test_facts_never_returns_craft(self, tmp_path: Path) -> None:
-        """A rhyme returned by the fact tool would be cited as a fact about the
-        world."""
-        result = tools_over(tmp_path)["search_facts"].invoke(
-            {"query": "refrain repeats line"}
-        )
-        assert "goose#" not in result
-
-    def test_craft_never_returns_facts(self, tmp_path: Path) -> None:
-        result = tools_over(tmp_path)["search_craft"].invoke({"query": "moon air"})
-        assert "moon#" not in result
+# `TestEachToolPinsItsOwnIndex` stood here. Both its tests asserted that
+# search_facts never returned a craft chunk and search_craft never returned a
+# fact -- the guarantee that made the two-tool split meaningful. With one tool
+# and one kind there is nothing left to pin apart.
 
 
 class TestNothingFound:
     def test_an_empty_index_says_so_rather_than_raising(self, tmp_path: Path) -> None:
         """Fail open all the way to the tool: the agent is told there is nothing,
         and its prompt authorises returning no facts."""
-        store = LocalVectorStore(root=tmp_path / "nope", embedder=FakeEmbedder())
-        tools = {t.name: t for t in build_retrieval_tools(HybridIndex(store=store))}
+        store = FakeChunkStore()
+        tools = {t.name: t for t in build_retrieval_tools(store)}
         assert tools["search_facts"].invoke({"query": "the moon"}) == NOTHING_FOUND
 
-    def test_a_kind_with_no_chunks_says_so(self, tmp_path: Path) -> None:
-        facts_only = [
-            Chunk(
-                chunk_id=cid,
-                text=text,
-                title="Moon",
-                source="NASA",
-                licence="public domain",
-                source_kind=kind,
-            )
-            for cid, text, kind in CHUNKS
-            if kind is SourceKind.FACT
-        ]
-        tools = tools_over(tmp_path, facts_only)
-        assert tools["search_craft"].invoke({"query": "refrain"}) == NOTHING_FOUND
+    # `test_a_kind_with_no_chunks_says_so` stood here: it built a facts-only
+    # corpus and asserted search_craft reported NOTHING_FOUND rather than raising.
+    # With one tool and one kind there is no second index to be empty, and the
+    # empty-store case above already covers the fail-open behaviour.
 
 
 class TestTopK:

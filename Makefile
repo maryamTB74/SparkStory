@@ -11,12 +11,18 @@ PYTEST := uv run pytest
 
 # Everything ruff should look at. Kept in one variable so a new top-level
 # directory is added once rather than in four targets.
-QA_PATHS := src tests scripts
+#
+# `alembic` is here because pre-commit lints whatever is *staged*, regardless of
+# this variable -- so a migration could pass `make ci-local`, pass CI, and then be
+# reformatted by the commit hook. The hook reporting "failed" for files it just
+# fixed is confusing enough without the gap that caused it.
+QA_PATHS := src tests scripts alembic
 
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus score-books run ci-local clean
+        fix check test test-fast test-corpus score-books migrate migrate-down ingest \
+        run ci-local clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -67,6 +73,19 @@ test-corpus: ## Run retrieval quality tests (needs a built index)
 
 score-books: ## Score every past run on the computed metrics (free, no network)
 	uv run python scripts/run_evals.py --from-run outputs --all --no-judge
+
+# --- Database ------------------------------------------------------------
+# Both targets need DATABASE_URL and a reachable Postgres:
+#   docker compose up -d postgres
+
+migrate: ## Apply database migrations (needs DATABASE_URL)
+	uv run alembic upgrade head
+
+migrate-down: ## Roll the last migration back, for checking one reverses cleanly
+	uv run alembic downgrade -1
+
+ingest: ## Load corpus/ into Postgres (offline; run after `make migrate`)
+	uv run python scripts/ingest_knowledge.py
 
 # --- Run -----------------------------------------------------------------
 

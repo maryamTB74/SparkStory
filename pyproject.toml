@@ -47,6 +47,25 @@ dependencies = [
     # in for verification when Firecrawl itself is the thing that is down.
     "tavily-python>=0.7.12",
     "opik>=2.2.18",
+    # SQLAlchemy is used for the engine, `DeclarativeBase` and Alembic's
+    # autogenerate -- NOT to build queries. The retrieval statement is a
+    # hand-written CTE fusing pgvector's `<=>` with `ts_rank` via RRF, which no
+    # ORM would generate and which is the point of the feature.
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    # psycopg v3, *sync*, and both halves of that are decisions.
+    #
+    # Sync rather than the course's asyncpg because `search_facts` and
+    # `search_craft` are sync `@tool` functions called from inside LangGraph's
+    # event loop: an async store would need `asyncio.run` there, which raises
+    # inside a running loop, so async would force the tool signatures to change
+    # too.
+    #
+    # `[binary]` bundles libpq in the wheel, which is what keeps the Dockerfile
+    # free of an apt-get layer -- a property verified in the container by
+    # rendering a PDF with no system libraries installed. Bare `psycopg` or
+    # asyncpg would both reintroduce `libpq5`.
+    "psycopg[binary]>=3.2",
 ]
 
 [project.scripts]

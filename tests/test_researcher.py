@@ -70,7 +70,6 @@ def some_grounding() -> StoryGrounding:
                 chunk_id="moon#1",
             )
         ],
-        craft_devices=[],
     )
 
 
@@ -199,7 +198,6 @@ class TestResearcherNode:
             agent=StubAgent(StoryGrounding()), brief=a_brief()
         ).ainvoke()
         assert result.facts == []
-        assert result.craft_devices == []
 
     async def test_a_missing_structured_response_becomes_empty_grounding(self) -> None:
         """An agent that hit its step limit mid-thought returns no structured

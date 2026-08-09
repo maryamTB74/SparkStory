@@ -64,10 +64,12 @@ class TestParseCorpusFile:
         assert all(chunk.title == "The Moon" for chunk in chunks)
 
     def test_source_kind_comes_from_the_caller(self, tmp_path: Path) -> None:
+        """The directory decides the kind, not a per-file field that could
+        contradict it. One kind exists today; the argument is what matters."""
         chunks = parse_corpus_file(
-            write(tmp_path, "goose.md", WELL_FORMED), SourceKind.CRAFT
+            write(tmp_path, "moon.md", WELL_FORMED), SourceKind.FACT
         )
-        assert all(chunk.source_kind is SourceKind.CRAFT for chunk in chunks)
+        assert all(chunk.source_kind is SourceKind.FACT for chunk in chunks)
 
     def test_url_is_absent_when_not_given(self, tmp_path: Path) -> None:
         chunks = parse_corpus_file(
@@ -132,35 +134,22 @@ class TestMalformedFiles:
 
 
 class TestLoadCorpus:
-    def test_reads_both_kinds_from_their_directories(self, tmp_path: Path) -> None:
-        """The directory name *is* the source_kind -- there is no per-file field to
-        get wrong."""
-        (tmp_path / "facts").mkdir()
-        (tmp_path / "craft").mkdir()
-        write(tmp_path / "facts", "moon.md", WELL_FORMED)
-        write(tmp_path / "craft", "goose.md", WELL_FORMED)
-
-        chunks = load_corpus(tmp_path)
-        kinds = {chunk.source_kind for chunk in chunks}
-        assert kinds == {SourceKind.FACT, SourceKind.CRAFT}
-        assert len(chunks) == 4
-
     def test_a_missing_directory_is_not_fatal(self, tmp_path: Path) -> None:
         """A corpus with facts but no craft files is legitimate."""
         (tmp_path / "facts").mkdir()
         write(tmp_path / "facts", "moon.md", WELL_FORMED)
         assert len(load_corpus(tmp_path)) == 2
 
-    def test_duplicate_chunk_ids_are_rejected(self, tmp_path: Path) -> None:
-        """Ids must be unique across the whole corpus, not per file: provenance
-        lookup takes an id and nothing else, so two chunks sharing one would make
-        a recorded fact ambiguous."""
-        (tmp_path / "facts").mkdir()
-        (tmp_path / "craft").mkdir()
-        write(tmp_path / "facts", "same.md", WELL_FORMED)
-        write(tmp_path / "craft", "same.md", WELL_FORMED)
-        with pytest.raises(CorpusError, match="duplicate"):
-            load_corpus(tmp_path)
+    # `test_duplicate_chunk_ids_are_rejected` stood here. It built a collision by
+    # writing `same.md` into both facts/ and craft/, since a chunk id is
+    # `<file stem>#<n>` and the stem ignores the directory.
+    #
+    # With one kind directory that collision is **unreachable through the public
+    # API**: filesystem stems are unique within a directory, so `load_corpus`
+    # cannot be made to produce one. The guard in load_corpus is kept -- it costs
+    # nothing and a second kind would make it reachable again -- but it is now
+    # untested rather than tested, and pretending otherwise by reaching into a
+    # private helper would be a test of the test rather than of the guarantee.
 
     def test_ignores_non_markdown_files(self, tmp_path: Path) -> None:
         (tmp_path / "facts").mkdir()
@@ -182,11 +171,6 @@ class TestTheCommittedCorpus:
         assert len(chunks) >= 40, f"only {len(chunks)} chunks"
         assert all(chunk.source for chunk in chunks)
         assert all(chunk.licence for chunk in chunks)
-
-    def test_it_has_both_kinds(self) -> None:
-        chunks = load_corpus(Path(__file__).resolve().parents[1] / "corpus")
-        kinds = {chunk.source_kind for chunk in chunks}
-        assert kinds == {SourceKind.FACT, SourceKind.CRAFT}
 
     def test_no_chunk_is_too_long_to_be_one_idea(self) -> None:
         """Lesson 9's "one logical unit per chunk". A chunk that has grown into

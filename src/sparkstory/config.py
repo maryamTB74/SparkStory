@@ -305,6 +305,24 @@ class Settings(BaseSettings):
         alias="KNOWLEDGE_ROOT",
         description="Directory holding the built knowledge index",
     )
+    # Where the corpus and its vectors live once retrieval moves to Postgres.
+    # `knowledge_root` above is retired in the same change that deletes
+    # LocalVectorStore; both exist meanwhile because deleting config for live code
+    # would break the suite before its replacement is wired up.
+    #
+    # Optional at import time, exactly like the API keys and for the same reason:
+    # the MCP server must start and list its tools without a database reachable.
+    # The failure belongs at the point of use, naming the variable, rather than at
+    # import where it would stop a `--help` from working.
+    #
+    # The driver is spelled explicitly. A bare `postgresql://` URL makes
+    # SQLAlchemy reach for psycopg2, which is not installed here, and the error
+    # names a package nobody asked for. `postgresql+psycopg://` pins v3.
+    database_url: str | None = Field(
+        default=None,
+        alias="DATABASE_URL",
+        description="postgresql+psycopg://user:pass@host:port/db",
+    )
     # Off by default, and that default is what keeps the test suite offline: at 0
     # no web client is constructed and no key is read. Mirrors max_research_steps,
     # where 0 also means "skip the stage" rather than "run it with no budget".

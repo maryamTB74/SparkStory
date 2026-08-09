@@ -70,35 +70,6 @@ class GroundedFact(BaseModel):
     )
 
 
-class CraftDevice(BaseModel):
-    """A technique that makes a story a pleasure to read aloud."""
-
-    device: str = Field(
-        min_length=1,
-        max_length=40,
-        description=(
-            "What the technique is called, in a word or two, for example "
-            "'refrain' or 'three attempts'."
-        ),
-    )
-    how_to_use: str = Field(
-        min_length=3,
-        max_length=200,
-        description=(
-            "How this particular story should use it, in one sentence. Say what "
-            "it would do here, not what the technique is in general."
-        ),
-    )
-    chunk_id: str = Field(
-        min_length=1,
-        max_length=120,
-        description=(
-            "The identifier shown in square brackets beside the example you "
-            "found, copied exactly. Do not invent one."
-        ),
-    )
-
-
 class StoryGrounding(BaseModel):
     """What is worth knowing before this story is planned."""
 
@@ -115,13 +86,5 @@ class StoryGrounding(BaseModel):
             "At most three facts this story must not get wrong, most important "
             "first. Return an empty list when the premise has nothing factual to "
             "get wrong, which is the usual case. Never add a fact to fill space."
-        ),
-    )
-    craft_devices: list[CraftDevice] = Field(
-        default_factory=list,
-        max_length=2,
-        description=(
-            "At most two techniques that would make this story better read "
-            "aloud. Return an empty list if none genuinely fit."
         ),
     )

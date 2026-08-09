@@ -45,10 +45,19 @@ jobs:
       # break. Separate jobs run on separate runners, so they cannot interfere.
       - run: uv sync --only-dev --frozen
 
-      # --no-sync so ruff cannot silently trigger a full dependency install and
-      # erase the point of the step above.
-      - run: uv run --no-sync ruff format --check src tests scripts
-      - run: uv run --no-sync ruff check src tests scripts
+      # `make check` rather than two raw ruff invocations, so QA_PATHS really is
+      # defined once. It was duplicated here until adding `alembic` to the
+      # Makefile silently left CI checking a narrower set than pre-commit -- which
+      # is the drift the comment at the top of this file warns about, committed by
+      # this file itself.
+      #
+      # Cost, stated rather than discovered: the Makefile's RUFF is plain
+      # `uv run ruff` with no --no-sync, so this step performs a FULL sync (~90s
+      # against the ~2s of --only-dev above) before linting. That is accepted
+      # deliberately -- a job that lints a different set of files than the commit
+      # hook is worse than a slower one, and pinning the paths in two places is
+      # what caused the divergence in the first place.
+      - run: make check
 
   tests:
     name: tests (offline)
@@ -76,5 +85,95 @@ jobs:
       # defined in one place. pyproject.toml sets addopts = ["-m", "not corpus"],
       # which is what keeps the 8 retrieval-quality tests out: they need real
       # embedding weights (a ~59 MB download) and a built index, and they have
-      # their own target, `make test-corpus`.
+      # their own target, `make test-corpus`. The `corpus` job below runs them.
       - run: make test
+
+  # A THIRD job rather than a database bolted onto `tests`, and the separation is
+  # the point. The job above is argued on "a green run is evidence the suite is
+  # still offline"; giving it a service container would destroy exactly that
+  # signal. Keeping them apart preserves both properties: `tests` proves the
+  # suite needs nothing, `corpus` proves retrieval still retrieves.
+  #
+  # Still no secrets. This job downloads embedding weights from HuggingFace, so it
+  # is not offline in the way `tests` is -- but it needs no API key, which is the
+  # property that actually matters for a public repository.
+  corpus:
+    name: retrieval quality (needs postgres)
+    runs-on: ubuntu-latest
+
+    # `postgres:postgres` is GitHub's own documented service-container example for
+    # PostgreSQL, and it is used here because it is the pattern a reviewer expects
+    # to see. An obviously-dummy credential reads as a dummy; the thing to avoid is
+    # a *plausible* one, which an earlier draft of this job had
+    # (`sparkstory:sparkstory_ci@...`) and which looks like a real leak to anyone
+    # scanning the repository.
+    #
+    # It is safe because the container is created when this job starts, destroyed
+    # when it ends, and reachable only from this job's own network namespace --
+    # there is no boundary for the credential to defend. It is written inline
+    # rather than in `secrets` deliberately: secrets are not exposed to fork pull
+    # requests, so a contributor's CI would fail with a confusing connection error.
+    #
+    # Two alternatives were considered and rejected, recorded because the reasoning
+    # outlives the choice:
+    #
+    #   * `POSTGRES_HOST_AUTH_METHOD: trust`, removing the credential entirely. It
+    #     is stricter and works (verified against a real container), but it is the
+    #     less familiar pattern and the literal it removes was never a risk.
+    #   * SQLite, which is what storyweave's CI does -- it swaps the backend rather
+    #     than running a database service. That cannot work here: the feature under
+    #     test *is* pgvector's `<=>` and Postgres's `ts_rank` fused by RRF, none of
+    #     which SQLite has. A green run against SQLite would exercise nothing.
+    #
+    # The course has no opinion: its CI is 78 lines with no `services:`, no
+    # postgres and no DATABASE_URL, and Part 3 ships a database with no CI for it.
+    # So this is a Rule 1 deviation with no course reference, like pgvector itself.
+    #
+    # `localhost`, not `postgres`: a service container publishes into the
+    # *runner's* own network namespace. docker-compose.yml uses the service name
+    # because there the app runs inside a container. Copying either connection
+    # string into the other file is the mistake this note exists to prevent.
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
+      OPIK_TRACK_DISABLE: "true"
+
+    services:
+      postgres:
+        # pgvector, not plain postgres: `vector(n)` is not a type without it.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Without the health gate the job's first query races container startup:
+        # a failure that passes on a warm runner and fails on a cold one.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --frozen
+
+      # Schema, then corpus. Ingestion is deliberately a separate step from
+      # serving -- lesson 9's offline phase -- so CI performs it explicitly rather
+      # than relying on anything to do it at startup.
+      - run: make migrate
+      - run: make ingest
+
+      # NOT `make test-corpus`. That target ends in `|| [ $$? -eq 5 ]` to tolerate
+      # "no tests collected", which is right locally and wrong here: these tests
+      # *skip* when DATABASE_URL is unset or the table is empty, so a misconfigured
+      # job would report success having measured nothing. That is finding M's
+      # failure mode, and this job exists precisely to produce a measurement.
+      #
+      # -m corpus overrides the addopts exclusion; --no-header -rN keeps the
+      # printed hit-rate lines visible in the log, which is the actual output.
+      - run: uv run pytest -m corpus -s -q --no-header

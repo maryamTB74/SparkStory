@@ -27,8 +27,8 @@ from langchain_core.tools import BaseTool, tool
 
 from sparkstory.config import settings
 from sparkstory.retrieval.chunks import SourceKind
-from sparkstory.retrieval.hybrid import HybridIndex
-from sparkstory.retrieval.store import SearchHit
+from sparkstory.retrieval.protocol import ChunkStore
+from sparkstory.retrieval.types import SearchHit
 
 # The ledger is plain data with no client and no key, so importing it eagerly
 # costs nothing and keeps the web tool's wiring readable. `providers` and
@@ -77,7 +77,7 @@ def _render(hits: list[SearchHit]) -> str:
 
 
 def build_retrieval_tools(
-    index: HybridIndex,
+    index: ChunkStore,
     ledger: WebLedger | None = None,
     searcher: WebSearcher | None = None,
     verifier: WebVerifier | None = None,
@@ -118,26 +118,16 @@ def build_retrieval_tools(
         logger.info("search_facts(%r) -> %d hit(s)", query, len(hits))
         return _render(hits)
 
-    @tool
-    def search_craft(query: str, top_k: int = settings.retrieval_top_k) -> str:
-        """Look up techniques that make a story a pleasure to read aloud.
-
-        Use this to find a device the story could be built around -- a line that
-        repeats, a pattern of three, words chosen for their sound, a question that
-        carries a reader across the page turn. Search for the effect you want
-        rather than for the story's subject.
-
-        Almost every story can use one of these, but only if it genuinely fits.
-        Two are plenty and one is often better.
-
-        Each result is labelled with an id, where it came from, and the text
-        itself. Copy the id and the source exactly if you keep it.
-        """
-        hits = index.search(query, source_kind=SourceKind.CRAFT, top_k=top_k)
-        logger.info("search_craft(%r) -> %d hit(s)", query, len(hits))
-        return _render(hits)
-
-    tools: list[BaseTool] = [search_facts, search_craft]
+    # `search_craft` used to sit here, pinned to SourceKind.CRAFT, and the two-tool
+    # split was a measured decision rather than a stylistic one: it made index
+    # selection *observable*, because "did the Researcher consult craft for a
+    # premise with no factual spine?" was answered by which tool appeared in the
+    # log. The teddy-bear premise called only search_craft and never search_facts.
+    #
+    # It went with the craft corpus. Note the consequence for such a premise: with
+    # only facts to search, a story about a lost toy or a birthday now retrieves
+    # nothing at all -- which the prompt already describes as a normal outcome.
+    tools: list[BaseTool] = [search_facts]
     if ledger is None:
         return tools
 

@@ -23,6 +23,7 @@ from sparkstory.entities.reviews import (
 )
 from sparkstory.entities.stories import StoryBrief, StoryOutline
 from sparkstory.mcp.tools.plan_story import plan_story_tool
+from sparkstory.memory.types import MemoryKind, MemoryRecord
 from sparkstory.models.fake_model import FakeModel
 from sparkstory.retrieval.chunks import Chunk, SourceKind
 from sparkstory.workflows import plan_outline as _plan_outline
@@ -593,3 +594,127 @@ class TestWebLedgerConstruction:
         _a, _b, first = REAL_BUILD_CONTEXT()
         _c, _d, second = REAL_BUILD_CONTEXT()
         assert first is not second
+
+
+class TestMemoryReachesThePlanner:
+    """Memory's read half: fetched before planning, rendered into the prompt.
+
+    Patched at ``build_memory_store`` in this module -- the same seam shape as
+    ``build_research_context``, and for the same reason rule 25 gives: a test that
+    fakes only the model would reach a real database here.
+    """
+
+    @staticmethod
+    def _remembering(*records: MemoryRecord) -> Any:
+        class _Store:
+            def fetch(self, child_id: str, kind: Any = None) -> list[MemoryRecord]:
+                return list(records)
+
+        return _Store()
+
+    @staticmethod
+    def _fact(text: str, subject: str = "Kit") -> MemoryRecord:
+        return MemoryRecord(
+            child_id="maryam-5",
+            kind=MemoryKind.SEMANTIC,
+            text=text,
+            subject=subject,
+            source_request_id="req-0",
+        )
+
+    def _with_child_id(self, brief: StoryBrief) -> StoryBrief:
+        payload = brief.model_dump()
+        payload["child"]["child_id"] = "maryam-5"
+        return StoryBrief.model_validate(payload)
+
+    async def test_no_child_id_never_touches_the_store(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+    ) -> None:
+        """Memory is opt-in, and 612 existing tests supply no child_id."""
+
+        def _fail() -> Any:
+            raise AssertionError("memory must not be read without a child_id")
+
+        monkeypatch.setattr(_plan_outline, "build_memory_store", _fail)
+        outline_fakes()
+        await run_outline_pipeline(brief)
+
+    async def test_a_remembered_fact_reaches_the_planner_prompt(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+    ) -> None:
+        monkeypatch.setattr(
+            _plan_outline,
+            "build_memory_store",
+            lambda: self._remembering(self._fact("A fox with a white-tipped tail.")),
+        )
+        fakes = outline_fakes()
+        await run_outline_pipeline(self._with_child_id(brief))
+
+        sent = str(fakes[StoryOutline].calls[0])
+        assert "white-tipped tail" in sent
+
+    async def test_an_unreachable_store_still_produces_a_plan(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+    ) -> None:
+        """Fails open: memory is enrichment, and no book at all is the failure."""
+
+        def _boom() -> Any:
+            raise RuntimeError("postgres is down")
+
+        monkeypatch.setattr(_plan_outline, "build_memory_store", _boom)
+        outline_fakes()
+        result = await run_outline_pipeline(self._with_child_id(brief))
+        assert result.title
+
+    async def test_a_disagreeing_plan_reports_a_conflict(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """The parent meets the disagreement at the approval point."""
+        planned = outline.characters[0]
+        monkeypatch.setattr(
+            _plan_outline,
+            "build_memory_store",
+            lambda: self._remembering(
+                self._fact("Something entirely different.", subject=planned.name)
+            ),
+        )
+        outline_fakes()
+        result = await run_outline_pipeline(self._with_child_id(brief))
+
+        assert len(result.memory_conflicts) == 1
+        assert result.memory_conflicts[0].subject == planned.name
+
+    async def test_an_agreeing_plan_reports_nothing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """Rule 24: the conflict path needs its negative direction asserted too,
+        or 'a conflict was reported' proves only that something was reported."""
+        planned = outline.characters[0]
+        monkeypatch.setattr(
+            _plan_outline,
+            "build_memory_store",
+            lambda: self._remembering(
+                self._fact(planned.description, subject=planned.name)
+            ),
+        )
+        outline_fakes()
+        result = await run_outline_pipeline(self._with_child_id(brief))
+
+        assert result.memory_conflicts == []

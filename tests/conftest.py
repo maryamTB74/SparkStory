@@ -4,9 +4,10 @@ Fixtures build objects explicitly rather than reading from ``.env`` so tests do
 not depend on whatever happens to be configured on the machine running them.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 import pytest
+from sqlalchemy import Engine
 
 from sparkstory.entities.stories import (
     CharacterSketch,
@@ -43,6 +44,43 @@ def _tracing_off(monkeypatch: pytest.MonkeyPatch) -> None:
     tests that need tracing on set it themselves, after this fixture runs.
     """
     monkeypatch.setattr("sparkstory.config.settings.opik_enabled", False)
+
+
+@pytest.fixture
+def memory_engine() -> Iterator[Engine]:
+    """An in-memory SQLite database holding an empty memories table.
+
+    **SQLite rather than Postgres, and the reason is coverage rather than
+    convenience.** ``PgVectorStore`` is exercised only by ``corpus``-marked tests
+    that *skip* when ``DATABASE_URL`` is unset (``test_retrieval_eval.py``), so
+    copying that seam would mean the guarantees this package exists for --
+    determinism, scope isolation, append-only -- never run under ``make test``.
+    That is non-obvious rule 24: a check with no room to fail proves nothing.
+
+    The *semantic* tier makes this possible: it uses no pgvector and no tsvector,
+    only plain columns fetched by equality, so ``embedding_dimensions=None``
+    omits the one column SQLite cannot express.
+
+    **The gap, stated rather than implied:** the episodic tier's vector search
+    cannot be tested this way. SQLite passing is not evidence the pgvector half
+    works.
+
+    Function-scoped, so every test starts from an empty database and no test can
+    observe another's rows -- which matters especially for the scope-isolation
+    test, whose whole subject is which rows are visible.
+    """
+    # Imported here rather than at module scope: `memories_table` arrives in a
+    # later task, and a module-scope import would break collection for the entire
+    # suite until then.
+    from sqlalchemy import MetaData, create_engine
+
+    from sparkstory.db.models import memories_table
+
+    engine = create_engine("sqlite://")
+    table = memories_table(metadata=MetaData(), embedding_dimensions=None)
+    table.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture

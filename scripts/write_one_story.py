@@ -130,6 +130,15 @@ def parse_args() -> argparse.Namespace:
             "premise may break."
         ),
     )
+    parser.add_argument(
+        "--child-id",
+        default=None,
+        help=(
+            "Stable id for this child, so their stories remember each other. "
+            "Omit it and the run reads and writes no memory at all, which is the "
+            "behaviour every run before this flag existed had."
+        ),
+    )
     parser.add_argument("--premise", default="a fox who wants to visit the moon")
     parser.add_argument("--pages", type=int, default=10)
     parser.add_argument("--interests", nargs="*", default=["foxes", "astronomy"])
@@ -205,6 +214,7 @@ def build_brief(args: argparse.Namespace) -> StoryBrief:
             pronouns=Pronouns(args.pronouns),
             reading_level=ReadingLevel(args.level),
             interests=args.interests,
+            child_id=args.child_id,
         ),
         premise=args.premise,
         tone=Tone(args.tone),
@@ -294,12 +304,18 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
         # this project has already lost debugging time to reading the wrong
         # artifact (finding E).
         "world_rules": args.world_rules,
+        # Same argument as world_rules: a second book for the same child is only
+        # evidence about memory if the artifact says which child it was for. None
+        # here means the run read and wrote nothing, which must stay
+        # distinguishable from a child whose memory happened to be empty.
+        "child_id": args.child_id,
         "models": {
             "researcher": settings.researcher_model,
             "embedder": settings.embedding_model,
             "planner": settings.planner_model,
             "plot": settings.plot_model,
             "writer": settings.writer_model,
+            "memory_extractor": settings.memory_extractor_model,
         },
         "max_research_steps": settings.max_research_steps,
         # Read from settings rather than from args, so an override on the command

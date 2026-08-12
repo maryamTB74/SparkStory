@@ -31,7 +31,13 @@ from pydantic import BaseModel, Field
 # Safe in this direction only: `entities/grounding.py` imports nothing from
 # sparkstory, so there is no cycle. Checked rather than assumed -- a cycle here
 # would surface as an ImportError at server start, not at edit time.
+#
+# The same check applies to `memory/types.py`, which likewise imports nothing
+# from sparkstory. That one points the opposite way to the usual
+# entities-as-a-leaf direction; keeping memory's vocabulary in one package is
+# worth it, because it then reads in one place and deletes in one place.
 from sparkstory.entities.grounding import StoryGrounding
+from sparkstory.memory.types import ChildId, MemoryConflict
 
 
 # Defaulting to they/them is a correctness decision, not a stylistic one: a name
@@ -120,6 +126,24 @@ class ChildProfile(BaseModel):
             "Things this child loves, for example 'foxes', 'astronomy', "
             "'digging in the garden'. Weave these into the story naturally "
             "rather than listing them."
+        ),
+    )
+    # A storage key, not story material. Optional so memory stays opt-in and
+    # every existing caller keeps working: with no child_id there is no fetch and
+    # no write, and the pipeline behaves exactly as it did before.
+    #
+    # It appears in the MCP tool schema because a client must supply it, but
+    # `render_story_brief` must NOT send it to the model -- there is a test
+    # asserting that, and the prompt audit (rule 1) would catch a leak.
+    #
+    # Typed `ChildId` rather than `str`: the caller is an LLM agent and this value
+    # scopes every memory read, so the guard belongs in the type.
+    child_id: ChildId | None = Field(
+        default=None,
+        description=(
+            "Stable identifier for this child, so their stories can remember "
+            "each other. Lowercase letters, digits and hyphens, for example "
+            "'maryam-5'. Omit it to write a story that remembers nothing."
         ),
     )
 
@@ -320,6 +344,25 @@ class StoryOutline(BaseModel):
     grounding: StoryGrounding | None = Field(
         default=None,
         description="Leave this out. It is filled in by the research step, not by you.",
+    )
+    # Details in this plan that disagree with what earlier books for this child
+    # established. Carried on the outline because `plan_story` already stops for a
+    # parent's approval, and that is the human checkpoint this project already has
+    # and has verified live -- rather than a new tool the `create_storybook` prompt
+    # would have to learn to call, which costs prompt length that Q4 has already
+    # shown is not free.
+    #
+    # Never a reason to fail a run: two descriptions of one fox is a question for a
+    # human, not a broken plan. Empty by default, so a first book and an
+    # unconflicted book are indistinguishable here -- both simply have nothing.
+    #
+    # Filled by code after planning, never by the planner, for the same reason
+    # `grounding` is not: the planner both sees this schema and has no way to know
+    # what earlier books said, so anything it invented here would be fabrication
+    # wearing the shape of a record.
+    memory_conflicts: list[MemoryConflict] = Field(
+        default_factory=list,
+        description="Leave this out. It is filled in after planning, not by you.",
     )
 
 

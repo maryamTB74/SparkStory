@@ -23,6 +23,10 @@ from sparkstory.entities.exceptions import StoryStructureError
 from sparkstory.entities.grounding import StoryGrounding
 from sparkstory.entities.reviews import OutlineReviews
 from sparkstory.entities.stories import StoryBrief, StoryOutline
+from sparkstory.memory.conflicts import find_conflicts
+from sparkstory.memory.render import render_memory
+from sparkstory.memory.store import build_memory_store
+from sparkstory.memory.types import MemoryKind, MemoryRecord
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.outline_critic import OutlineCriticNode
 from sparkstory.nodes.researcher import ResearcherNode, build_researcher_agent
@@ -110,12 +114,43 @@ async def research(request_id: str, brief: StoryBrief) -> StoryGrounding:
     return drop_unprovenanced(grounding, store, ledger=ledger)
 
 
+def fetch_memory(request_id: str, brief: StoryBrief) -> tuple[str, list[MemoryRecord]]:
+    """Read what earlier books established, as prompt text and as records.
+
+    Returns both because the two halves have different jobs: the text goes to the
+    planner, and the records are what a freshly-planned outline is compared
+    against to find conflicts.
+
+    **Fails open**, like research above it. Memory is enrichment: a book planned
+    without it is less consistent than it could be, while no book at all is a
+    failure. A child with no ``child_id`` never reaches the store at all, which
+    is the common case and must cost nothing.
+
+    Not a ``@task``: it makes no model call, so wrapping it in one would buy
+    retries on a database read while adding a checkpoint boundary to replay.
+    """
+    if not brief.child.child_id:
+        return "", []
+    try:
+        records = build_memory_store().fetch(brief.child.child_id)
+    except Exception:
+        # ERROR with the exception, matching the research failure below: the
+        # likeliest cause is an unreachable database, and the symptom otherwise
+        # reads as "this child has no memory" -- which is indistinguishable from a
+        # first book, and would be read as working.
+        logger.exception("[%s] could not read memory; planning without it", request_id)
+        return "", []
+    logger.info("[%s] recalled %d memories", request_id, len(records))
+    return render_memory(records), records
+
+
 @task(retry_policy=RETRY_POLICY)
 async def plan_outline(
     request_id: str,
     brief: StoryBrief,
     reviews: OutlineReviews | None = None,
     grounding: StoryGrounding | None = None,
+    memory: str = "",
 ) -> StoryOutline:
     """Stage 1: plan the story's structure, or revise it from reviews.
 
@@ -135,6 +170,7 @@ async def plan_outline(
         brief=brief,
         reviews=reviews,
         grounding=grounding,
+        memory=memory,
     )
     outline = await node.ainvoke()
     validate_outline(brief, outline)
@@ -199,7 +235,13 @@ def build_outline_workflow(
         else:
             logger.info("[%s] research skipped (MAX_RESEARCH_STEPS=0)", request_id)
 
-        outline = await plan_outline(request_id, brief, grounding=grounding)
+        # Read before planning, so the planner is told what is already fixed
+        # rather than being corrected afterwards. Costs no model call.
+        memory_text, remembered = fetch_memory(request_id, brief)
+
+        outline = await plan_outline(
+            request_id, brief, grounding=grounding, memory=memory_text
+        )
 
         # A plain `for` in the entrypoint body, as brown's generate_article.py
         # does it. Safe against the resume trap: this body re-executes when a run
@@ -242,8 +284,13 @@ def build_outline_workflow(
             )
             # Grounding travels into the revision too. Without it a revised plan
             # would silently lose every constraint the first draft was built to
-            # respect, and the critic would have no way to notice.
-            outline = await plan_outline(request_id, brief, reviews, grounding)
+            # respect, and the critic would have no way to notice. Memory travels
+            # for the same reason: a revision that forgot what Kit looks like
+            # would be free to re-describe him, and the critic has no rubric for
+            # consistency with a book it has never seen.
+            outline = await plan_outline(
+                request_id, brief, reviews, grounding, memory=memory_text
+            )
 
         # The best draft seen, not the last. A later revision can be worse: the
         # critic cannot reliably tell a feeling shown subtly from one that is
@@ -266,6 +313,37 @@ def build_outline_workflow(
         # both world-rule modes, so comparing against it is vacuous.
         if grounding is not None:
             best_outline = best_outline.model_copy(update={"grounding": grounding})
+
+        # Conflicts are found against the draft that won, for the same reason
+        # grounding is attached to it: the loop discards drafts, and a conflict
+        # reported from a discarded one would point at wording no parent will see.
+        #
+        # Compared at the *plan* stage rather than after the book, so the parent
+        # meets the disagreement at the approval point that already exists. The
+        # cost is that a character the Writer describes differently in prose is
+        # not caught here -- that surfaces on the next book, when extraction runs
+        # over what was actually written.
+        if remembered:
+            planned = [
+                MemoryRecord(
+                    child_id=brief.child.child_id or "",
+                    kind=MemoryKind.SEMANTIC,
+                    text=character.description,
+                    subject=character.name,
+                    source_request_id=request_id,
+                )
+                for character in best_outline.characters
+            ]
+            conflicts = find_conflicts(new=planned, stored=remembered)
+            if conflicts:
+                logger.info(
+                    "[%s] %d memory conflict(s) for the parent to resolve",
+                    request_id,
+                    len(conflicts),
+                )
+                best_outline = best_outline.model_copy(
+                    update={"memory_conflicts": conflicts}
+                )
         return best_outline
 
     return outline_workflow

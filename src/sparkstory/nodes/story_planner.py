@@ -240,6 +240,7 @@ class StoryPlannerNode(Node):
         brief: StoryBrief,
         reviews: OutlineReviews | None = None,
         grounding: StoryGrounding | None = None,
+        memory: str = "",
     ) -> None:
         super().__init__(model)
         self.brief = brief
@@ -247,6 +248,16 @@ class StoryPlannerNode(Node):
         # in the human turn beside the brief rather than in the system prompt,
         # which stays a static constant so the cached prefix survives.
         self.grounding = grounding
+        # What earlier books for this child established, already rendered by
+        # `memory.render.render_memory`. A string rather than the records
+        # themselves, for the same reason `render_grounding` returns text: exactly
+        # one place decides how memory is worded to a model, which keeps the rule 1
+        # audit a single file to read.
+        #
+        # Empty string when this child has no memory, or when the brief carries no
+        # `child_id` at all -- the overwhelmingly common case, and the one that
+        # must behave exactly as it did before this field existed.
+        self.memory = memory
         # The generator is also the editor: its
         # `edit_based_on_reviews` rebuilds `ArticleWriter` with `reviews=` rather
         # than calling a separate node. One prompt, one voice, and no second set
@@ -284,6 +295,13 @@ class StoryPlannerNode(Node):
             # No new constructor argument: the brief is already on the node, and
             # world rules belong to the brief rather than to the renderer.
             request += render_grounding(self.grounding, self.brief.world_rules)
+        if self.memory:
+            # After grounding, so the ordering matches the two constraints'
+            # relative authority: what the world is like, then what this child's
+            # own earlier books already fixed. A character described in book 1
+            # cannot be re-described here, while a retrieved fact is a constraint
+            # on a world nobody has committed to yet.
+            request += "\n\n" + self.memory
 
         messages: list[Any] = [
             SystemMessage(content=STORY_PLANNER_SYSTEM_PROMPT),
@@ -305,10 +323,16 @@ class StoryPlannerNode(Node):
             # Excluded at the *serialisation* point rather than on the field,
             # because the field must survive serialisation everywhere else -- run
             # artifacts, the checkpointer, and the client round trip all need it.
+            # `memory_conflicts` is excluded for the same reasons as `grounding`,
+            # and it is the more dangerous of the two to replay. It is bookkeeping
+            # about *earlier books* rather than story material (rule 1), it is
+            # filled by code after planning, and showing the planner a field it is
+            # told to leave empty is an invitation to fill it -- with fabricated
+            # disagreements a parent would then be asked to resolve.
             messages += [
                 AIMessage(
                     content=self.reviews.outline.model_dump_json(
-                        indent=2, exclude={"grounding"}
+                        indent=2, exclude={"grounding", "memory_conflicts"}
                     )
                 ),
                 HumanMessage(

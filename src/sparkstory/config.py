@@ -197,6 +197,16 @@ class Settings(BaseSettings):
         alias="JUDGE_MODEL",
         description="Model used by the offline book judge",
     )
+    # Runs after a book is finished and delivered, so it is the one model call in
+    # the system whose failure cannot cost a parent their story -- the write path
+    # fails open. Rule 21 still applies to it: this default is Google while a .env
+    # pinning everything else to Grok would leave it the odd one out, so set it
+    # together with the other *_MODEL vars.
+    memory_extractor_model: str = Field(
+        default="gemini-3.5-flash",
+        alias="MEMORY_EXTRACTOR_MODEL",
+        description="Model that reads a finished book and says what to remember",
+    )
 
     # --- Evaluator-optimizer loop budgets --------------------------------
     # Two knobs which separates how many review->edit rounds

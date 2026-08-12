@@ -38,6 +38,8 @@ from sparkstory.entities.stories import (
     StoryOutline,
     StoryProse,
 )
+from sparkstory.memory.extract import MemoryExtractor
+from sparkstory.memory.store import build_memory_store
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.prose_critic import ProseCriticNode
@@ -269,6 +271,46 @@ def build_story_workflow(
 STORY_WORKFLOW = build_story_workflow()
 
 
+async def remember_story(request_id: str, brief: StoryBrief, story: Story) -> None:
+    """Record what this book established, so the next one can stay consistent.
+
+    **Runs only on a finished book**, which is what makes memory a record of what
+    the child actually received. A plan the parent abandoned, and a run that
+    raised ``UnsafeContentError``, both leave no trace -- the latter because this
+    is never reached: the safety gate raises inside the workflow, well before
+    here.
+
+    **Fails open, and this is the one place that decides it.** The book is already
+    written and about to be returned; losing it because an extraction call failed
+    or a database was unreachable would trade the thing the parent asked for
+    against a side effect they did not. The same reasoning `observability/` uses.
+
+    Outside the ``@entrypoint`` deliberately. A ``@task`` result is cached and
+    replayed on resume, so a checkpointed run would re-invoke this on every
+    resume and write the same memories again -- and this is the one step in the
+    pipeline whose effect is not idempotent.
+    """
+    if not brief.child.child_id:
+        return
+    try:
+        extractor = MemoryExtractor(
+            get_chat_model(settings.memory_extractor_model),
+            story=story,
+            child_id=brief.child.child_id,
+            request_id=request_id,
+        )
+        records = extractor.to_records(await extractor.ainvoke())
+        if not records:
+            logger.info("[%s] nothing worth remembering from this book", request_id)
+            return
+        build_memory_store().save(records)
+        logger.info("[%s] remembered %d thing(s)", request_id, len(records))
+    except Exception:
+        logger.exception(
+            "[%s] could not write memory; the book is unaffected", request_id
+        )
+
+
 async def run_story_pipeline(
     brief: StoryBrief,
     outline: StoryOutline,
@@ -346,4 +388,6 @@ async def run_story_pipeline(
         story.outline.title,
         len(story.pages),
     )
+
+    await remember_story(request_id, brief, story)
     return story

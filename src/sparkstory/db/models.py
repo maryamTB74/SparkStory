@@ -30,7 +30,16 @@ generation.
 
 import re
 
-from sqlalchemy import Column, Computed, Index, MetaData, String, Table, Text
+from sqlalchemy import (
+    Column,
+    Computed,
+    DateTime,
+    Index,
+    MetaData,
+    String,
+    Table,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.types import UserDefinedType
 
@@ -131,4 +140,53 @@ def chunks_table(
         # speed -- the wrong trade when recall is the measured property. Add one
         # when the corpus demands it, and re-measure the labelled set when doing
         # so.
+    )
+
+
+def memories_table(
+    metadata: MetaData | None = None, embedding_dimensions: int | None = None
+) -> Table:
+    """Describe the per-child memories table.
+
+    **One table for both tiers, not one per embedder.** ``chunks_table`` is split
+    by embedder because every row there carries a fixed-width vector. Here only
+    *episodic* rows are embedded and ``embedding`` is nullable, so changing
+    embedder re-embeds some rows rather than invalidating the table. Splitting
+    would also scatter one child's memory across tables, which is the opposite of
+    what this store is for.
+
+    Args:
+        metadata: Where to register the table. Pass a fresh ``MetaData`` to build
+            it twice in one process, as a test does.
+        embedding_dimensions: Width of the episodic vector column, or ``None`` to
+            omit the column entirely. ``None`` is what lets the semantic tier be
+            tested on SQLite, which has no ``vector`` type -- and the semantic
+            tier is the one carrying this package's guarantees.
+    """
+    columns = [
+        Column("memory_id", String, primary_key=True),
+        # Indexed and present in every read: this is the scope, and no query
+        # omits it. A leaked scope is one child's memory in another child's book.
+        Column("child_id", String, nullable=False, index=True),
+        Column("kind", String, nullable=False),
+        Column("text", Text, nullable=False),
+        # Nullable: episodic records are about a book, not a subject.
+        Column("subject", Text, nullable=True),
+        Column("source_request_id", String, nullable=False),
+        Column("created_at", DateTime(timezone=True), nullable=False),
+        # A resolution adds a pointer; it never deletes. Deliberately NOT a
+        # ForeignKey even though it references this table: a record may be
+        # superseded by one written in a later run, and the constraint would
+        # order inserts for no gain.
+        Column("superseded_by", String, nullable=True),
+    ]
+    if embedding_dimensions is not None:
+        columns.append(Column("embedding", Vector(embedding_dimensions), nullable=True))
+
+    return Table(
+        "memories",
+        metadata if metadata is not None else Base.metadata,
+        *columns,
+        # The exact-fetch access path: every read is (child_id, kind).
+        Index("ix_memories_child_kind", "child_id", "kind"),
     )

@@ -35,6 +35,7 @@ from sparkstory.entities.stories import (
     StoryProse,
 )
 from sparkstory.mcp.tools.write_story import write_story_tool
+from sparkstory.memory.extract import ExtractedFact, ExtractedMemories
 from sparkstory.models.exceptions import MissingAPIKeyError
 from sparkstory.models.fake_model import FakeModel
 from sparkstory.workflows import write_story as write_story_module
@@ -709,3 +710,116 @@ class TestLoopsKeepTheBestDraft:
         story = await run_story_pipeline(brief, outline)
 
         assert story.pages == safe.pages
+
+
+class TestMemoryIsWrittenAfterTheBook:
+    """Memory's write half: only a finished book, and never at the book's expense.
+
+    Patched at ``build_memory_store`` in the write_story module -- a different
+    patch target from the outline workflow's, which is the same trap that split
+    these two test files in the first place.
+    """
+
+    @staticmethod
+    def _with_child_id(brief: StoryBrief) -> StoryBrief:
+        payload = brief.model_dump()
+        payload["child"]["child_id"] = "maryam-5"
+        return StoryBrief.model_validate(payload)
+
+    @staticmethod
+    def _extracted() -> ExtractedMemories:
+        return ExtractedMemories(
+            facts=[ExtractedFact(subject="Kit", text="A fox with a white tail.")],
+            episode="Maryam sent Kit to the moon.",
+        )
+
+    class _RecordingStore:
+        def __init__(self) -> None:
+            self.saved: list[Any] = []
+
+        def save(self, records: list[Any]) -> None:
+            self.saved.extend(records)
+
+    async def test_no_child_id_never_writes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """Opt-in, and the overwhelmingly common path."""
+
+        def _fail() -> Any:
+            raise AssertionError("memory must not be written without a child_id")
+
+        monkeypatch.setattr(write_story_module, "build_memory_store", _fail)
+        await run_story_pipeline(brief, outline)
+
+    async def test_a_finished_book_is_remembered(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        store = self._RecordingStore()
+        monkeypatch.setattr(write_story_module, "build_memory_store", lambda: store)
+        fakes[ExtractedMemories] = FakeModel(self._extracted())
+
+        await run_story_pipeline(self._with_child_id(brief), outline)
+
+        texts = [r.text for r in store.saved]
+        assert "A fox with a white tail." in texts
+        assert "Maryam sent Kit to the moon." in texts
+
+    async def test_a_failed_write_still_returns_the_book(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """Fail open. The parent asked for a book, not for a side effect."""
+
+        def _boom() -> Any:
+            raise RuntimeError("postgres is down")
+
+        monkeypatch.setattr(write_story_module, "build_memory_store", _boom)
+        fakes[ExtractedMemories] = FakeModel(self._extracted())
+
+        story = await run_story_pipeline(self._with_child_id(brief), outline)
+        assert story.pages, "the book must survive a memory failure"
+
+    async def test_an_unsafe_book_is_never_remembered(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        looping_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """A book that fails the safety gate must leave no trace.
+
+        It never reaches the write at all: the gate raises inside the entrypoint,
+        and `remember_story` is called after the pipeline returns.
+        """
+        store = self._RecordingStore()
+        monkeypatch.setattr(write_story_module, "build_memory_store", lambda: store)
+        fakes = looping_fakes(
+            [
+                ProseReviewsOutput(
+                    reviews=[
+                        ProseReview(
+                            rubric=ProseRubric.SAFETY,
+                            page_number=1,
+                            comment="Unsafe content on this page.",
+                        )
+                    ]
+                )
+            ]
+        )
+        fakes[ExtractedMemories] = FakeModel(self._extracted())
+
+        with pytest.raises(UnsafeContentError):
+            await run_story_pipeline(self._with_child_id(brief), outline)
+
+        assert store.saved == [], "an unsafe book must leave nothing behind"

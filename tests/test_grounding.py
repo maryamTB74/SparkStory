@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from sparkstory.entities.grounding import GroundedFact, StoryGrounding
+from sparkstory.entities.stories import StoryOutline
 
 
 def a_fact(chunk_id: str = "moon#1") -> GroundedFact:
@@ -67,3 +68,53 @@ class TestStoryGrounding:
         assert len(StoryGrounding(facts=facts).facts) == 3
         with pytest.raises(ValidationError):
             StoryGrounding(facts=[a_fact(f"moon#{i}") for i in range(4)])
+
+
+class TestOutlineCarriesGrounding:
+    """The field that carries research past ``plan_story``.
+
+    Before this, ``run_outline_pipeline`` returned a bare outline, so the grounding
+    was computed, planned from, and dropped -- which is why the Writer had never
+    seen a fact and why a craft device could only ever be *described* in a beat
+    summary (findings J and Q).
+
+    Optional with a ``None`` default deliberately: ``MAX_RESEARCH_STEPS=0`` must
+    stay a valid configuration, and an ungrounded run must be representable,
+    because it is the control arm of the A/B this feature is judged by.
+    """
+
+    def test_an_outline_defaults_to_no_grounding(self, outline: StoryOutline) -> None:
+        assert outline.grounding is None
+
+    def test_an_outline_accepts_grounding(self, outline: StoryOutline) -> None:
+        """Constructed through ``model_validate``, not ``model_copy``.
+
+        ``model_copy(update=...)`` skips validation and will happily set an
+        attribute the model does not declare, so it passes whether or not the
+        field exists -- rule 24's trap (a check with no room to fail) inside a
+        test. Validation is what actually proves the field is declared.
+        """
+        payload = outline.model_dump()
+        payload["grounding"] = StoryGrounding(facts=[a_fact()]).model_dump()
+        grounded = StoryOutline.model_validate(payload)
+        assert grounded.grounding is not None
+        assert grounded.grounding.facts[0].chunk_id == "moon#1"
+
+    def test_grounding_survives_a_json_round_trip(self, outline: StoryOutline) -> None:
+        """The field must serialise. It crosses the MCP tool boundary and, once
+        runs are resumable, a checkpointer -- so a field that died in JSON would
+        fail only when a client threaded it, which is the most expensive place to
+        find out.
+
+        Built through ``model_validate`` for the reason given above: a
+        ``model_copy`` variant would serialise nothing and still pass, because
+        ``model_dump_json`` only emits declared fields.
+        """
+        payload = outline.model_dump()
+        payload["grounding"] = StoryGrounding(facts=[a_fact()]).model_dump()
+        grounded = StoryOutline.model_validate(payload)
+        restored = StoryOutline.model_validate_json(grounded.model_dump_json())
+        assert restored.grounding is not None
+        assert restored.grounding.facts[0].story_note == (
+            "Nothing outdoors can flutter, drift or make a sound."
+        )

@@ -25,6 +25,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
+from sparkstory.entities.grounding import StoryGrounding
 from sparkstory.entities.guidelines import READING_LEVEL_GUIDANCE
 from sparkstory.entities.reviews import ProseReviews
 from sparkstory.entities.stories import (
@@ -32,6 +33,7 @@ from sparkstory.entities.stories import (
     StoryBrief,
     StoryOutline,
     StoryProse,
+    WorldRules,
 )
 from sparkstory.nodes.base import Node
 from sparkstory.utils.logging_utils import get_logger
@@ -126,6 +128,60 @@ def render_prose_reviews(reviews: ProseReviews) -> str:
     return "\n".join(lines)
 
 
+def render_prose_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
+    """Render research findings as extra instructions for the Writer.
+
+    **Only ``story_note`` is rendered. ``claim`` never is.** The planner's renderer
+    says the same, and the reason is sharper here: prose is the stage that writes
+    the sentences a child reads aloud, so it is where a fact is most recitable.
+    ``source`` and ``chunk_id`` are an attribution and a storage key -- neither is
+    story material.
+
+    The instruction is deliberately *not* the planner's. A planner is asked to
+    shape a story that obeys a constraint; the Writer is told the constraint is
+    already true and asked to write what it causes. Those are opposite jobs over
+    the same data, which is why this is a second renderer rather than a shared one
+    -- a shared renderer would drift toward whichever caller was edited last.
+
+    ``world_rules`` is a *required* argument, matching ``render_grounding``: a
+    default here could drift from ``StoryBrief``'s default invisibly, since both
+    branches produce a perfectly valid prompt.
+
+    Returns an empty string when there is nothing, so an ungrounded run renders
+    byte-identically to how it rendered before this feature existed -- which keeps
+    the provider-side prompt-cache prefix intact and makes the ungrounded control
+    arm of the A/B a real comparison rather than a nominal one.
+    """
+    if not grounding.facts:
+        return ""
+
+    lines = [""]
+    if world_rules is WorldRules.REALISTIC:
+        lines.append(
+            "These things are already true of this story's world. Write what they "
+            "cause, not what they are: let them show in what happens and in what "
+            "the characters can and cannot do."
+        )
+    else:
+        # Facts as texture, not law -- the one-big-lie principle, matching the
+        # planner's imaginative branch. Accurate furniture is what makes the
+        # impossible thing believable, so a retrieved fact earns its place by
+        # furnishing the world rather than by policing it.
+        lines.append(
+            "These things are true of the real world. Use them as detail, so the "
+            "impossible parts feel real: a story is more believable, not less, "
+            "when everything around the magic is accurate. This story may break "
+            "them, but let what surrounds the magic stay true."
+        )
+    # The SAME literal sentence as the planner's, in both branches, rather than a
+    # paraphrase. A paraphrase of a prohibition is how a prohibition quietly
+    # weakens, and this is the sentence standing between a grounded book and a
+    # character reciting a fact aloud.
+    lines.append("Do not state them, explain them, or have anyone mention them:")
+    lines += [f"- {fact.story_note}" for fact in grounding.facts]
+    return "\n".join(lines)
+
+
 def render_prose_request(
     brief: StoryBrief, outline: StoryOutline, page_plan: PagePlan
 ) -> str:
@@ -169,6 +225,24 @@ def render_prose_request(
         # "leaves open:" invites an invented cliffhanger where the book ends.
         if page.page_turn_hook:
             lines.append(f"    leaves open: {page.page_turn_hook}")
+
+    # Read from the outline rather than taken as a parameter, so there is no second
+    # source of truth that could disagree with `outline.grounding`. The whole point
+    # of nesting grounding in the outline is that the pair cannot come apart.
+    #
+    # Appended to the *initial* request rather than to the revision turn, so the
+    # constraint is present on draft 1 and on every rewrite. A constraint that
+    # vanished on revision would be worse than one never supplied: the loop would
+    # quietly "fix" a grounded page into an ungrounded one while its finding count
+    # improved.
+    #
+    # The empty check matters for a reason the renderer's own early return does not
+    # cover: appending "" would add a blank line and break the byte-identical
+    # property an ungrounded run depends on.
+    if outline.grounding is not None:
+        grounding_block = render_prose_grounding(outline.grounding, brief.world_rules)
+        if grounding_block:
+            lines.append(grounding_block)
 
     return "\n".join(lines)
 

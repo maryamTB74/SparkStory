@@ -102,12 +102,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def read_notes(run_dir: Path) -> list[str]:
-    """Grounding ``story_note`` values from a run's research artifacts.
+def read_notes(run_dir: Path, story: Story | None = None) -> list[str]:
+    """Grounding ``story_note`` values for a run on disk.
 
-    Missing files mean an ungrounded run, which returns ``[]`` and records ``None``
+    Prefers the notes carried by the finished book, because those are the ones the
+    Writer was actually given: a fact that failed the ``write_story`` boundary check
+    is in ``research-1.json`` and *not* in the book, so scoring prose against it
+    would measure a note the Writer never saw.
+
+    Falls back to the research artifacts, which is what every run produced before
+    the outline carried its grounding -- including the five committed baseline books,
+    whose scorecards must stay reproducible.
+
+    Missing both means an ungrounded run, which returns ``[]`` and records ``None``
     for the recital metrics -- absence of a measurement rather than a clean score.
     """
+    if story is not None and story.outline.grounding is not None:
+        return [fact.story_note for fact in story.outline.grounding.facts]
+
     notes: list[str] = []
     for path in sorted(run_dir.glob("research*.json")):
         try:
@@ -138,7 +150,7 @@ async def score_run_dir(run_dir: Path, args: argparse.Namespace) -> BookScorecar
     card = await score_book(
         story,
         name=run_dir.name,
-        notes=read_notes(run_dir),
+        notes=read_notes(run_dir, story),
         judge=make_judge(story, args.model, args.no_judge),
     )
     (run_dir / "scorecard.json").write_text(
@@ -154,19 +166,19 @@ async def generate_and_score(
     run_dir = args.out_dir / f"eval-{name}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Captured through the task callback, because the pipeline returns only the
-    # outline. Without this a fixture run scores no recital numbers at all -- and
-    # a metric that reports "-" on every row of a baseline is not a measurement,
-    # which is the trap this project has recorded twice in live runs.
-    notes: list[str] = []
-
+    # The callback now exists only to write the artifact. The *notes* come from
+    # `story.outline.grounding` below, which is a stricter source: this callback
+    # sees what research returned, while the outline carries what survived the
+    # `write_story` boundary check -- and a fact dropped there never reached the
+    # Writer, so scoring the book against it would measure a note the book was
+    # never given.
+    #
+    # research-1.json is still written here, because the fact count is what decides
+    # whether a grounded comparison meant anything (rule 27), and findings M and S
+    # are both what happens when nobody checks it.
     def capture(task_name: str, value: object) -> None:
         if task_name != "research":
             return
-        facts = getattr(value, "facts", None) or []
-        notes.extend(fact.story_note for fact in facts)
-        # Written out so the fact count is checkable, which is the thing that
-        # decides whether a grounded comparison meant anything.
         if isinstance(value, BaseModel):
             (run_dir / "research-1.json").write_text(
                 value.model_dump_json(indent=2) + "\n", encoding="utf-8"
@@ -186,6 +198,13 @@ async def generate_and_score(
     (run_dir / "brief.json").write_text(
         brief.model_dump_json(indent=2) + "\n", encoding="utf-8"
     )
+
+    # Read from the finished book rather than accumulated during the run, so the
+    # notes scored against are exactly the ones the Writer was given. `None`
+    # grounding means research never ran, which yields no notes and records the
+    # recital metrics as absent -- not as a clean score.
+    grounding = story.outline.grounding
+    notes = [fact.story_note for fact in grounding.facts] if grounding else []
 
     card = await score_book(
         story,

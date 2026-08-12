@@ -295,20 +295,7 @@ class Settings(BaseSettings):
     # Illustration is turned off by not calling it -- the separate tool *is* the
     # switch.
     #
-    # Anchored to the repo root rather than left relative, for the same reason
-    # `env_file` is: a relative default resolves against the *process* working
-    # directory, and an MCP client starts this server from wherever it likes. The
-    # failure that would cause is "no index found" while the index plainly
-    # exists, which is the least debuggable kind.
-    knowledge_root: Path = Field(
-        default=_PROJECT_ROOT / "data" / "knowledge",
-        alias="KNOWLEDGE_ROOT",
-        description="Directory holding the built knowledge index",
-    )
-    # Where the corpus and its vectors live once retrieval moves to Postgres.
-    # `knowledge_root` above is retired in the same change that deletes
-    # LocalVectorStore; both exist meanwhile because deleting config for live code
-    # would break the suite before its replacement is wired up.
+    # Where the corpus and its vectors live.
     #
     # Optional at import time, exactly like the API keys and for the same reason:
     # the MCP server must start and list its tools without a database reachable.

@@ -28,6 +28,11 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+# Safe in this direction only: `entities/grounding.py` imports nothing from
+# sparkstory, so there is no cycle. Checked rather than assumed -- a cycle here
+# would surface as an ImportError at server start, not at edit time.
+from sparkstory.entities.grounding import StoryGrounding
+
 
 # Defaulting to they/them is a correctness decision, not a stylistic one: a name
 # does not indicate someone's pronouns, and the story text refers to the child
@@ -286,6 +291,35 @@ class StoryOutline(BaseModel):
             "The story's structure in order. Include a setup, an inciting "
             "incident, a climax and a resolution at minimum."
         ),
+    )
+    # Research that shaped this plan, carried so the Writer can obey the same
+    # constraints the planner did. Before this the grounding died at the end of
+    # `plan_story`: it was computed, planned from, and dropped when the pipeline
+    # returned a bare outline -- which is why a craft device could only ever be
+    # *described* in a beat summary (findings J and Q). A refrain lives in prose.
+    #
+    # Nested here rather than passed beside the outline as a third `write_story`
+    # argument. Three independently-assembled arguments let a client pair a genuine
+    # outline with a genuine grounding from a *different* `plan_story` call, and
+    # nothing would compare them. That matters more than it sounds because
+    # `world_rules` lives on the brief: changing it re-runs retrieval and re-frames
+    # the result, so the same chunk means "the eagle cannot fly" under `realistic`
+    # and "empty space is what the wings push against" under `imaginative`. A
+    # grounding paired with the wrong brief is not stale, it is wrong. Nesting makes
+    # that pairing unrepresentable rather than merely discouraged.
+    #
+    # Optional because `MAX_RESEARCH_STEPS=0` is a supported configuration and an
+    # ungrounded run is the control arm of the A/B this feature is judged by.
+    #
+    # NOT filled by the planner, and the description below says so because a field
+    # description is prompt text (non-obvious rule 1). The planner is the one node
+    # that both sees this schema and could invent a `chunk_id` -- which
+    # `drop_unprovenanced` would then silently drop, losing a real fact with no
+    # error anywhere. Its revision replay excludes this field for the same reason;
+    # see `nodes/story_planner.py`.
+    grounding: StoryGrounding | None = Field(
+        default=None,
+        description="Leave this out. It is filled in by the research step, not by you.",
     )
 
 

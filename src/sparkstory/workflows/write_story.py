@@ -43,6 +43,9 @@ from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.prose_critic import ProseCriticNode
 from sparkstory.nodes.writer import WriterNode
 from sparkstory.observability.tracing import build_handler
+from sparkstory.retrieval.embed import get_embedder
+from sparkstory.retrieval.pg_store import build_store
+from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.retries import RETRY_POLICY
 from sparkstory.workflows.reviews import (
@@ -157,6 +160,48 @@ def build_story_workflow(
         # plan_story. It can be stale, hand-edited or invented. Checked before a
         # single model call is paid for.
         validate_outline(brief, outline)
+
+        # And so does its grounding, which is why it is re-verified rather than
+        # trusted. `validate_outline` checks structural fit; this checks *origin*,
+        # which is strictly stronger: every chunk_id is resolved against the store
+        # and `source` is overwritten from it, so a fabricated `source: "NASA"` is
+        # unreachable rather than merely detectable. That is the same move
+        # drop_unprovenanced already makes on the planning side, applied at the
+        # point the data stops being ours.
+        #
+        # It DROPS rather than raising, matching drop_unroutable_prose_reviews: a
+        # book is better than no book, and a brief whose whole grounding is
+        # fabricated simply becomes an ungrounded run.
+        #
+        # Guarded on `is not None` for a reason beyond tidiness: `build_store`
+        # raises ConfigurationError when DATABASE_URL is unset, so verifying
+        # unconditionally would make an ungrounded write_story newly require
+        # Postgres -- a behaviour change for every caller that never researched.
+        #
+        # ledger=None deliberately, and this is the feature's accepted scope limit.
+        # A WebLedger is per-run and in-memory, so a `web:<n>` id minted during
+        # planning cannot be resolved here and its fact is dropped as though
+        # invented. Corpus facts only. It is logged rather than silent, because a
+        # book quietly losing its grounding with nothing to read afterwards is
+        # finding M's failure mode.
+        if outline.grounding is not None:
+            verified = drop_unprovenanced(
+                outline.grounding,
+                build_store(
+                    settings.database_url,
+                    get_embedder(settings.embedding_model),
+                    settings.embedding_model,
+                ),
+            )
+            dropped = len(outline.grounding.facts) - len(verified.facts)
+            if dropped:
+                logger.warning(
+                    "[%s] dropped %d unprovenanced fact(s) from the caller's "
+                    "grounding; note a web:<n> id cannot be verified here",
+                    request_id,
+                    dropped,
+                )
+            outline = outline.model_copy(update={"grounding": verified})
 
         page_plan = await plan_pages(request_id, brief, outline)
         prose = await write_prose(request_id, brief, outline, page_plan)

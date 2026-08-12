@@ -11,8 +11,6 @@ was unreachable until a .env file declared the variable blank. .env files are
 gitignored, so the trigger was never in the repository.
 """
 
-from pathlib import Path
-
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -214,21 +212,6 @@ class TestResearchSettings:
         fresh = Settings()
         assert fresh.max_research_steps == 4
         assert fresh.retrieval_top_k == 5
-        assert fresh.knowledge_root.parts[-2:] == ("data", "knowledge")
-
-    def test_the_default_index_path_is_absolute(self) -> None:
-        """Non-obvious rules 4 and 6, in a new place. A relative default resolves
-        against the *process* working directory, and an MCP client launches this
-        server from wherever it likes -- so the failure would be "no index found"
-        while data/knowledge plainly has one. Anchored to the repo root instead."""
-        assert Settings().knowledge_root.is_absolute()
-
-    def test_an_explicit_root_is_respected(self) -> None:
-        """Whatever an operator sets wins, absolute or not: the anchoring is a
-        default, not a policy."""
-        assert Settings(knowledge_root=Path("/tmp/elsewhere")).knowledge_root == Path(
-            "/tmp/elsewhere"
-        )
 
     def test_research_can_be_switched_off_entirely(self) -> None:
         """0 skips research rather than running it with no budget, mirroring

@@ -248,6 +248,24 @@ def build_outline_workflow(
         # The best draft seen, not the last. A later revision can be worse: the
         # critic cannot reliably tell a feeling shown subtly from one that is
         # absent, so it re-flags a good page and the generator degrades it.
+        #
+        # Grounding is attached here, once, to the draft actually being returned.
+        # Not inside `plan_outline`, because the loop discards drafts and grounding
+        # on a discarded draft is noise in the run artifacts -- and this is the only
+        # place that knows *which* outline won.
+        #
+        # This is what carries research past `plan_story`. Until now the grounding
+        # was computed, planned from, and dropped when this returned a bare outline,
+        # so the Writer had never seen a fact and a craft device could only ever be
+        # described in a beat summary rather than used (findings J and Q).
+        #
+        # `is not None` rather than a truthiness check: empty grounding means
+        # "research ran and found nothing", which is a correct and common answer,
+        # and it must stay distinguishable from "research never ran". Rule 27 needs
+        # that distinction -- a run that retrieved nothing renders identically in
+        # both world-rule modes, so comparing against it is vacuous.
+        if grounding is not None:
+            best_outline = best_outline.model_copy(update={"grounding": grounding})
         return best_outline
 
     return outline_workflow

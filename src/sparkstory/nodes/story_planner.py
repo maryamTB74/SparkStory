@@ -293,8 +293,24 @@ class StoryPlannerNode(Node):
             # The previous draft is replayed as the model's *own* turn, following
             # brown's article_writer.py: it then edits something it owns rather
             # than critiquing a stranger's work.
+            #
+            # `exclude={"grounding"}` because this is the only place a whole
+            # outline is serialised to a model, and grounding carries `chunk_id`
+            # and `source` -- a storage key and an attribution, neither of which is
+            # story material (rule 1). The specific hazard is worse than noise:
+            # the planner is the one node that both sees this schema and could
+            # fill the field itself, and an invented `chunk_id` is dropped
+            # silently by `drop_unprovenanced`, losing a real fact with no error.
+            #
+            # Excluded at the *serialisation* point rather than on the field,
+            # because the field must survive serialisation everywhere else -- run
+            # artifacts, the checkpointer, and the client round trip all need it.
             messages += [
-                AIMessage(content=self.reviews.outline.model_dump_json(indent=2)),
+                AIMessage(
+                    content=self.reviews.outline.model_dump_json(
+                        indent=2, exclude={"grounding"}
+                    )
+                ),
                 HumanMessage(
                     content=OUTLINE_REVISION_PROMPT_TEMPLATE.format(
                         reviews=render_outline_reviews(self.reviews)

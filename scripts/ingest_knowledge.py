@@ -31,7 +31,9 @@ from sparkstory.utils.logging_utils import configure_logging
 logger = logging.getLogger(__name__)
 
 #: Anchored to the repository, not the working directory -- same reasoning as
-#: `knowledge_root` in config.py, and the same failure if it were relative.
+#: `_PROJECT_ROOT` and `env_file` in config.py, and the same failure if it were
+#: relative: a relative default resolves against the *process* cwd, so the corpus
+#: would go missing while it plainly sits in the repo.
 _DEFAULT_CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
 

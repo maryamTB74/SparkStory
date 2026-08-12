@@ -8,6 +8,7 @@ other test in the suite and looks exactly like success.
 
 from langchain_core.messages import AIMessage
 
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.reviews import (
     OutlineReview,
     OutlineReviews,
@@ -72,6 +73,46 @@ class TestStoryPlannerRevision:
         replay = model.messages[2]
         assert isinstance(replay, AIMessage)
         assert outline.title in replay.content
+
+    async def test_the_replayed_draft_carries_no_provenance(
+        self, brief: StoryBrief, outline: StoryOutline
+    ) -> None:
+        """Rule 1, in the one place a whole outline is serialised to a model.
+
+        The replay dumps the previous draft with ``model_dump_json``, so once the
+        outline carries grounding it would hand the planner every ``chunk_id`` and
+        ``source``. Worse than the general case: the planner is the one node that
+        both sees this schema and could *fill the field itself*, inventing an id
+        that ``drop_unprovenanced`` then drops silently -- a real fact lost with no
+        error anywhere.
+
+        The draft itself must still be replayed. Excluding the whole message would
+        "fix" the leak by removing the mechanism it protects.
+        """
+        grounded = StoryOutline.model_validate(
+            outline.model_dump()
+            | {
+                "grounding": StoryGrounding(
+                    facts=[
+                        GroundedFact(
+                            claim="The Moon has no air.",
+                            story_note="Nothing outdoors can flutter or make a sound.",
+                            source="NASA -- Moon Facts",
+                            chunk_id="moon#1",
+                        )
+                    ]
+                ).model_dump()
+            }
+        )
+        model = FakeModel(outline)
+        await StoryPlannerNode(
+            model=model, brief=brief, reviews=_reviews(grounded)
+        ).ainvoke()
+        replay = model.messages[2]
+        assert isinstance(replay, AIMessage)
+        assert grounded.title in replay.content
+        assert "moon#1" not in replay.content
+        assert "NASA" not in replay.content
 
     async def test_the_review_comment_reaches_the_model(
         self, brief: StoryBrief, outline: StoryOutline

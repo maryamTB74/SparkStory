@@ -73,6 +73,7 @@ from sparkstory.entities.stories import (
     ReadingLevel,
     Story,
     StoryBrief,
+    StoryOutline,
     Tone,
     WorldRules,
 )
@@ -250,6 +251,31 @@ def attach_file_log(path: Path) -> logging.Handler:
     )
     logging.getLogger().addHandler(handler)
     return handler
+
+
+def grounding_meta(outline: StoryOutline) -> dict:
+    """What research the book was actually built from, for `meta.json`.
+
+    The count is here for a specific reason: non-obvious rule 27 says to check the
+    fact count *before* comparing two runs, because a run that retrieved nothing
+    renders identically in both world-rule modes -- so a comparison against it is
+    vacuous while still looking like a successful control. Findings M and S are both
+    that mistake, one session apart. Recording it beside `world_rules` means the two
+    fields that decide whether an A/B means anything sit in the same file.
+
+    `chunk_ids` rather than the notes themselves: this is an audit trail, and the
+    notes are already in `research-1.json` and in the outline.
+
+    Distinguishes three states, which a bare count could not: `null` means research
+    never ran (`MAX_RESEARCH_STEPS=0`), `0` means it ran and found nothing, and a
+    number means it found something.
+    """
+    if outline.grounding is None:
+        return {"facts": None, "chunk_ids": None}
+    return {
+        "facts": len(outline.grounding.facts),
+        "chunk_ids": [fact.chunk_id for fact in outline.grounding.facts],
+    }
 
 
 def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dict:
@@ -488,7 +514,12 @@ async def run_stages(
             run_dir,
             "meta.json",
             build_meta(
-                args, started, outcome="ok", beats=len(outline.beats), stage_run="plan"
+                args,
+                started,
+                outcome="ok",
+                beats=len(outline.beats),
+                stage_run="plan",
+                grounding=grounding_meta(outline),
             ),
         )
         return 0
@@ -521,6 +552,7 @@ async def run_stages(
                 stage_run="plot",
                 beats=len(outline.beats),
                 pages=len(plan.pages),
+                grounding=grounding_meta(outline),
             ),
         )
         return 0
@@ -602,6 +634,10 @@ async def run_stages(
             stage_run="all",
             beats=len(story.outline.beats),
             pages=len(story.pages),
+            # From `story.outline`, not the pre-`write_story` outline: the boundary
+            # check may have dropped a fact, and this must record what the book was
+            # built from rather than what the caller supplied.
+            grounding=grounding_meta(story.outline),
             total_words=sum(words),
             longest_page_words=max(words),
             pages_over_level_limit=dense,

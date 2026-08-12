@@ -20,6 +20,7 @@ from sparkstory.entities.exceptions import (
     StoryStructureError,
     UnsafeContentError,
 )
+from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.reviews import (
     ProseReview,
     ProseReviewsOutput,
@@ -36,6 +37,7 @@ from sparkstory.entities.stories import (
 from sparkstory.mcp.tools.write_story import write_story_tool
 from sparkstory.models.exceptions import MissingAPIKeyError
 from sparkstory.models.fake_model import FakeModel
+from sparkstory.workflows import write_story as write_story_module
 from sparkstory.workflows.retries import _retry_on
 from sparkstory.workflows.write_story import run_story_pipeline
 
@@ -99,6 +101,81 @@ def fakes(
     keeps these wiring tests measuring wiring: one call per stage, no revisions.
     """
     return looping_fakes()
+
+
+class TestCallerGroundingIsVerified:
+    """The outline arrives from a caller, so its grounding does too.
+
+    A fabricated ``source: "NASA"`` is a provenance lie in the one feature whose
+    purpose is factual accuracy, so every ``chunk_id`` is resolved against the
+    store and ``source`` is overwritten from it -- the same move
+    ``drop_unprovenanced`` already makes on the planning side, applied where the
+    data stops being ours.
+
+    It **drops** rather than raising, matching ``drop_unroutable_prose_reviews``: a
+    brief whose whole grounding is fabricated becomes an ungrounded run, not a
+    failed one.
+    """
+
+    async def test_a_fabricated_chunk_id_is_dropped(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Acceptance test 5, forced rather than left unfalsified. An unfalsified
+        check is not a proven one -- finding M is the worked example."""
+        monkeypatch.setattr(
+            write_story_module, "build_store", lambda *a, **k: _EmptyStore()
+        )
+        grounded = StoryOutline.model_validate(
+            outline.model_dump()
+            | {
+                "grounding": StoryGrounding(
+                    facts=[
+                        GroundedFact(
+                            claim="Invented.",
+                            story_note="An invented note.",
+                            source="Nowhere at all",
+                            chunk_id="moon#9999",
+                        )
+                    ]
+                ).model_dump()
+            }
+        )
+
+        story = await run_story_pipeline(brief, grounded)
+
+        assert story.outline.grounding is not None
+        assert story.outline.grounding.facts == []
+
+    async def test_an_ungrounded_outline_needs_no_database(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+    ) -> None:
+        """`build_store` raises `ConfigurationError` when DATABASE_URL is unset, so
+        verifying unconditionally would make an ungrounded `write_story` newly
+        require Postgres -- a real behaviour change for every caller that never
+        researched. Nothing is stubbed here deliberately: this test would fail if
+        the store were built when there is nothing to verify."""
+        assert outline.grounding is None
+        story = await run_story_pipeline(brief, outline)
+        assert story.outline.grounding is None
+
+
+class _EmptyStore:
+    """A store that vouches for nothing, so every cited id is unprovenanced.
+
+    Not a `PgVectorStore`: `drop_unprovenanced` takes the `ChunkStore` protocol, so
+    the only methods needed are the ones it calls. A real store here would need a
+    database and would put this module's offline guarantee at risk.
+    """
+
+    def get(self, chunk_id: str) -> None:
+        return None
 
 
 class TestRunStoryPipeline:

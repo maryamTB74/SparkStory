@@ -83,7 +83,13 @@ class TestRunOutlinePipeline:
         outline: StoryOutline,
     ) -> None:
         outline_fakes()
-        assert await run_outline_pipeline(brief) == outline
+        result = await run_outline_pipeline(brief)
+        # Compared field by field rather than as a whole object: the returned
+        # outline now also carries the run's grounding, so whole-object equality
+        # against the fixture would fail on a field this test is not about.
+        assert result.model_dump(exclude={"grounding"}) == outline.model_dump(
+            exclude={"grounding"}
+        )
 
     async def test_an_approving_critic_costs_one_extra_call(
         self,
@@ -402,6 +408,71 @@ class TestResearchCanBeSwitchedOff:
         assert await run_outline_pipeline(brief) == outline
 
 
+class TestGroundingIsAttachedToTheReturnedOutline:
+    """The point of the whole feature: grounding survives ``plan_story``.
+
+    It used to be computed, planned from, and dropped when the pipeline returned a
+    bare outline -- so the Writer had never once seen a fact, and a craft device
+    could only ever be *described* in a beat summary (findings J and Q).
+
+    Attached to the outline rather than returned beside it, so the pair cannot come
+    apart. ``world_rules`` lives on the brief, so a genre change re-runs retrieval
+    and re-frames the result: a grounding paired with the wrong brief is not stale,
+    it is wrong.
+    """
+
+    async def test_the_returned_outline_carries_the_runs_grounding(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+    ) -> None:
+        outline_fakes()
+        fake_research(StoryGrounding(facts=[_grounded_fact()]))
+
+        result = await run_outline_pipeline(brief)
+
+        assert result.grounding is not None
+        assert result.grounding.facts[0].chunk_id == "moon#1"
+
+    async def test_no_research_means_no_grounding(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        brief: StoryBrief,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The control arm of the A/B has to stay representable, and an outline
+        with no grounding has to stay usable."""
+        outline_fakes()
+        monkeypatch.setattr(settings, "max_research_steps", 0)
+
+        result = await run_outline_pipeline(brief)
+
+        assert result.grounding is None
+
+    async def test_empty_grounding_is_attached_as_empty_not_dropped(
+        self,
+        outline_fakes: Callable[..., dict[type, FakeModel]],
+        fake_research: Callable[..., None],
+        brief: StoryBrief,
+    ) -> None:
+        """Research ran and found nothing -- a correct and common answer for a
+        premise with no factual spine.
+
+        Distinguishable from "research never ran", which matters because rule 27
+        says to check the fact count before comparing two runs: a run that
+        retrieved nothing renders identically in both world-rule modes, so a
+        comparison against it is vacuous. Findings M and S are both that mistake.
+        """
+        outline_fakes()
+        fake_research(StoryGrounding(facts=[]))
+
+        result = await run_outline_pipeline(brief)
+
+        assert result.grounding is not None
+        assert result.grounding.facts == []
+
+
 class TestResearchFailsOpen:
     async def test_a_broken_researcher_still_yields_a_book(
         self,
@@ -428,7 +499,18 @@ class TestResearchFailsOpen:
         everything is dropped, and the run continues."""
         outline_fakes()
         fake_research(StoryGrounding(facts=[_grounded_fact()]), known_chunks=())
-        assert await run_outline_pipeline(brief) == outline
+
+        result = await run_outline_pipeline(brief)
+
+        assert result.model_dump(exclude={"grounding"}) == outline.model_dump(
+            exclude={"grounding"}
+        )
+        # The dropped fact leaves *empty* grounding attached, not absent grounding.
+        # "We looked and the corpus could not vouch for anything" is a different
+        # state from "we never looked", and the Writer must be told the first
+        # rather than left to infer it.
+        assert result.grounding is not None
+        assert result.grounding.facts == []
 
 
 class TestWebLedgerConstruction:

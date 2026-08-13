@@ -72,18 +72,22 @@ class TestModelRegistry:
             if name.endswith("_model")
         }
         assert configured, "no *_model settings found -- the discovery broke"
-        # Three registries, three factories, and the routing is by name because
+        # Four registries, four factories, and the routing is by name because
         # every one of these fields ends in `_model` while naming entries in
         # different places. An embedder takes no messages and binds no output
-        # schema; an image model takes a prompt and returns bytes. Routed rather
-        # than skipped, so each stays covered.
+        # schema; an image model takes a prompt and returns bytes; a speech model
+        # takes text and a voice and returns audio. Routed rather than skipped, so
+        # each stays covered.
         #
         # `illustration_director_model` deliberately falls through to
         # `llm_configs`: deciding how a book looks is a writing task, so the
         # Director is a chat model. Only the thing that *draws* is an image model.
+        # There is no narration equivalent, because nothing decides how a book
+        # sounds -- the script is the page text and the voice is on the brief.
         other_registries = {
             "embedding_model": settings.embedding_configs,
             "illustrator_model": settings.image_configs,
+            "narrator_model": settings.speech_configs,
         }
         for name, value in configured.items():
             registry = other_registries.get(name, settings.llm_configs)
@@ -107,6 +111,25 @@ class TestModelRegistry:
             assert "identifier" in cfg, f"{name} missing identifier"
             assert ":" not in cfg["identifier"], (
                 f"{name} identifier is sent verbatim, so it takes no provider prefix"
+            )
+            assert cfg["api_key_env_var"], f"{name} missing api_key_env_var"
+            assert "base_url" in cfg.get("params", {}), (
+                f"{name} needs a base_url -- there is no default provider here"
+            )
+
+    def test_every_speech_entry_is_well_formed(self) -> None:
+        """Same guard for the speech registry, with one deliberate difference.
+
+        There is **no** ``identifier``, and unlike the image registry that is not
+        a formatting difference but a measured one: ``POST /v1/tts`` returns 200
+        with no ``model`` field, so an identifier would be a value nothing reads.
+        Asserted rather than merely omitted, so nobody adds one back by analogy
+        with the other three registries and then wonders why it has no effect.
+        """
+        assert settings.speech_configs, "the speech registry must not be empty"
+        for name, cfg in settings.speech_configs.items():
+            assert "identifier" not in cfg, (
+                f"{name} has an identifier, but /v1/tts takes no model field"
             )
             assert cfg["api_key_env_var"], f"{name} missing api_key_env_var"
             assert "base_url" in cfg.get("params", {}), (

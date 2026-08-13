@@ -294,6 +294,25 @@ class Settings(BaseSettings):
         alias="ILLUSTRATION_DIRECTOR_MODEL",
         description="Model that decides the style bible and each page's picture",
     )
+    # --- Narration -------------------------------------------------------
+    # Names an entry in `speech_configs`, not `llm_configs` or `image_configs`: a
+    # speech model takes text and a voice and returns audio bytes. Four
+    # registries, four factories.
+    #
+    # Defaults to xAI for the reason rule 21 exists and finding CC bills. Four
+    # stages have now defaulted to Google while `.env` pinned everything else to
+    # Grok, and the memory extractor's version of this failed *open* -- storing
+    # nothing while the run looked completely normal. There is no narration
+    # equivalent of failing open, but there is no reason to find out.
+    #
+    # There is deliberately no `narration_voice` beside it: the voice belongs to
+    # the brief, because a parent chooses it per story and it crosses the MCP tool
+    # boundary. See `StoryBrief.voice`.
+    narrator_model: str = Field(
+        default="grok-speech",
+        alias="NARRATOR_MODEL",
+        description="Model used to read the finished story aloud",
+    )
     # There is deliberately no `max_images_per_book`. One was written and removed:
     # the image count is *derived*, not chosen -- one picture per page plus one
     # portrait per character -- and `StoryBrief` already caps pages at 24 while
@@ -580,6 +599,42 @@ class Settings(BaseSettings):
             # test run.
             "grok-image-quality": {
                 "identifier": "grok-imagine-image-quality",
+                "api_key_env_var": "XAI_API_KEY",
+                "params": {
+                    "base_url": "https://api.x.ai/v1",
+                },
+            },
+        }
+
+    @property
+    def speech_configs(self) -> dict[str, dict[str, Any]]:
+        """Text-to-speech models, by logical name.
+
+        The fourth registry, and separate from the other three for the reason they
+        are separate from each other: a speech model takes text and a voice and
+        returns audio bytes, so it is built by ``get_speech_model`` and shares no
+        construction step with a chat model, an embedder or an image model.
+
+        **One entry, not two.** ``grok-image`` has a ``grok-image-quality``
+        sibling because xAI ships two image models at different tiers. The TTS
+        endpoint exposes no such tier -- 26 voices, one endpoint, no quality
+        parameter -- so a second entry here would differ in nothing. The
+        registry's job is to make swapping a *model* a config change, not to
+        enumerate one model's parameters.
+
+        **There is no ``identifier``, and that is measured rather than omitted.**
+        ``POST /v1/tts`` returns 200 with no ``model`` field at all, and supplying
+        one changes nothing. What varies is the ``voice_id`` request parameter,
+        which belongs to the brief. An identifier here would be a value nothing
+        reads -- and a *wrong* one fails at the first live call and nowhere
+        earlier, which is what a web-search-asserted ``grok-2-image`` cost the
+        image seam.
+
+        ``base_url`` travels in ``params`` exactly as it does for ``grok-*`` chat
+        and image entries.
+        """
+        return {
+            "grok-speech": {
                 "api_key_env_var": "XAI_API_KEY",
                 "params": {
                     "base_url": "https://api.x.ai/v1",

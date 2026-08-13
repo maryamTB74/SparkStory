@@ -67,6 +67,7 @@ from pydantic import BaseModel
 
 from sparkstory.config import settings
 from sparkstory.entities.illustration import ArtStatus
+from sparkstory.entities.narration import NarrationStatus
 from sparkstory.entities.stories import (
     ChildProfile,
     Pronouns,
@@ -75,6 +76,7 @@ from sparkstory.entities.stories import (
     StoryBrief,
     StoryOutline,
     Tone,
+    Voice,
     WorldRules,
 )
 from sparkstory.models.get_model import get_chat_model
@@ -84,6 +86,7 @@ from sparkstory.renderers import render_pdf
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import configure_logging
 from sparkstory.workflows.illustrate import run_illustration_pipeline
+from sparkstory.workflows.narrate import run_narration_pipeline
 from sparkstory.workflows.plan_outline import (
     build_research_context,
     run_outline_pipeline,
@@ -203,6 +206,24 @@ def parse_args() -> argparse.Namespace:
             "under --no-save, because the images need somewhere to live."
         ),
     )
+    parser.add_argument(
+        "--narrate",
+        action="store_true",
+        help=(
+            "Read the finished book aloud: one MP3 per page plus a stitched "
+            "story.mp3, into the run directory. Ignored under --no-save, because "
+            "the audio needs somewhere to live."
+        ),
+    )
+    parser.add_argument(
+        "--voice",
+        choices=[v.value for v in Voice],
+        default=Voice.FEMALE.value,
+        help=(
+            "Which voice reads the story aloud. Recorded in meta.json, without "
+            "which comparing two voices is an anecdote rather than evidence."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -219,6 +240,7 @@ def build_brief(args: argparse.Namespace) -> StoryBrief:
         premise=args.premise,
         tone=Tone(args.tone),
         world_rules=WorldRules(args.world_rules),
+        voice=Voice(args.voice),
         page_count=args.pages,
         must_include=args.must_include,
         avoid=args.avoid,
@@ -309,6 +331,13 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
         # here means the run read and wrote nothing, which must stay
         # distinguishable from a child whose memory happened to be empty.
         "child_id": args.child_id,
+        # And the same argument again, for the same reason `--world-rules` was
+        # recorded in Session 9: comparing two voices is only evidence if each
+        # run's artifacts say which voice produced it. Recorded even when
+        # --narrate is off, so a run that could have been narrated and was not
+        # stays distinguishable from one narrated in the default voice.
+        "voice": args.voice,
+        "narrated": args.narrate,
         "models": {
             "researcher": settings.researcher_model,
             "embedder": settings.embedding_model,
@@ -316,6 +345,7 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
             "plot": settings.plot_model,
             "writer": settings.writer_model,
             "memory_extractor": settings.memory_extractor_model,
+            "narrator": settings.narrator_model,
         },
         "max_research_steps": settings.max_research_steps,
         # Read from settings rather than from args, so an override on the command
@@ -601,6 +631,27 @@ async def run_stages(
         for item in art.portraits + art.pages:
             if item.status is not ArtStatus.CONDITIONED:
                 print(f"  {item.key}: {item.status.value} -- {item.detail}")
+
+    # After the PDF rather than before it, because narration and illustration are
+    # independent: audio does not go in the book, and a failure here must not cost
+    # the pictures. `run_narration_pipeline` writes narration.json itself.
+    if args.narrate and run_dir is not None:
+        narration = await run_narration_pipeline(
+            story, brief, run_dir, on_task_result=save_iteration
+        )
+        print(
+            f"\nnarrated {narration.pages_narrated}/{len(narration.items)} pages "
+            f"as {narration.voice_id!r} at speed {narration.speed:.2f}"
+        )
+        # Printed rather than left in the artifact for the same reason
+        # `fully_conditioned` is: a partially narrated book is the thing a person
+        # reading the terminal needs told, because an unplayable page 6 is
+        # invisible until someone reaches page 6.
+        for item in narration.items:
+            if item.status is not NarrationStatus.NARRATED:
+                print(f"  page {item.page_number}: {item.status.value}")
+        if narration.stitched is None:
+            print("  no story.mp3 written -- nothing was narrated")
 
     if run_dir is not None:
         (run_dir / "story.md").write_text(

@@ -85,6 +85,13 @@ class WorldRules(StrEnum):
     IMAGINATIVE = "imaginative"  # facts are detail; the premise may break them
 
 
+class Voice(StrEnum):
+    """Which voice reads the story aloud."""
+
+    FEMALE = "female"
+    MALE = "male"
+
+
 # Naming the structural roles explicitly gives the planner a vocabulary for
 # story shape, rather than leaving it to emit an undifferentiated list of events.
 class NarrativeFunction(StrEnum):
@@ -211,6 +218,24 @@ class StoryBrief(BaseModel):
             "Subjects to keep out of the story entirely, for example 'spiders', "
             "'the dark', 'losing a pet'. Treat these as hard constraints."
         ),
+    )
+    # On the brief rather than in settings, because it varies per story, a parent
+    # chooses it, and it crosses the MCP tool boundary -- the argument
+    # `world_rules` won in Session 9, which is why Rule 3's settings table does
+    # not apply to it.
+    #
+    # Two values rather than the four expressive ones first designed. The
+    # provider's 26-voice roster carries no expressive metadata at all: every
+    # entry is `multilingual` and the only distinguishing field is `gender`. A
+    # `warm`/`gentle`/`bright` split would have been invented and then presented
+    # as a mapping -- finding N's shape. Adding a value once a live listen shows
+    # it audibly differs is one row here and one in `_VOICES`.
+    #
+    # Optional with a default, because every existing brief carries no voice and
+    # `world_rules` already demonstrated what a required new brief field costs.
+    voice: Voice = Field(
+        default=Voice.FEMALE,
+        description="Which voice reads the story aloud.",
     )
 
 

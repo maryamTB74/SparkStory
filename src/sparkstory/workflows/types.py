@@ -41,6 +41,29 @@ class OutlineWorkflowInput(TypedDict):
     brief: StoryBrief
 
 
+class NarrationWorkflowInput(TypedDict):
+    """What ``narration_workflow`` is invoked with.
+
+    ``story`` is a *finished* book and is never modified, for the same reason
+    illustration never modifies one: narration is a separate entrypoint precisely
+    so a provider failure cannot damage prose that already passed both critics.
+
+    ``brief`` is here for exactly two fields -- ``voice`` and the child's
+    ``reading_level``, which set who reads and how fast. Nothing else about the
+    brief reaches the provider, because the script is the page text.
+
+    ``directory`` is a ``str`` rather than a ``Path`` for the reason
+    :class:`IllustrationWorkflowInput` records: a workflow input has to survive a
+    checkpointer, and a ``Path`` works against an in-memory saver while failing
+    against SQLite.
+    """
+
+    request_id: str
+    brief: StoryBrief
+    story: Story
+    directory: str
+
+
 class IllustrationWorkflowInput(TypedDict):
     """What ``illustration_workflow`` is invoked with.
 

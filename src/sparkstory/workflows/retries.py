@@ -8,6 +8,7 @@ happen.
 from langgraph.types import RetryPolicy, default_retry_on
 
 from sparkstory.entities.exceptions import (
+    AudioGenerationError,
     ConfigurationError,
     ImageGenerationError,
     StoryStructureError,
@@ -51,10 +52,22 @@ def _retry_on(exc: Exception) -> bool:
         indistinguishable from an oversight. ``ImageConfigurationError`` is a
         ``ConfigurationError`` and so is excluded above; a missing key is not
         transient.
+
+    ``AudioGenerationError``
+        Retried, and named explicitly for the same reason as the image case: the
+        fall-through would retry it anyway, and silence would be indistinguishable
+        from having forgotten to classify it. One narration case is worth
+        recording: an unknown ``voice_id`` answers **404**, which is not transient
+        and so is retried three times before the page is recorded as failed.
+        Accepted rather than special-cased -- the voice map is a two-entry constant
+        with a test asserting every id is one the live endpoint accepted, so a bad
+        id is a code defect caught offline rather than a runtime condition, and
+        telling a permanent 404 from a transient one would mean parsing a
+        provider's error prose.
     """
     if isinstance(exc, ConfigurationError | StoryStructureError | UnsafeContentError):
         return False
-    if isinstance(exc, ImageGenerationError):
+    if isinstance(exc, ImageGenerationError | AudioGenerationError):
         return True
     return default_retry_on(exc)
 

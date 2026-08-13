@@ -104,3 +104,33 @@ class ImageConfigurationError(ConfigurationError):
     to set. Inheriting also picks up the existing ``_retry_on`` exclusion, so a
     missing key cannot be retried three times the way ``GOOGLE_API_KEY`` was.
     """
+
+
+class AudioGenerationError(SparkStoryError):
+    """A speech provider was reached and returned no usable audio.
+
+    The audio twin of ``ImageGenerationError``, with the same placement argument:
+    a sibling of ``ConfigurationError`` rather than a child, because no operator
+    fixes a 503 by editing ``.env``. Transient by assumption, so it **is** retried.
+
+    Narration fails **soft**, like illustration: the workflow catches this per
+    page and records that page as unnarrated rather than destroying a finished
+    book. So being raised is a normal, expected event here.
+
+    Two non-obvious cases are deliberately this class rather than a quiet
+    fallback. An **empty body** on a 200 -- because a zero-byte MP3 plays as
+    silence, and silence is indistinguishable from success on a casual listen. And
+    an **unknown voice id**, which the live endpoint answers with 404 plus a JSON
+    error body; writing that JSON into ``page-03.mp3`` would leave a file that
+    looks like audio and is not.
+    """
+
+
+class AudioConfigurationError(ConfigurationError):
+    """A speech model cannot be built: unknown model id, or a missing API key.
+
+    A ``ConfigurationError`` subclass for exactly the reasons
+    ``ImageConfigurationError`` is one: the tool layer translates only that class
+    into a message naming the variable to set, and inheriting picks up the
+    ``_retry_on`` exclusion so a missing key is not retried three times.
+    """

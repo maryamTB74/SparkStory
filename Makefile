@@ -21,7 +21,8 @@ QA_PATHS := src tests scripts alembic
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus score-books migrate migrate-down ingest \
+        fix check test test-fast test-corpus test-vision score-books migrate \
+        migrate-down ingest \
         run ci-local clean
 
 help: ## Show available targets
@@ -69,6 +70,10 @@ test-fast: ## Run tests, stopping at the first failure
 
 test-corpus: ## Run retrieval quality tests (needs a built index)
 	$(PYTEST) -m corpus || [ $$? -eq 5 ]
+
+
+test-vision: ## Judge the known drifts in committed runs (needs XAI_API_KEY)
+	$(PYTEST) -m vision || [ $$? -eq 5 ]
 
 
 score-books: ## Score every past run on the computed metrics (free, no network)

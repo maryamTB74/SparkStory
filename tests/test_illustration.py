@@ -13,11 +13,14 @@ from pathlib import Path
 
 import pytest
 
+from sparkstory.config import settings
 from sparkstory.entities.exceptions import StoryStructureError
 from sparkstory.entities.illustration import (
     ArtItem,
     ArtStatus,
     CharacterAppearance,
+    ConsistencyAttribute,
+    ConsistencyVerdict,
     IllustrationPlan,
     PageArt,
     StoryArt,
@@ -77,14 +80,35 @@ def provider(monkeypatch: pytest.MonkeyPatch) -> FakeImageProvider:
     return fake
 
 
+def _fake_chat_model(model_id: str) -> FakeModel:
+    """Answer as whichever agent asked, since two now share one factory.
+
+    The Director returns a plan and the consistency judge returns a verdict, so a
+    single fake returning a plan fails every judged run with `'IllustrationPlan'
+    object has no attribute 'matches'`. Written once and shared rather than inlined
+    per test: the version of this that lived inline in two places is what let one
+    test keep the old single-response stub and fail on its own.
+    """
+    if model_id == settings.consistency_judge_model:
+        return FakeModel(ConsistencyVerdict(matches=True))
+    return FakeModel(_plan())
+
+
 @pytest.fixture
 def directed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the Director's chat model, so no LLM is needed."""
-    monkeypatch.setattr(
-        illustrate_module,
-        "get_chat_model",
-        lambda _model_id: FakeModel(_plan()),
-    )
+    """Replace both chat models the workflow uses, so no LLM is needed.
+
+    Two of them now share this one seam -- the Director, which returns a plan, and
+    the consistency judge, which returns a verdict -- so the fake has to answer by
+    model id. A single fake returning a plan made every judged run fail with
+    `'IllustrationPlan' object has no attribute 'matches'`, which is the fixture
+    telling the truth: these are two different agents behind one factory.
+
+    The judge answers "matches" here, so the tests below exercise the drawing path
+    rather than the gate. The gate has its own tests.
+    """
+
+    monkeypatch.setattr(illustrate_module, "get_chat_model", _fake_chat_model)
 
 
 class TestTheDirectorPrompt:
@@ -282,9 +306,7 @@ class TestConditioning:
         monkeypatch.setattr(
             illustrate_module, "get_image_model", lambda _m: fake.as_model()
         )
-        monkeypatch.setattr(
-            illustrate_module, "get_chat_model", lambda _m: FakeModel(_plan())
-        )
+        monkeypatch.setattr(illustrate_module, "get_chat_model", _fake_chat_model)
 
         await run_illustration_pipeline(brief, story, tmp_path)
 
@@ -550,3 +572,239 @@ class TestRenderingArt:
         render_pdf(story, illustrated, art)
 
         assert len(illustrated.read_bytes()) > len(plain.read_bytes())
+
+
+class TestRecordingConsistency:
+    """The verdict field, and the contract it must not break.
+
+    Finding II is what these are for: every item in three live runs recorded
+    `conditioned` while a fox's paws changed colour between portrait and pages, so
+    the record had no way to say a picture missed its reference.
+    """
+
+    def test_a_verdict_is_optional_so_every_existing_item_is_unchanged(self) -> None:
+        """The whole feature is additive or it is a migration.
+
+        Built through `model_validate` rather than the constructor, because what is
+        under test is that an item *without* the field is still valid -- rule 31,
+        after a `model_copy(update=...)` fixture once passed before its field
+        existed.
+        """
+        item = ArtItem.model_validate({"key": "1", "status": "conditioned"})
+        assert item.consistency is None
+
+    def test_a_mismatch_does_not_change_fully_conditioned(self) -> None:
+        """Section 6a's contract, and the reason this is a field and not a status.
+
+        `fully_conditioned` is read by four call sites outside the entity, one of
+        them a prompt telling a client to report it to the parent. It means "the
+        mechanism ran". A book whose paws came out the wrong colour still *ran* the
+        mechanism, so this must stay True -- and `fully_consistent` is what carries
+        the bad news.
+        """
+        art = StoryArt(
+            style_bible="x" * 60,
+            portraits=[ArtItem(key="Kit", status=ArtStatus.CONDITIONED)],
+            pages=[
+                ArtItem(
+                    key="1",
+                    status=ArtStatus.CONDITIONED,
+                    consistency=ConsistencyVerdict(
+                        matches=False,
+                        attribute=ConsistencyAttribute.COLOUR,
+                        difference=(
+                            "the paws are black in the picture and white in "
+                            "the reference"
+                        ),
+                    ),
+                )
+            ],
+        )
+
+        assert art.fully_conditioned is True
+        assert art.fully_consistent is False
+
+    def test_an_unjudged_book_is_not_reported_inconsistent(self) -> None:
+        """None means nobody looked, which is not the same as a mismatch.
+
+        Rule 24 is why this is asserted rather than assumed: with judging off every
+        verdict is None, and a property that returned False there would make a
+        clean book indistinguishable from a broken one.
+        """
+        art = StoryArt(
+            style_bible="x" * 60,
+            pages=[ArtItem(key="1", status=ArtStatus.CONDITIONED)],
+        )
+
+        assert art.fully_consistent is True
+
+    def test_a_matching_verdict_needs_no_difference(self) -> None:
+        """The empty string has to validate or the judge cannot report success.
+
+        Rule 14's shape: a reflexive `min_length=1` on `difference` would make
+        "this picture is fine" unrepresentable, and the symptom would read as the
+        judge never approving anything.
+        """
+        verdict = ConsistencyVerdict(matches=True)
+
+        assert verdict.difference == ""
+        assert verdict.attribute is None
+
+    def test_colour_is_the_first_attribute_the_model_is_offered(self) -> None:
+        """Finding HH measured colour as the only attribute that ever drifts, and
+        both spike verdicts returned it. Enum order reaches the model in the JSON
+        schema, so it is prompt text and worth pinning."""
+        assert list(ConsistencyAttribute)[0] is ConsistencyAttribute.COLOUR
+
+
+class TestTheConsistencyGate:
+    """Check A drops a portrait that does not match its own description.
+
+    The case this exists for is real and is in `outputs/`: one Director wrote "small
+    black ant", the portrait came back green, and every page then copied the green
+    faithfully. A check comparing pages to portraits would have called that book
+    consistent while the character was wrong throughout, which is why this check runs
+    before the pages are paid for.
+    """
+
+    @staticmethod
+    def _chat(verdict: ConsistencyVerdict):
+        """A chat factory whose judge returns `verdict`."""
+
+        def fake(model_id: str) -> FakeModel:
+            if model_id == settings.consistency_judge_model:
+                return FakeModel(verdict)
+            return FakeModel(_plan())
+
+        return fake
+
+    async def test_a_mismatched_portrait_is_not_used_as_a_reference(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """The gate: pages fall back to the unconditioned path rather than
+        inheriting a character that is already wrong."""
+        monkeypatch.setattr(
+            illustrate_module,
+            "get_chat_model",
+            self._chat(
+                ConsistencyVerdict(
+                    matches=False,
+                    attribute=ConsistencyAttribute.COLOUR,
+                    difference=(
+                        "the ant is green in the picture and black in the reference"
+                    ),
+                )
+            ),
+        )
+
+        art = await run_illustration_pipeline(brief, story, tmp_path)
+
+        assert not provider.edit_calls, "a rejected portrait must not condition a page"
+        assert all(i.status is ArtStatus.UNCONDITIONED for i in art.pages)
+        assert art.fully_consistent is False
+
+    async def test_a_matching_portrait_still_conditions_every_page(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        directed: None,
+        tmp_path: Path,
+    ) -> None:
+        """Rule 24: a gate that rejected everything would pass the test above while
+        breaking the feature, so the approving case is asserted too."""
+        art = await run_illustration_pipeline(brief, story, tmp_path)
+
+        assert provider.edit_calls, "an approved portrait must condition the pages"
+        assert art.fully_conditioned is True
+        assert art.fully_consistent is True
+
+    async def test_the_verdict_is_recorded_on_the_portrait(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Finding II: the run must be able to say *why* it degraded, not only that
+        it did. The rejected portrait keeps its file and carries its verdict."""
+        monkeypatch.setattr(
+            illustrate_module,
+            "get_chat_model",
+            self._chat(
+                ConsistencyVerdict(
+                    matches=False,
+                    attribute=ConsistencyAttribute.PROP,
+                    difference=(
+                        "the collar is gold in the picture and silver in the reference"
+                    ),
+                )
+            ),
+        )
+
+        art = await run_illustration_pipeline(brief, story, tmp_path)
+
+        portrait = art.portraits[0]
+        assert portrait.consistency is not None
+        assert portrait.consistency.attribute is ConsistencyAttribute.PROP
+        assert portrait.path is not None and portrait.path.exists(), (
+            "the evidence must survive the rejection"
+        )
+
+    async def test_a_broken_judge_leaves_the_book_intact(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A check may never destroy a book that is fine.
+
+        This is the asymmetry the module docstring argues for, one level up: a
+        missing picture is a missing picture, but a *broken checker* taking out a
+        good book would be the feature causing the harm it exists to detect.
+        """
+
+        class Exploding(FakeModel):
+            async def ainvoke(self, messages: object) -> object:  # type: ignore[override]
+                raise RuntimeError("judge is down")
+
+        def fake(model_id: str) -> FakeModel:
+            if model_id == settings.consistency_judge_model:
+                return Exploding(ConsistencyVerdict(matches=True))
+            return FakeModel(_plan())
+
+        monkeypatch.setattr(illustrate_module, "get_chat_model", fake)
+
+        art = await run_illustration_pipeline(brief, story, tmp_path)
+
+        assert art.fully_conditioned is True, "the drawing must be unaffected"
+        assert all(i.consistency is None for i in art.portraits + art.pages)
+        assert art.fully_consistent is True, "unjudged is not the same as mismatched"
+
+    async def test_page_judging_can_be_switched_off(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        directed: None,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """The page half is one call per page, so it has an off switch. The portrait
+        half is two calls a book and does not."""
+        monkeypatch.setattr(settings, "judge_pages", False)
+
+        art = await run_illustration_pipeline(brief, story, tmp_path)
+
+        assert all(i.consistency is None for i in art.pages)
+        assert all(i.consistency is not None for i in art.portraits), (
+            "the cheap check with the most leverage always runs"
+        )

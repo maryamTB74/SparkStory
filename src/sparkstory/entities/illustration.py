@@ -11,6 +11,16 @@ back from the image provider, so nothing in it is prompt text and nothing in it 
 ever bound as an output schema. Mixing the two would mean a model writing into the
 fields we use to decide whether the feature worked.
 
+**``ConsistencyVerdict`` is the one exception, and it is a real one.** It is bound
+as an output schema, so its descriptions are prompt text, and it is *stored on an
+``ArtItem``* -- a model writing into our record, which the paragraph above says
+not to do. The reason it is allowed here is that the record needs to carry a
+judgement nothing else can produce: whether a picture matches its reference is not
+observable from a provider response. The guard is that it goes in its own field
+which defaults to ``None``, so a model can only ever add a verdict beside our
+facts and never overwrite ``status``, ``path`` or ``detail``. Keep that boundary:
+if a future judge wants to change what ``status`` says, it is doing our job.
+
 **Three field descriptions here exist to close a rule 13 trap.** Each was written
 by asking what the laziest thing that satisfies the field is:
 
@@ -154,6 +164,68 @@ class IllustrationPlan(BaseModel):
     )
 
 
+class ConsistencyAttribute(StrEnum):
+    """What differs between a picture and the reference it should match.
+
+    A closed list rather than free text, for the reason ``ReviewRubric`` is an enum:
+    it lets code branch on the kind of difference, and it stops "is this
+    consistent?" from being answered as a general impression.
+
+    The order is not arbitrary and it is the opposite of what this rubric would
+    have been written to check. Across three illustrated runs, faces, body plans,
+    ears, tails and props all carried across untouched and **only colour moved** --
+    a fox's white paws came back black, a green ant came back black. So colour is
+    named first here and first in the prompt, and ``identity`` is last because it
+    has never once happened.
+    """
+
+    COLOUR = "colour"  # the most common drift by far; see the class docstring
+    MARKINGS = "markings"  # a white chest, a black tail tip, patterned pyjamas
+    PROP = "prop"  # a collar, a charm, a scarf, a basket
+    BODY_PLAN = "body_plan"  # leg count, segments, proportions
+    IDENTITY = "identity"  # a different character altogether
+
+
+class ConsistencyVerdict(BaseModel):
+    """Whether one picture shows the same character as its reference.
+
+    Bound as an output schema, so everything visible here is prompt text -- which
+    makes this the one exception to the module docstring's rule that our records
+    carry no prompt text. It is stored on an ``ArtItem`` and written by a model.
+
+    ``difference`` exists because a verdict alone is worthless: asked "does this
+    match?", the cheapest defensible answer is always *yes*, and a judge that
+    agrees costs a call and buys nothing. Requiring the difference to be named
+    makes an agreeable answer falsifiable -- the same move the web-claim design
+    makes by requiring a supporting quote, and the reason attribution is
+    overwritten from the store rather than trusted.
+    """
+
+    matches: bool = Field(
+        description=(
+            "True only if the picture shows the same character as the reference. "
+            "Judge what the image actually shows, not what the description says "
+            "it should show."
+        )
+    )
+    attribute: ConsistencyAttribute | None = Field(
+        default=None,
+        description=(
+            "Which aspect differs. Null only when the picture matches. Check "
+            "colour first: it is the difference that occurs most often."
+        ),
+    )
+    difference: str = Field(
+        default="",
+        description=(
+            "One sentence naming what the picture shows against what the "
+            "reference asked for -- for example 'the collar is gold in the "
+            "picture and silver in the reference'. Do not restate the reference "
+            "as though it were what you see. Empty only when the picture matches."
+        ),
+    )
+
+
 # --- Our record of what happened, never model output -------------------------
 
 
@@ -180,6 +252,18 @@ class ArtItem(BaseModel):
     status: ArtStatus
     path: Path | None = None
     detail: str | None = None  # why it failed, or which references were used
+    #: The judge's verdict, or None when this image was never judged -- which is
+    #: honest for an UNCONDITIONED or FAILED item (there is no reference to match,
+    #: or no image at all) and for any run with judging switched off.
+    #:
+    #: A separate field rather than a fourth `ArtStatus`, and the distinction is
+    #: load-bearing. `status` says what the pipeline *did*; this says whether it
+    #: *worked*. Collapsing them would drag `fully_conditioned` -- which is
+    #: `all(status is CONDITIONED)`, and which four call sites read, one of them a
+    #: prompt that tells a client to report it to the parent -- from "the
+    #: consistency mechanism ran" to "the mechanism ran and produced a match".
+    #: Those are different claims and the property's docstring commits to the first.
+    consistency: ConsistencyVerdict | None = None
 
 
 class StoryArt(BaseModel):
@@ -219,3 +303,24 @@ class StoryArt(BaseModel):
         """
         every = self.portraits + self.pages
         return bool(every) and all(i.status is ArtStatus.CONDITIONED for i in every)
+
+    @property
+    def fully_consistent(self) -> bool:
+        """True when nothing that was judged came back as a mismatch.
+
+        The companion to ``fully_conditioned``, and deliberately a *second*
+        property rather than a stricter version of the first. That one answers
+        "did the consistency mechanism run?"; this answers "did it work?". A book
+        can honestly be `fully_conditioned` and not `fully_consistent` -- that is
+        precisely the case three live runs produced, where every item recorded
+        `conditioned` while a fox's paws changed colour between its portrait and
+        its pages.
+
+        Unjudged items do not count against it: ``None`` means nobody looked, and
+        reporting "inconsistent" for a book nobody judged would be the same
+        overclaim in the other direction. So this is True for a run with judging
+        off, which is why it must be read alongside how many verdicts exist rather
+        than alone -- rule 24, a check that cannot fail proves nothing.
+        """
+        judged = [i.consistency for i in self.portraits + self.pages if i.consistency]
+        return all(v.matches for v in judged)

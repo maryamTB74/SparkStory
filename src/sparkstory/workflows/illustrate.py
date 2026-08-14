@@ -50,6 +50,7 @@ from sparkstory.entities.illustration import (
     ArtItem,
     ArtStatus,
     CharacterAppearance,
+    ConsistencyVerdict,
     IllustrationPlan,
     PageArt,
     StoryArt,
@@ -57,6 +58,7 @@ from sparkstory.entities.illustration import (
 from sparkstory.entities.stories import Story, StoryBrief
 from sparkstory.models.get_image_model import ImageModel, get_image_model
 from sparkstory.models.get_model import get_chat_model
+from sparkstory.nodes.consistency_judge import ConsistencyJudgeNode
 from sparkstory.nodes.illustration_director import IllustrationDirectorNode
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.retries import RETRY_POLICY
@@ -268,6 +270,96 @@ async def draw_portraits(
     return records, portraits
 
 
+async def _judge(
+    *,
+    name: str,
+    image: bytes,
+    reference_image: bytes | None = None,
+    appearance: str | None = None,
+) -> ConsistencyVerdict | None:
+    """One comparison, or None if the judge could not be asked.
+
+    Fails soft, like every other per-image step in this module, and for a sharper
+    reason than the drawing does: a judge is a *check*, so a broken check must never
+    be able to destroy a book that is fine. `None` therefore means "nobody looked",
+    which is exactly what `fully_consistent` treats it as.
+    """
+    try:
+        node = ConsistencyJudgeNode(
+            model=get_chat_model(settings.consistency_judge_model),
+            name=name,
+            image=image,
+            reference_image=reference_image,
+            appearance=appearance,
+        )
+        return await node.ainvoke()
+    except Exception as exc:  # noqa: BLE001 -- a check may never break a book
+        # Loud, for finding N's reason: a check that silently stopped running
+        # produces a book that looks judged and is not.
+        logger.warning("could not judge %r, leaving it unjudged: %s", name, exc)
+        return None
+
+
+@task(retry_policy=RETRY_POLICY)
+async def check_portraits(
+    request_id: str,
+    plan: IllustrationPlan,
+    records: list[ArtItem],
+    portraits: dict[str, bytes],
+) -> tuple[list[ArtItem], dict[str, bytes]]:
+    """Stage 2b: does each portrait show the character it was told to?
+
+    Runs *before* any page is paid for, and this ordering is the point. One live
+    run's Director wrote "small black ant" and the portrait came back green, and
+    every page then copied the green faithfully -- so a check comparing pages to
+    portraits would have called that book consistent while the character was wrong
+    throughout. A wrong reference poisons every page conditioned on it, which makes
+    this the cheapest check in the module and the one with the most leverage: two
+    calls, before the expensive stage.
+
+    A portrait that fails is **dropped from the references**, so pages fall back to
+    the existing unconditioned path rather than conditioning on a picture known to
+    be wrong. It is deliberately not deleted and not redrawn: the file stays on disk
+    with its verdict recorded, because a run that quietly discarded its own evidence
+    would be unauditable.
+    """
+    appearances = {c.name: c.appearance for c in plan.characters}
+    checked: list[ArtItem] = []
+    kept = dict(portraits)
+
+    for record in records:
+        data = portraits.get(record.key)
+        if data is None:
+            # Never drawn, so there is nothing to look at. `consistency` stays None,
+            # which reads as "nobody looked" rather than as a pass.
+            checked.append(record)
+            continue
+
+        verdict = await _judge(
+            name=record.key, image=data, appearance=appearances[record.key]
+        )
+        checked.append(record.model_copy(update={"consistency": verdict}))
+
+        if verdict is not None and not verdict.matches:
+            logger.warning(
+                "[%s] portrait for %r does not match its description (%s: %s);"
+                " pages will not be conditioned on it",
+                request_id,
+                record.key,
+                verdict.attribute,
+                verdict.difference,
+            )
+            kept.pop(record.key, None)
+
+    logger.info(
+        "[%s] %d/%d portraits usable as references",
+        request_id,
+        len(kept),
+        len(portraits),
+    )
+    return checked, kept
+
+
 #: How many image requests may be in flight at once.
 #:
 #: Measured, like everything else about this endpoint: the first live run fired six
@@ -314,6 +406,95 @@ async def draw_pages(
     return sorted(records, key=lambda item: int(item.key))
 
 
+@task(retry_policy=RETRY_POLICY)
+async def check_pages(
+    request_id: str,
+    plan: IllustrationPlan,
+    records: list[ArtItem],
+    portraits: dict[str, bytes],
+) -> list[ArtItem]:
+    """Stage 3b: does each page still show the character its portrait established?
+
+    **Report-only. Nothing is redrawn.** Deliberately, and the reason is rule 17: a
+    revision can be worse than what it replaced and the loop cannot tell. Prose
+    solves that with `draft_score`, and there is no equivalent for a picture --
+    "fewer findings from a judge whose noise floor is unmeasured" is exactly what
+    rule 29 warns against. So this measures first. Whether a redraw loop is worth
+    building is a decision to make once the false-positive rate is known, and the
+    committed runs in `outputs/` are enough to measure it without generating
+    anything.
+
+    Only `CONDITIONED` pages are judged: an unconditioned page had no reference, so
+    there is nothing for it to be consistent *with*, and a failed page has no image.
+    Judging either would spend a call to produce a finding no redraw could fix.
+
+    Unlike `check_portraits`, this reads the image back from disk -- `draw_pages`
+    returns paths rather than bytes, because a page's bytes have no second consumer
+    the way a portrait's do. That is one more failure mode (a missing or unreadable
+    file), which is why the read is inside the guarded helper's try and a page whose
+    file has gone simply stays unjudged.
+    """
+    if not settings.judge_pages:
+        logger.info("[%s] page judging is off", request_id)
+        return records
+
+    by_page = {page.page_number: page for page in plan.pages}
+    checked: list[ArtItem] = []
+    judged = 0
+
+    for record in records:
+        page = by_page.get(int(record.key))
+        # The reference to compare against is the first portrait this page was
+        # actually conditioned on. One rather than all of them: `ConsistencyVerdict`
+        # answers for one character, and asking about two at once would return a
+        # single verdict covering both, which is unattributable.
+        reference = next(
+            (
+                portraits[name]
+                for name in (page.characters_present if page else [])
+                if name in portraits
+            ),
+            None,
+        )
+        if (
+            record.status is not ArtStatus.CONDITIONED
+            or record.path is None
+            or reference is None
+        ):
+            checked.append(record)
+            continue
+
+        name = next(n for n in page.characters_present if n in portraits)  # type: ignore[union-attr]
+        try:
+            image = record.path.read_bytes()
+        except OSError as exc:
+            logger.warning("could not read %s to judge it: %s", record.path, exc)
+            checked.append(record)
+            continue
+
+        verdict = await _judge(name=name, image=image, reference_image=reference)
+        checked.append(record.model_copy(update={"consistency": verdict}))
+        if verdict is not None:
+            judged += 1
+            if not verdict.matches:
+                logger.warning(
+                    "[%s] page %s does not match %r's portrait (%s: %s)",
+                    request_id,
+                    record.key,
+                    name,
+                    verdict.attribute,
+                    verdict.difference,
+                )
+
+    mismatched = sum(
+        1 for i in checked if i.consistency is not None and not i.consistency.matches
+    )
+    logger.info(
+        "[%s] judged %d pages, %d did not match", request_id, judged, mismatched
+    )
+    return checked
+
+
 def build_illustration_workflow(
     checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> Any:
@@ -336,7 +517,14 @@ def build_illustration_workflow(
         validate_illustration_plan(story, plan)
 
         portrait_records, portraits = await draw_portraits(request_id, plan, directory)
+        # Between drawing the references and using them: a portrait that does not
+        # match its own description is dropped here, so the pages below fall back to
+        # the unconditioned path instead of inheriting a wrong character.
+        portrait_records, portraits = await check_portraits(
+            request_id, plan, portrait_records, portraits
+        )
         page_records = await draw_pages(request_id, plan, portraits, directory)
+        page_records = await check_pages(request_id, plan, page_records, portraits)
 
         art = StoryArt(
             style_bible=plan.style_bible,
@@ -344,12 +532,17 @@ def build_illustration_workflow(
             pages=page_records,
         )
         drawn = sum(1 for item in page_records if item.status is not ArtStatus.FAILED)
+        # Both properties, because they answer different questions and a book can
+        # honestly be one and not the other: `fully_conditioned` says the mechanism
+        # ran, `fully_consistent` says it worked. Reporting only the first is what
+        # three live runs did while a fox's paws changed colour.
         logger.info(
-            "[%s] illustrated %d/%d pages, fully_conditioned=%s",
+            "[%s] illustrated %d/%d pages, fully_conditioned=%s fully_consistent=%s",
             request_id,
             drawn,
             len(page_records),
             art.fully_conditioned,
+            art.fully_consistent,
         )
         return art
 

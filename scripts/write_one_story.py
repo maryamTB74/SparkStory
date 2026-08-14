@@ -148,6 +148,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--must-include", nargs="*", default=["a paper rocket"])
     parser.add_argument("--avoid", nargs="*", default=["spiders", "the dark"])
     parser.add_argument(
+        "--minimal-brief",
+        action="store_true",
+        help=(
+            "Send only what StoryBrief requires -- name, age and premise -- and "
+            "let every other field take its schema default. The defaults here "
+            "belong to the standing fox-and-moon premise, so a new --premise "
+            "otherwise inherits a paper rocket, an interest in astronomy and a "
+            "magical tone. Overrides --tone, --pages, --interests, "
+            "--must-include and --avoid even when they are given explicitly."
+        ),
+    )
+    parser.add_argument(
         "--stage",
         choices=["research", "plan", "plot", "all"],
         default="all",
@@ -228,22 +240,34 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_brief(args: argparse.Namespace) -> StoryBrief:
+    # Under --minimal-brief these fields are omitted rather than set to a copied
+    # constant, so StoryBrief itself supplies the default. Writing `[]` or
+    # `Tone.GENTLE` here would be a second declaration of the schema's default,
+    # free to drift from it with nothing failing -- the same reason
+    # `render_grounding` takes world_rules as a required argument.
+    optional: dict[str, object] = (
+        {}
+        if args.minimal_brief
+        else {
+            "tone": Tone(args.tone),
+            "page_count": args.pages,
+            "must_include": args.must_include,
+            "avoid": args.avoid,
+        }
+    )
     return StoryBrief(
         child=ChildProfile(
             name=args.name,
             age=args.age,
             pronouns=Pronouns(args.pronouns),
             reading_level=ReadingLevel(args.level),
-            interests=args.interests,
+            interests=[] if args.minimal_brief else args.interests,
             child_id=args.child_id,
         ),
         premise=args.premise,
-        tone=Tone(args.tone),
         world_rules=WorldRules(args.world_rules),
         voice=Voice(args.voice),
-        page_count=args.pages,
-        must_include=args.must_include,
-        avoid=args.avoid,
+        **optional,
     )
 
 
@@ -338,6 +362,10 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
         # stays distinguishable from one narrated in the default voice.
         "voice": args.voice,
         "narrated": args.narrate,
+        # Same argument a third time. This flag silently changes five brief
+        # fields, so two runs on one premise can differ in tone, page count,
+        # interests, must_include and avoid with nothing else on disk saying so.
+        "minimal_brief": args.minimal_brief,
         "models": {
             "researcher": settings.researcher_model,
             "embedder": settings.embedding_model,

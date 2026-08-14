@@ -294,6 +294,30 @@ class Settings(BaseSettings):
         alias="ILLUSTRATION_DIRECTOR_MODEL",
         description="Model that decides the style bible and each page's picture",
     )
+    # A chat model that can accept an image, so it names an `llm_configs` entry.
+    # Defaults to the *critic* variant at temperature 0.0 rather than a new
+    # registry entry: a judge that answers differently on identical input turns a
+    # verdict into noise, which is the same reason the two prose critics have
+    # zero-temperature entries of their own.
+    #
+    # `grok-3-mini` rather than `grok-4` on measured evidence: the spike put both
+    # in front of a green ant described as black, and both reported green. A small
+    # model succeeding is the stronger result -- the behaviour survives a weak
+    # judge -- and it means judging a book does not need an expensive model.
+    consistency_judge_model: str = Field(
+        default="grok-3-mini-critic",
+        alias="CONSISTENCY_JUDGE_MODEL",
+        description="Model that checks a picture against the reference it should match",
+    )
+    # Gates the *page* half only. Checking each portrait against its own written
+    # description is 2 calls per book and catches a reference that was wrong before
+    # any page was drawn, so it always runs; judging every page is one call per page
+    # and is the half whose false-positive rate has not been measured yet.
+    judge_pages: bool = Field(
+        default=True,
+        alias="JUDGE_PAGES",
+        description="Judge each finished page against its reference portraits",
+    )
     # --- Narration -------------------------------------------------------
     # Names an entry in `speech_configs`, not `llm_configs` or `image_configs`: a
     # speech model takes text and a voice and returns audio bytes. Four

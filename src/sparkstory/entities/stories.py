@@ -198,7 +198,7 @@ class StoryBrief(BaseModel):
     # mapped onto pages by a later stage. Keeping them uncoupled means changing
     # the page count does not invalidate an otherwise good outline.
     page_count: int = Field(
-        default=12,
+        default=6,
         ge=4,
         le=24,
         description="How many pages the finished book should have.",

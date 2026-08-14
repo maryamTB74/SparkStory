@@ -48,6 +48,7 @@ from langchain_core.messages import (
 )
 
 from sparkstory.config import settings
+from sparkstory.mcp.client.session import as_openai_tools
 from sparkstory.mcp.server import create_server
 from sparkstory.utils.logging_utils import configure_logging
 
@@ -74,19 +75,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def as_openai_tools(tools: list[Any]) -> list[dict]:
-    """Convert MCP tool definitions into the shape ``bind_tools`` accepts."""
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description or "",
-                "parameters": tool.inputSchema,
-            },
-        }
-        for tool in tools
-    ]
+# Imported from the client package rather than redefined here. It moved there
+# when `ClientSession` was built, and two copies of a schema converter is exactly
+# the kind of duplication that drifts silently -- the REPL would start binding
+# tools in a shape this harness had stopped testing.
+#
+# What is deliberately NOT shared is the turn driving. `ClientSession.send` runs
+# the tool loop to completion, which is the right shape for a REPL and the wrong
+# one here: this script's whole method is stopping between turns to inspect what
+# was requested, and `write_story` is never executed at all. Rebuilding that on
+# top of a loop that runs to completion would risk the six verdicts to remove
+# duplication that is not actually there.
 
 
 def report_turn(label: str, response: AIMessage) -> list[dict]:

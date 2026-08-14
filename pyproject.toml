@@ -72,6 +72,9 @@ dependencies = [
 # Points at the server entry point, not the package root. This is the command
 # the README's Cursor/MCP client configuration invokes: `uv run sparkstory`.
 sparkstory = "sparkstory.mcp.server:main"
+# The other end of the same pipe: an interactive client for talking to the
+# server. `--transport stdio` makes it spawn `sparkstory` above as a subprocess.
+sparkstory-client = "sparkstory.mcp.client.repl:main"
 
 [build-system]
 # Upper bound widened from the <0.10.0 that `uv init` generated: the build

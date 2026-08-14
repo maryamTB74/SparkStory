@@ -216,6 +216,34 @@ class TestNoInternalTermsLeak:
                 assert term not in lowered, f"{where} leaks {term!r} to the model"
 
 
+class TestResourceTextIsPromptText:
+    """A resource is read by a *client's model*, so rule 1 covers it too.
+
+    The tools and prompts have been audited since Session 1; resources are a new
+    surface with the same property, and it would be easy to treat their output as
+    a debug dump because that is what an introspection endpoint usually is.
+    """
+
+    def _resource_text(self) -> dict[str, str]:
+        from sparkstory.mcp.resources.library import read_corpus, read_library
+
+        return {"library": read_library(), "corpus": read_corpus()}
+
+    def test_the_audit_actually_reads_something(self) -> None:
+        # Rule 24: a sweep over empty strings passes without checking anything.
+        assert all(text for text in self._resource_text().values())
+
+    def test_no_resource_mentions_our_machinery(self) -> None:
+        # `json` and `schema` are excluded from the term list here: a resource
+        # legitimately reports file counts and formats, and the terms that matter
+        # for a resource are the orchestration ones.
+        terms = [t for t in _INTERNAL_TERMS if t not in {"json", "schema"}]
+        for where, text in self._resource_text().items():
+            lowered = text.lower()
+            for term in terms:
+                assert term not in lowered, f"{where} leaks {term!r} to the model"
+
+
 class TestProseRevisionPrompt:
     def test_forbids_writing_the_note_down(self) -> None:
         """Live-run regression: an interiority finding was "fixed" by copying

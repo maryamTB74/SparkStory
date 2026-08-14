@@ -12,6 +12,7 @@ from fastmcp import FastMCP
 
 from sparkstory.config import settings
 from sparkstory.mcp.routers.prompts import register_mcp_prompts
+from sparkstory.mcp.routers.resources import register_mcp_resources
 from sparkstory.mcp.routers.tools import register_mcp_tools
 from sparkstory.utils.logging_utils import configure_logging, get_logger
 
@@ -48,6 +49,7 @@ def create_server() -> FastMCP:
 
     register_mcp_tools(mcp)
     register_mcp_prompts(mcp)
+    register_mcp_resources(mcp)
 
     logger.info(
         "%s v%s ready (planner model: %s)",

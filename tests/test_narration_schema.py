@@ -17,7 +17,7 @@ def _item(page: int, status: NarrationStatus, path: Path | None) -> NarrationIte
 
 def test_pages_narrated_counts_only_successes() -> None:
     # "6 of 8" has to be readable from a file, or a partially narrated book
-    # looks identical to a complete one -- finding N's failure mode.
+    # looks identical to a complete one.
     narration = StoryNarration(
         voice_id="eve",
         speed=0.9,
@@ -46,8 +46,7 @@ def test_is_complete_requires_every_page_and_a_non_empty_book() -> None:
     assert both.is_complete is True
 
     # An empty run is NOT complete. `all([])` is True, which would report a book
-    # that narrated nothing as fully narrated -- rule 24, a check with no room
-    # to fail.
+    # that narrated nothing as fully narrated: a check with no room to fail.
     empty = StoryNarration(voice_id="eve", speed=1.0, items=[], stitched=None)
     assert empty.is_complete is False
     assert empty.pages_narrated == 0

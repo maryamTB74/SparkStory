@@ -31,8 +31,8 @@ class ChunkStore(Protocol):
     """Somewhere chunks live and can be searched.
 
     Five members, which is exactly what ``LocalVectorStore`` already exposes. No
-    member is added here that no caller uses: Rule 3 applies to interfaces as much
-    as to config, and a Protocol is a promise every implementation has to keep.
+    member is added here that no caller uses: a Protocol is a promise every
+    implementation has to keep, so an unused member is a cost with no payer.
 
     ``runtime_checkable`` so a test can assert conformance with ``isinstance``.
     Note this only checks that the *methods exist*, never their signatures -- so
@@ -44,8 +44,8 @@ class ChunkStore(Protocol):
         """Replace the stored corpus with ``chunks``.
 
         Whole-corpus replacement rather than an upsert, because ingestion is an
-        offline batch step (lesson 9's offline phase) and a partial write is the
-        one outcome neither implementation should be able to produce.
+        offline batch step and a partial write is the one outcome neither
+        implementation should be able to produce.
         """
         ...
 
@@ -101,10 +101,9 @@ class ChunkStore(Protocol):
     ) -> list[SearchHit]:
         """Rank stored chunks against ``query``, best first.
 
-        ``source_kind`` filters **before** scoring, not after -- lesson 9's
-        metadata filtering. Filtering afterwards spends the top-k budget on chunks
-        the caller cannot use, and can return fewer than ``top_k`` results while
-        relevant ones exist.
+        ``source_kind`` filters **before** scoring, not after. Filtering
+        afterwards spends the top-k budget on chunks the caller cannot use, and
+        can return fewer than ``top_k`` results while relevant ones exist.
 
         ``SearchHit.similarity`` is deliberately *not* specified to be a cosine.
         The local store returns one; a fused ranking returns an RRF score, which

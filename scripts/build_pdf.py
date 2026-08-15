@@ -5,8 +5,8 @@
 Separate from `write_one_story.py` so a layout change can be checked against
 the runs already on disk without paying for another eleven model calls.
 
-Untested glue, like `write_one_story.py`, and kept thin for that reason:
-finding P is what an untested script costs when it fails at a live run.
+Untested glue, like `write_one_story.py`, and kept thin for that reason: an
+untested script fails at the live run, after the paid work is already done.
 """
 
 import sys

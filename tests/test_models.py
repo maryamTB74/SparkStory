@@ -79,8 +79,8 @@ class TestStoryBrief:
     def test_world_rules_has_exactly_two_values(self) -> None:
         """Two modes, not a genre taxonomy.
 
-        A third value would be config for a distinction nothing branches on
-        (Rule 3), and "mostly real with one licensed miracle" is wording inside
+        A third value would be config for a distinction nothing branches on,
+        and "mostly real with one licensed miracle" is wording inside
         `imaginative` rather than a mode of its own. Asserting the exact set
         makes adding one a deliberate conversation.
         """

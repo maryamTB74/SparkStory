@@ -54,7 +54,7 @@ def test_the_two_tiers_are_framed_oppositely() -> None:
 
 
 def test_no_internal_vocabulary_reaches_the_model() -> None:
-    """Non-obvious rule 1: prompt text must carry no engineering terms."""
+    """Prompt text reaches the model, so it must carry no engineering terms."""
     out = render_memory(
         [_semantic("A fox.", "Kit"), _episodic("Kit reached the moon.")]
     )

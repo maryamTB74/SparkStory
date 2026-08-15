@@ -19,6 +19,8 @@ from sparkstory.entities.exceptions import (
     SparkStoryError,
     StoryStructureError,
     UnsafeContentError,
+    VideoConfigurationError,
+    VideoGenerationError,
 )
 from sparkstory.entities.grounding import GroundedFact, StoryGrounding
 from sparkstory.entities.reviews import (
@@ -125,8 +127,8 @@ class TestCallerGroundingIsVerified:
         outline: StoryOutline,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Acceptance test 5, forced rather than left unfalsified. An unfalsified
-        check is not a proven one -- finding M is the worked example."""
+        """Forced rather than left unfalsified: a check that has never rejected
+        anything is unfalsified, not proven."""
         monkeypatch.setattr(
             write_story_module, "build_store", lambda *a, **k: _EmptyStore()
         )
@@ -823,3 +825,35 @@ class TestMemoryIsWrittenAfterTheBook:
             await run_story_pipeline(self._with_child_id(brief), outline)
 
         assert store.saved == [], "an unsafe book must leave nothing behind"
+
+
+class TestVideoErrorClassification:
+    """Retry classification for the two newest exceptions.
+
+    ``default_retry_on`` returns True for every type it does not recognise, which
+    is all of ours -- so a class that is not classified here silently gets three
+    attempts. Both are asserted rather than assumed, exactly as the image and
+    audio pairs are.
+    """
+
+    def test_a_missing_ffmpeg_is_not_retried(self) -> None:
+        """Retrying cannot make a binary appear.
+
+        The same shape as the missing GOOGLE_API_KEY that was retried three
+        times, printing three tracebacks for a one-line fix.
+        """
+        assert _retry_on(VideoConfigurationError("ffmpeg is not installed")) is False
+
+    def test_a_clip_failure_is_retried(self) -> None:
+        """A killed subprocess or a full disk is transient, like a 503."""
+        assert _retry_on(VideoGenerationError("ffmpeg exited 1")) is True
+
+    def test_video_configuration_error_is_a_configuration_error(self) -> None:
+        """The tool layer translates only ConfigurationError into a message
+        naming what to fix, and inheriting picks up the retry exclusion."""
+        assert issubclass(VideoConfigurationError, ConfigurationError)
+
+    def test_video_generation_error_is_a_sibling_not_a_child(self) -> None:
+        """No operator fixes a broken encode by editing .env."""
+        assert issubclass(VideoGenerationError, SparkStoryError)
+        assert not issubclass(VideoGenerationError, ConfigurationError)

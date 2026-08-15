@@ -25,8 +25,8 @@ shared bases live here, so ``entities`` depends on nothing.
 
 A ``ProviderError`` for upstream chat failures, once retry and fallback exist, is
 still deliberately not declared: nothing raises it today, and empty classes are
-speculation. ``ImageGenerationError`` below was in that category until Session 6,
-when image generation gave it a caller -- which is the bar Rule 3 sets.
+speculation. ``ImageGenerationError`` below was in that category until image
+generation was built and gave it a caller -- which is the bar to clear.
 """
 
 
@@ -52,7 +52,7 @@ class StoryStructureError(SparkStoryError):
     Deliberately **not** a ``ConfigurationError``: no operator can fix it by
     editing ``.env``, so it must not be dressed up as a configuration problem.
     It is also excluded from workflow retries, because retrying with an identical
-    prompt only re-rolls the dice. Session 4 catches it and retries *with the
+    prompt only re-rolls the dice. The revision loops catch it and retry *with the
     message as feedback*, which is the point of raising something specific.
     """
 
@@ -133,4 +133,40 @@ class AudioConfigurationError(ConfigurationError):
     ``ImageConfigurationError`` is one: the tool layer translates only that class
     into a message naming the variable to set, and inheriting picks up the
     ``_retry_on`` exclusion so a missing key is not retried three times.
+    """
+
+
+class VideoGenerationError(SparkStoryError):
+    """A video encoder ran and produced no usable clip.
+
+    The third of these, after ``ImageGenerationError`` and
+    ``AudioGenerationError``, with the same placement argument: a sibling of
+    ``ConfigurationError`` rather than a child, because no operator fixes a
+    non-zero ffmpeg exit by editing ``.env``.
+
+    Retried, because the failures it covers are transient by assumption -- a
+    killed subprocess, a full disk, a truncated write. A *malformed invocation* is
+    not transient, but it is also a code defect caught offline rather than a
+    runtime condition, so it is deliberately not special-cased. That is the same
+    call ``AudioGenerationError`` makes about an unknown voice id answering 404.
+
+    Video fails **soft** per page, like illustration and narration: a page whose
+    clip fails is recorded and the video is assembled from the rest. So this being
+    raised is a normal, expected event rather than a run-ending one.
+    """
+
+
+class VideoConfigurationError(ConfigurationError):
+    """A clip maker cannot be built: ffmpeg is absent, or the maker id is unknown.
+
+    A ``ConfigurationError`` subclass for exactly the reasons
+    ``ImageConfigurationError`` and ``AudioConfigurationError`` are: the tool layer
+    translates only that class into a message naming what to fix, and inheriting
+    picks up the ``_retry_on`` exclusion so a missing binary is not retried three
+    times.
+
+    **ffmpeg's absence is checked once, before any page is processed**, rather
+    than surfacing per page. Every page would fail identically, so failing after
+    doing the work tells nobody anything they could not have known up front -- the
+    same call ``run_narration_pipeline`` makes for a missing API key.
     """

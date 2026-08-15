@@ -5,9 +5,9 @@ index and real embedding weights. Run it with ``make test-corpus`` after
 ``scripts/ingest_knowledge.py``.
 
 This is the only measurement anywhere in this project. Every other quality question
-here is answered by reading two runs and forming an opinion, which is exactly the
-position lesson 9 warns about: it says to tune chunking "on a labeled set" against
-"hit rate/recall". Because the embedder is local and deterministic, the same query
+here is answered by reading two runs and forming an opinion. Chunking should be
+tuned on a labelled set against hit rate and recall instead, which is what this
+file supplies. Because the embedder is local and deterministic, the same query
 produces the same vector forever -- so this is a genuine regression test rather than
 a flaky judge, and a prompt or chunking change that hurts retrieval shows up as a
 falling number instead of a feeling.
@@ -171,7 +171,7 @@ class TestHybridBeatsEitherHalf:
     def test_fusion_is_at_least_as_good_as_vectors_alone(
         self, index: PgVectorStore
     ) -> None:
-        """Compared **at top-1**, and that is the whole lesson of this test's
+        """Compared **at top-1**, and that is the whole point of this test's
         history. Measured at top-3 first, where both retrievers score 20/20 and the
         comparison is vacuous -- it cannot fail, so it proves nothing. At top-1
         there is room, and fusion wins by one (17 vs 16). That single query is the

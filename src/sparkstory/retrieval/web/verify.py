@@ -13,10 +13,10 @@ any model call -- cheaper, and it means an invented URL never reaches a judge
 that might be talked into accepting it.
 
 **The page must say what was claimed**, and this half is a model judging a model.
-The playbook's question was asked before the prompt was written: *what is the
-laziest thing that satisfies this?* For "is this claim supported?" the laziest
-answer is **yes**. So a verdict alone is not accepted -- the judge must quote the
-supporting sentence, and **code checks that the quote is actually in the page**.
+The question to ask of any rubric was asked before the prompt was written: *what
+is the laziest thing that satisfies this?* For "is this claim supported?" the
+laziest answer is **yes**. So a verdict alone is not accepted -- the judge must
+quote the supporting sentence, and **code checks the quote is in the page**.
 A model that agrees but cannot point at the sentence has verified nothing. That
 is the same move ``drop_unprovenanced`` makes by overwriting ``source`` from the
 store: convert a claim we would have to trust into one we can check.
@@ -220,8 +220,7 @@ def _firecrawl_fetcher() -> PageFetcher | None:
     service that is only needed for enrichment.
 
     Imported lazily and constructed on call, so at ``MAX_WEB_SEARCHES=0`` no
-    client exists, no key is read, and the dependency is never imported. Follows
-    the course's ``scrape_url``, which returns a failure rather than raising.
+    client exists, no key is read, and the dependency is never imported.
     """
     api_key = settings.api_key_for("FIRECRAWL_API_KEY")
     if not api_key:
@@ -251,9 +250,9 @@ def _claim_judge() -> ClaimJudge:
     """Build the real judge.
 
     Uses the researcher's own model rather than a new setting: this is part of
-    research, and Rule 3 says a setting arrives when something needs it to
-    differ. A dedicated ``CLAIM_JUDGE_MODEL`` would be config for a distinction
-    nobody has asked for yet.
+    research, and a setting only arrives once something needs it to differ. A
+    dedicated ``CLAIM_JUDGE_MODEL`` would be config for a distinction nobody has
+    asked for yet.
     """
 
     async def judge(claim: str, page: str) -> ClaimVerdict:

@@ -50,8 +50,8 @@ class TestChunk:
         assert restored == original
 
     def test_embed_text_carries_the_source_title(self) -> None:
-        """Context-enriched chunking, lesson 9: a bare fact embeds worse than one
-        that says what it is about."""
+        """Context-enriched chunking: a bare fact embeds worse than one that says
+        what it is about."""
         chunk = a_chunk(text="It has no air.", title="The Moon")
         assert "The Moon" in chunk.embed_text
         assert "It has no air." in chunk.embed_text

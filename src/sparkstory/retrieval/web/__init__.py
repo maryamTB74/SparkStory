@@ -24,5 +24,5 @@ so a web fact is kept or dropped by the same rule as a corpus one.
 
 **The whole package is inert at ``MAX_WEB_SEARCHES=0``**, which is the default.
 Nothing here is imported, no client is constructed and neither key is read, so
-the test suite keeps the no-network property it has held since Session 1.
+the test suite keeps its no-network property.
 """

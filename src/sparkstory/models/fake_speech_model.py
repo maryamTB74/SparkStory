@@ -16,7 +16,8 @@ reason ``FakeImageProvider`` is not: a speech model has no
 ``with_structured_output`` and binds no schema, so inheriting would offer methods
 that mean nothing here.
 
-**The bytes are a real MPEG frame header, and rule 22 is why.** ``FakeEmbedder``'s
+**The bytes are a real MPEG frame header, because a fake that is wrong in a
+plausible direction passes every test written about it.** ``FakeEmbedder``'s
 first hash was wrong in a plausible direction and passed its own tests;
 ``_PNG_4X3``'s predecessor was a hand-copied PNG that PIL rejected, and every test
 in its module passed while only the renderer failed. So this is a valid frame and
@@ -38,10 +39,11 @@ from sparkstory.models.get_speech_model import GeneratedAudio, SpeechModel
 #: Every offline test passed throughout, because they asserted the sync bits and
 #: the layer, which a *plausible* header satisfies.
 #:
-#: That is rule 22 in its exact shape: a fake wrong in a plausible direction passes
-#: the tests written about it and fails downstream on real data. There is now a
-#: test pinning this constant's MPEG version to the one real runs produce, so the
-#: fake and the provider cannot drift apart silently again.
+#: The lesson: a fake must be valid in the format the real provider returns, not
+#: merely valid, and an assertion has to check structure that *composes* -- walking
+#: declared frame lengths end to end -- rather than one frame in isolation. There is
+#: now a test pinning this constant's MPEG version to the one real runs produce, so
+#: the fake and the provider cannot drift apart silently again.
 #: 384 bytes exactly, because that is what the header declares: an MPEG-2 Layer III
 #: frame at 128 kbps / 24 kHz is `576 / 8 * 128000 / 24000` bytes. A fake whose real
 #: length disagreed with its own header would leave a parser walking declared

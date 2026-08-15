@@ -2,16 +2,16 @@
 
 A fourth ``@entrypoint``, deliberately separate from ``write_story`` and from
 ``illustrate`` rather than a stage inside either. The reason is this project's own
-precedent, twice over: Session 8 split planning from writing because one tool doing
-both meant a failure in either half destroyed the other's work, and Session 6 split
-illustration off for the sharper version of the same argument -- it is expensive and
-failure-prone while prose is the part five sessions were spent improving.
+precedent, twice over: planning was split from writing because one tool doing
+both meant a failure in either half destroyed the other's work, and illustration was
+split off for the sharper version of the same argument -- it is expensive and
+failure-prone while prose is the part most of the effort has gone into.
 
 Narration inherits that argument and adds one of its own. Holding the ``Story``
 fixed is what makes comparing two voices *attributable*: re-narrate without
 re-writing and the only thing that changed is the voice. Under a coupled design
-every voice comparison would re-roll the prose, which is exactly the confound
-finding L had to be written around.
+every voice comparison would re-roll the prose, leaving two things changed and no
+way to say which one caused the difference.
 
 **No barrier, and no planning stage.** Every page is independent, so all pages run
 concurrently under ``asyncio.gather``; serial narration would make a ten-page book
@@ -24,7 +24,7 @@ equivalent, because nothing decides how a book sounds. The script is
 Director, no per-page delivery note, no script rewriter. Three reasons, in order of
 weight: a model rewriting the prose would make the audio and the printed page
 disagree, in a book whose words fail closed on safety findings a post-hoc rewrite
-would bypass; rule 13 says a per-page "delivery note" gets satisfied with *"read
+would bypass; a per-page "delivery note" is cheapest to satisfy with *"read
 warmly"*, which a ``speed`` derived from ``ReadingLevel`` gives for free with no
 call; and verbatim text is what makes "the audio matches page 6" checkable at all.
 ``NarrationItem.sha256`` is that check made durable.
@@ -36,8 +36,8 @@ exclude is in their child's book, while a missing page of narration means a miss
 page of narration.
 
 The exception is an **all-failed run**, which writes no ``story.mp3`` at all rather
-than an empty one. That is finding N's failure mode in audio form -- an empty file
-plays as silence, and silence is indistinguishable from success on a casual listen.
+than an empty one -- an empty file plays as silence, and silence is
+indistinguishable from success on a casual listen.
 """
 
 import asyncio
@@ -125,8 +125,9 @@ _SPEEDS: dict[ReadingLevel, float] = {
 #: seconds, all ten pages**. So the pause is dropped: a correct stream beats a
 #: cosmetic beat between pages, and the pages already end on natural silence.
 #:
-#: The general lesson is rule 22's, one level up. Both broken versions were *valid
-#: in isolation* and the offline tests asserted exactly that -- sync bits and layer
+#: The general point: a fake that is wrong in a plausible direction survives every
+#: test that checks it in isolation. Both broken versions were *valid in
+#: isolation* and the offline tests asserted exactly that -- sync bits and layer
 #: -- which is precisely what let a plausible-but-wrong constant pass and fail on
 #: real audio. Do not reintroduce a gap without walking a real stitched file.
 
@@ -137,8 +138,8 @@ _SPEEDS: dict[ReadingLevel, float] = {
 #: happened. It is set to the image endpoint's proven-safe number on the
 #: assumption that one account's limits are related across endpoints, which is a
 #: guess. If a live run returns 429, that is the finding that replaces this value
-#: with a measurement. Not a setting, per Rule 3: it describes a provider limit
-#: rather than a preference.
+#: with a measurement. Not a setting: it describes a provider limit rather than a
+#: preference an operator would tune.
 _MAX_CONCURRENT_SPEECH = 4
 
 
@@ -408,7 +409,8 @@ async def run_narration_pipeline(
     # Written here rather than by the caller, so the record exists even when the
     # caller forgets -- and because a `StoryNarration` is a BaseModel,
     # `model_dump_json` handles the Paths that a bare `json.dumps` would choke on.
-    # Finding P is the bill for learning that at a live run instead.
+    # Serialisation left to an untested caller script has failed here before, and
+    # it failed at the live run -- after every paid call had already been made.
     (directory / "narration.json").write_text(
         narration.model_dump_json(indent=2) + "\n", encoding="utf-8"
     )

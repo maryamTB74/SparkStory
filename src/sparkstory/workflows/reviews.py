@@ -44,14 +44,14 @@ def format_pacing_report(outline: StoryOutline, plan: PagePlan) -> str:
     """Render pages-per-beat as one log line, keyed by narrative function.
 
     Keyed by function rather than position because "beat 3 got 4 pages" is data
-    and "climax=4" is a finding. Session 2's book gave the climax one page and
+    and "climax=4" is a finding. An early live run gave the climax one page and
     the setup two, which is the imbalance this makes visible.
 
     **Reported, never enforced.** There is no loop over the page plan to route a
     finding to, and an unbalanced climax is bad rather than impossible -- raising
     ``StoryStructureError`` over a soft preference would kill an otherwise usable
-    book. How often this comes out lopsided is what tells a later session whether
-    a plan loop earns its keep, which is the same reasoning that keeps
+    book. How often this comes out lopsided is the evidence for whether a plan
+    loop would ever earn its keep, which is the same reasoning that keeps
     ``_retry_on`` from retrying structural errors.
     """
     counts = pages_per_beat(outline, plan)
@@ -104,7 +104,7 @@ def drop_unroutable_outline_reviews(
 
 #: Below this share of pages, a repeated opening word is not worth a revision
 #: pass. Proportional rather than a flat count: three of twenty-four pages is
-#: unremarkable, while Session 2's book opened six of eight with a character's
+#: unremarkable, while one early book opened six of eight pages with a character's
 #: name. The floor of 3 stops a four-page book tripping on two.
 _REPEATED_OPENING_SHARE = 3
 

@@ -137,8 +137,8 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
     **Only ``story_note`` is rendered. ``claim`` never is**, and that is the
     whole point of splitting the two fields. This planner's prompt already forbids
     a character reciting facts, and handing it a fact is handing it something to
-    recite -- non-obvious rule 13, where the laziest way to satisfy an instruction
-    is the one that gets taken. A rule about the world cannot be pasted into a
+    recite: the laziest way to satisfy an instruction is the one that gets taken.
+    A rule about the world cannot be pasted into a
     story; a sentence about the Moon can.
 
     Same reasoning applies to ``source``: attribution matters for checking a claim
@@ -169,10 +169,10 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
             # Facts as texture, not law. The one-big-lie principle: accurate
             # furniture is what makes the impossible thing believable, so the
             # retrieved facts earn their place by furnishing the world rather
-            # than by policing it. "break as few as you can" is the spec's
-            # recommendation B as wording rather than machinery -- asking the
-            # planner to nominate its violation would be one more decision it
-            # could get wrong, and asking it to be sparing is free.
+            # than by policing it. "break as few as you can" is wording rather
+            # than machinery -- asking the planner to nominate its violation
+            # would be one more decision it could get wrong, and asking it to be
+            # sparing is free.
             lines += [
                 "These things are true of the real world. Use them as detail, to "
                 "make the impossible parts feel real: a story is more believable, "
@@ -183,11 +183,12 @@ def render_grounding(grounding: StoryGrounding, world_rules: WorldRules) -> str:
             ]
         lines += [f"- {fact.story_note}" for fact in grounding.facts]
 
-    # The craft-device block used to render here, and it carried the fix for
-    # finding Q: a repeated line must be built from the story's own words, because
-    # handed a "repeat a short line" device beside a story_note the cheapest way to
-    # satisfy both is to repeat the note -- which the eagle run did, verbatim, in
-    # three beats. That instruction went with the devices it constrained.
+    # The craft-device block used to render here, and it carried an instruction
+    # earned the hard way: a repeated line must be built from the story's own
+    # words. Handed a "repeat a short line" device beside a story_note, the
+    # cheapest way to satisfy both is to repeat the note verbatim, which one run
+    # did across three beats. That instruction went with the devices it
+    # constrained.
 
     return "\n".join(lines)
 
@@ -251,17 +252,16 @@ class StoryPlannerNode(Node):
         # What earlier books for this child established, already rendered by
         # `memory.render.render_memory`. A string rather than the records
         # themselves, for the same reason `render_grounding` returns text: exactly
-        # one place decides how memory is worded to a model, which keeps the rule 1
-        # audit a single file to read.
+        # one place decides how memory is worded to a model, which keeps the audit
+        # for internal terms leaking into a prompt down to a single file to read.
         #
         # Empty string when this child has no memory, or when the brief carries no
         # `child_id` at all -- the overwhelmingly common case, and the one that
         # must behave exactly as it did before this field existed.
         self.memory = memory
-        # The generator is also the editor: its
-        # `edit_based_on_reviews` rebuilds `ArticleWriter` with `reviews=` rather
-        # than calling a separate node. One prompt, one voice, and no second set
-        # of craft rules to keep in sync with this one.
+        # The generator is also the editor: a revision rebuilds this node with
+        # `reviews=` rather than calling a separate one. One prompt, one voice,
+        # and no second set of craft rules to keep in sync with this one.
         self.reviews = reviews
 
     async def ainvoke(self) -> StoryOutline:
@@ -308,14 +308,14 @@ class StoryPlannerNode(Node):
             HumanMessage(content=request),
         ]
         if self.reviews is not None:
-            # The previous draft is replayed as the model's *own* turn, following
-            # brown's article_writer.py: it then edits something it owns rather
-            # than critiquing a stranger's work.
+            # The previous draft is replayed as the model's *own* turn, so it
+            # then edits something it owns rather than critiquing a stranger's
+            # work.
             #
             # `exclude={"grounding"}` because this is the only place a whole
             # outline is serialised to a model, and grounding carries `chunk_id`
             # and `source` -- a storage key and an attribution, neither of which is
-            # story material (rule 1). The specific hazard is worse than noise:
+            # story material. The specific hazard is worse than noise:
             # the planner is the one node that both sees this schema and could
             # fill the field itself, and an invented `chunk_id` is dropped
             # silently by `drop_unprovenanced`, losing a real fact with no error.
@@ -325,7 +325,7 @@ class StoryPlannerNode(Node):
             # artifacts, the checkpointer, and the client round trip all need it.
             # `memory_conflicts` is excluded for the same reasons as `grounding`,
             # and it is the more dangerous of the two to replay. It is bookkeeping
-            # about *earlier books* rather than story material (rule 1), it is
+            # about *earlier books* rather than story material, it is
             # filled by code after planning, and showing the planner a field it is
             # told to leave empty is an invitation to fill it -- with fabricated
             # disagreements a parent would then be asked to resolve.

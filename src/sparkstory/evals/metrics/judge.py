@@ -13,7 +13,10 @@ single page in isolation cannot answer.
 **Measured against human labels on 2026-08-13, and it failed.** Cohen's kappa was
 **-0.066 delight, +0.121 showing, -0.060 momentum** over 40 pages of five books --
 agreement no better than chance. ``momentum`` scored 1 on 35 of 40 pages, so it is
-close to a constant. See findings KK, LL and MM.
+close to a constant. The rubric also admits two defensible readings of
+``momentum`` -- a page ending on a question literally leaves something open, while
+a formulaic question appended to seven pages of eight does not pull a reader
+forward -- and it does not choose between them.
 
 So a judged number moving is **not** evidence that a book changed, and this is now
 a measurement rather than a caveat. That is why ``BookScorecard`` keeps these

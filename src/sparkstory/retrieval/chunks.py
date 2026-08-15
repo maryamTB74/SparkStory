@@ -74,8 +74,8 @@ class Chunk(BaseModel):
     def embed_text(self) -> str:
         """The text that gets embedded, prefixed with its source title.
 
-        Lesson 9's context-enriched chunking: *"It has no air"* embeds poorly on
-        its own and well as *"The Moon: It has no air"*. Deliberately different
+        Context-enriched: *"It has no air"* embeds poorly on its own and well as
+        *"The Moon: It has no air"*. Deliberately different
         from ``text``, which is what the agent is shown -- if the title travelled
         with the fact it would end up quoted inside a ``GroundedFact.claim``.
         """

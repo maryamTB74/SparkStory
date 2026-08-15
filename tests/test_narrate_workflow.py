@@ -128,7 +128,7 @@ def test_a_stitched_file_walks_end_to_end_as_contiguous_frames() -> None:
 
 
 def test_the_fake_and_the_real_provider_agree_on_mpeg_version() -> None:
-    """Rule 22, made checkable.
+    """A fake must be valid in the format the real provider returns.
 
     ``MP3_SILENCE`` was MPEG-1 while the live provider returns MPEG-2, and nothing
     offline noticed. This pins the fake to the format real runs produce, so the
@@ -205,7 +205,8 @@ async def test_the_record_names_the_provider_id_not_the_enum(
     monkeypatch: pytest.MonkeyPatch,
     speak: Callable[..., FakeSpeechProvider],
 ) -> None:
-    # `meta.json` recording `world_rules` is what made finding L writable. The
+    # A run that does not record which mode it ran in cannot be compared against
+    # another afterwards -- `meta.json` records `world_rules` for that reason. The
     # same argument applies here: a run must answer "which voice was this?"
     # without re-deriving the mapping.
     speak(monkeypatch)
@@ -303,9 +304,9 @@ async def test_it_writes_a_narration_record_to_disk(
     monkeypatch: pytest.MonkeyPatch,
     speak: Callable[..., FakeSpeechProvider],
 ) -> None:
-    # Finding P: `save_json` could not serialise the web ledger, and the first
-    # live run died after paying for the search. A Path is not JSON-serialisable
-    # by default, and this record is full of them.
+    # `save_json` once could not serialise the web ledger, and the live run died
+    # after paying for the search. A Path is not JSON-serialisable by default,
+    # and this record is full of them.
     import json
 
     speak(monkeypatch)

@@ -9,8 +9,8 @@ corpus changes::
     uv run python scripts/ingest_knowledge.py --check "could a flag wave on the moon?"
 
 The corpus files are the source of truth and stay committed; the table is a build
-artifact and can be dropped at any time. This separation is lesson 9's offline
-phase: ingestion is deliberately not something the server does at startup.
+artifact and can be dropped at any time. Ingestion is deliberately an offline
+phase rather than something the server does at startup.
 
 A ``--check`` query at the end is worth using: an index that built without error but
 retrieves the wrong chunk is the failure that otherwise shows up much later, inside

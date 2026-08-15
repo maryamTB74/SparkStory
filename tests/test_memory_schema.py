@@ -1,6 +1,6 @@
 """Memory's two schema fields.
 
-Rule 31: these prove a field EXISTS, so every fixture is built through
+These prove a field EXISTS, so every fixture is built through
 `model_validate`. `model_copy(update=...)` skips validation and will happily set
 a field the model does not declare -- which once made a test pass before the field
 it was written to prove existed.

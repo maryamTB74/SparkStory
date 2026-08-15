@@ -2,8 +2,8 @@
 
 Mirrors ``render_grounding``: the store returns records, and exactly one function
 decides how they are worded to a model. Keeping that in one place is what makes
-the "no internal vocabulary" audit (rule 1) a single file to read rather than a
-sweep of every node.
+the "no internal vocabulary reaches the model" audit a single file to read rather
+than a sweep of every node.
 
 **The two tiers are framed oppositely, and that is the point.** A character fact
 is something to *obey* -- Kit looks the way Kit looked last time. An episode is
@@ -11,9 +11,10 @@ something to *avoid* -- this child already had that story. Rendering them the sa
 way would invite the planner to reuse the plot it was shown, which is the exact
 opposite of why episodes are kept.
 
-**Rule 13 applies to the episode wording.** The laziest way to satisfy "do not
-tell this story again" is a cosmetic swap -- the same plot with a badger instead
-of a fox. The instruction therefore asks for a different *shape*, not different
+**The episode wording had to be written against its own laziest reading.** The
+cheapest way to satisfy "do not tell this story again" is a cosmetic swap -- the
+same plot with a badger instead of a fox. The instruction therefore asks for a
+different *shape*, not different
 furniture. Whether that lands is a live-run question, not a test one.
 """
 

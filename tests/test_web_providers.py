@@ -2,8 +2,8 @@
 
 Offline throughout: the provider is injected, so these tests never construct a
 client and never read a key. The live half -- that Perplexity actually answers in
-this shape -- is what task 12's runs are for, exactly as
-``build_researcher_agent`` was left to the Session 5 spike.
+this shape -- is left to a run against the real endpoint, exactly as
+``build_researcher_agent`` was.
 
 **The invariant these tests exist to protect** is that a URL coming out of here
 is *model-asserted*. Perplexity returns a synthesised answer and the URL arrives
@@ -105,8 +105,9 @@ class TestTavilyFallback:
     """Tavily stands in only when the primary path is *unusable*.
 
     Never because a search legitimately found nothing. This project already has
-    a scar there: finding I was an instruction meant to stop invention that
-    stopped grounding instead, and retrying an empty result on a second provider
+    a scar there: an "empty is fine" instruction meant to stop invention stopped
+    grounding instead, and a story about the Moon came back with zero facts.
+    Retrying an empty result on a second provider
     is the same lever pushed the other way -- it would make "nothing found",
     which is the correct answer for most premises, into a failure to route
     around.

@@ -20,8 +20,8 @@ def test_voice_has_exactly_two_values() -> None:
 
 
 def test_brief_defaults_to_a_female_voice() -> None:
-    # Optional with a default, so all pre-existing briefs keep working -- the
-    # lesson `world_rules` taught when it changed behaviour for every caller.
+    # Optional with a default, so all pre-existing briefs keep working. Adding
+    # `world_rules` changed behaviour for every caller that supplied nothing.
     brief = StoryBrief(
         child=ChildProfile(name="Maryam", age=5),
         premise="a fox who wants to visit the moon",
@@ -49,7 +49,7 @@ def test_brief_rejects_an_unknown_voice() -> None:
 
 def test_audio_errors_sit_in_the_right_places() -> None:
     # Generation failures are retryable; configuration failures are not, and
-    # `workflows/retries.py` branches on exactly this distinction (rule 10).
+    # `workflows/retries.py` branches on exactly this distinction.
     assert issubclass(AudioGenerationError, SparkStoryError)
     assert issubclass(AudioConfigurationError, ConfigurationError)
     assert not issubclass(AudioGenerationError, ConfigurationError)

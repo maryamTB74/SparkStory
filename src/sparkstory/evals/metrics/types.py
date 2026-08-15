@@ -3,9 +3,8 @@
 Two rules are encoded structurally rather than left to convention.
 
 **Binary per page, averaged per dimension.** ``CriterionScore.score`` is an int
-bounded to 0-1, following the course (``brown/evals/metrics/base.py``), so a
-dimension's book-level value is the *share of pages that passed* and cannot
-quietly become anything else.
+bounded to 0-1, so a dimension's book-level value is the *share of pages that
+passed* and cannot quietly become anything else.
 
 **Computed and judged values never mix.** They live in two models on
 ``BookScorecard``, with no field summing across them and no overall score. A
@@ -85,7 +84,8 @@ class DeterministicScores(BaseModel):
     words_per_page: float
     # Kept alongside words_per_page, which cannot see what this sees: two books can
     # spend the same page budget on few long sentences or many short ones, and only
-    # the second reads as a list of declaratives. Finding OO.
+    # the second reads as a list of declaratives. It earned its place by tracking a
+    # human's judgement of delight better than the LLM judge did.
     words_per_sentence: float
     beats_per_page: float
     # Absolute word counts, not runs normalised by note length. Measured against
@@ -127,7 +127,7 @@ class BookScorecard(BaseModel):
     deterministic: DeterministicScores
     # None when the judge failed or was skipped, and the computed numbers survive
     # either way: losing a whole measurement to one failed model call is what the
-    # course's per-sample error fallback exists to avoid.
+    # per-sample error fallback exists to avoid.
     judged: JudgedScores | None = None
     #: Why `judged` is absent, so a null is never silent.
     judge_error: str | None = None

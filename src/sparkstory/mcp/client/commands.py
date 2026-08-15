@@ -3,11 +3,11 @@
 Parsing is separated from acting for one reason: it is the half that can be
 tested exhaustively without a server, a model or a transport. ``repl.py`` stays
 thin by delegating here, which matters because an ``input()`` loop is close to
-untestable and finding P is the record of what a deliberately-untested script
-costs -- it died at a live run after the search had already been paid for.
+untestable, and a deliberately-untested script here has already cost a live run:
+``scripts/write_one_story.py`` died *after* the search had been paid for.
 
-**No thinking toggle.** The course client offers ``/model-thinking-switch``,
-which reads ``google.genai`` thought summaries. This project's model seam spans
+**No thinking toggle.** A ``/model-thinking-switch`` reading ``google.genai``
+thought summaries is the obvious candidate. This project's model seam spans
 two providers and Grok exposes no equivalent, so the command would work on one
 provider and silently do nothing on the other. A command that lies about what it
 did is worse than an absent one.

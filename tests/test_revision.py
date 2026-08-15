@@ -64,7 +64,7 @@ class TestStoryPlannerRevision:
         self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
         """The model then edits something it owns rather than critiquing a
-        stranger's work. Following brown's article_writer.py.
+        stranger's work.
         """
         model = FakeModel(outline)
         await StoryPlannerNode(
@@ -77,7 +77,8 @@ class TestStoryPlannerRevision:
     async def test_the_replayed_draft_carries_no_provenance(
         self, brief: StoryBrief, outline: StoryOutline
     ) -> None:
-        """Rule 1, in the one place a whole outline is serialised to a model.
+        """Schema text reaches the model, in the one place a whole outline is
+        serialised to one.
 
         The replay dumps the previous draft with ``model_dump_json``, so once the
         outline carries grounding it would hand the planner every ``chunk_id`` and

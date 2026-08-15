@@ -1,7 +1,7 @@
 """Outline Critic: judges a story plan before any prose is paid for.
 
-**Why a critic on the plan at all, when ``brown`` reviews only finished prose.**
-Two of Session 2's seven failures live in the outline: the resolution arrived by
+**Why a critic on the plan at all, and not only on finished prose.** The worst
+failures read in real runs live in the outline: the resolution arrived by
 coincidence, and the child was not the protagonist -- the want belonged to the fox
 and she only helped. Neither is fixable downstream. A prose critic can report "the
 child is not the protagonist"; the Writer cannot act on it, because whose story it
@@ -12,11 +12,11 @@ artifact instead of a whole-book rewrite.
 the child is always the main character. It did not take. That is the failure mode
 a prompt tweak cannot reach.
 
-**Where a parent's feedback will attach.** ``brown``'s ``ArticleReviewer`` takes
-``human_feedback`` as a first-class input, ranked above every other requirement,
-and must always turn it into at least one action point. That is the shape Session
-7's confirmation step wants. It is not a parameter here yet because nothing
-supplies one, and a field no caller can fill is speculation -- but when it arrives
+**Where a parent's feedback will attach.** The shape a confirmation step wants is
+a first-class ``human_feedback`` input, ranked above every other requirement and
+always turned into at least one action point. It is not a parameter here yet
+because nothing supplies one, and a field no caller can fill is speculation -- but
+when it arrives
 it belongs in this constructor and at the top of the priority order, not bolted on
 downstream.
 """

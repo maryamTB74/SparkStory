@@ -79,12 +79,14 @@ from sparkstory.entities.stories import (
     Voice,
     WorldRules,
 )
+from sparkstory.entities.video import VideoStatus
 from sparkstory.models.get_model import get_chat_model
 from sparkstory.nodes.plot_planner import PlotPlannerNode
 from sparkstory.nodes.researcher import ResearcherNode
 from sparkstory.renderers import render_pdf
 from sparkstory.retrieval.provenance import drop_unprovenanced
 from sparkstory.utils.logging_utils import configure_logging
+from sparkstory.workflows.animate import run_video_pipeline
 from sparkstory.workflows.illustrate import run_illustration_pipeline
 from sparkstory.workflows.narrate import run_narration_pipeline
 from sparkstory.workflows.plan_outline import (
@@ -228,6 +230,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--animate",
+        action="store_true",
+        help=(
+            "Assemble story.mp4 from the page images and the narration: one "
+            "Ken Burns clip per page, held for exactly that page's audio. Needs "
+            "both --illustrate and --narrate, and needs ffmpeg on PATH. Costs no "
+            "API call -- it encodes locally from files already on disk."
+        ),
+    )
+    parser.add_argument(
         "--voice",
         choices=[v.value for v in Voice],
         default=Voice.FEMALE.value,
@@ -312,12 +324,12 @@ def attach_file_log(path: Path) -> logging.Handler:
 def grounding_meta(outline: StoryOutline) -> dict:
     """What research the book was actually built from, for `meta.json`.
 
-    The count is here for a specific reason: non-obvious rule 27 says to check the
-    fact count *before* comparing two runs, because a run that retrieved nothing
-    renders identically in both world-rule modes -- so a comparison against it is
-    vacuous while still looking like a successful control. Findings M and S are both
-    that mistake, one session apart. Recording it beside `world_rules` means the two
-    fields that decide whether an A/B means anything sit in the same file.
+    The count is here for a specific reason: check the fact count *before*
+    comparing two runs, because a run that retrieved nothing renders identically in
+    both world-rule modes -- so a comparison against it is vacuous while still
+    looking like a successful control. That mistake has been made twice. Recording
+    the count beside `world_rules` means the two fields that decide whether an A/B
+    means anything sit in the same file.
 
     `chunk_ids` rather than the notes themselves: this is an audit trail, and the
     notes are already in `research-1.json` and in the outline.
@@ -348,15 +360,15 @@ def build_meta(args: argparse.Namespace, started: float, **extra: object) -> dic
         # Not decoration. An A/B is two runs differing in one field, and a run
         # whose artifacts do not say which mode produced them is not evidence --
         # this project has already lost debugging time to reading the wrong
-        # artifact (finding E).
+        # artifact.
         "world_rules": args.world_rules,
         # Same argument as world_rules: a second book for the same child is only
         # evidence about memory if the artifact says which child it was for. None
         # here means the run read and wrote nothing, which must stay
         # distinguishable from a child whose memory happened to be empty.
         "child_id": args.child_id,
-        # And the same argument again, for the same reason `--world-rules` was
-        # recorded in Session 9: comparing two voices is only evidence if each
+        # And the same argument again, for the same reason `--world-rules` is
+        # recorded: comparing two voices is only evidence if each
         # run's artifacts say which voice produced it. Recorded even when
         # --narrate is off, so a run that could have been narrated and was not
         # stays distinguishable from one narrated in the default voice.
@@ -397,9 +409,9 @@ def _as_jsonable(value: object) -> object:
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
     # `StoryArt` carries `Path` values, and a dict of models containing paths is
-    # the shape the illustration stage streams. Finding P is why this is here
-    # rather than discovered live: the same class of bug -- a value json cannot
-    # encode -- killed a run *after* the search had been paid for, and images
+    # the shape the illustration stage streams. Handled here rather than
+    # discovered live: the same class of bug -- a value json cannot
+    # encode -- once killed a run *after* the search had been paid for, and images
     # cost considerably more than a search.
     if isinstance(value, Path):
         return str(value)
@@ -426,8 +438,8 @@ def story_markdown(story: Story, brief: StoryBrief) -> str:
     """Render the book as readable markdown.
 
     Lives in this script rather than in the package because it is a debugging
-    convenience, not the product's rendering. When a session needs real book
-    output, the course's reserved name for it is ``renderers.py``.
+    convenience, not the product's rendering. Real book output belongs in
+    ``renderers.py``.
     """
     lines = [
         f"# {story.outline.title}",
@@ -540,7 +552,7 @@ async def run_stages(
         if ledger is not None:
             # What the web was asked and what came back, including sources that
             # failed verification -- a run whose artifacts do not record what
-            # happened is not evidence (Session 9, finding M).
+            # happened is not evidence.
             save_json(run_dir, "web_sources.json", {"sources": ledger.sources})
 
         print(f"\n{'=' * 66}\n  Research\n{'=' * 66}")
@@ -663,6 +675,11 @@ async def run_stages(
     # After the PDF rather than before it, because narration and illustration are
     # independent: audio does not go in the book, and a failure here must not cost
     # the pictures. `run_narration_pipeline` writes narration.json itself.
+    #
+    # Initialised outside the branch because --animate below reads it: without
+    # this, a run with --animate and no --narrate raises NameError rather than
+    # saying what is missing.
+    narration = None
     if args.narrate and run_dir is not None:
         narration = await run_narration_pipeline(
             story, brief, run_dir, on_task_result=save_iteration
@@ -680,6 +697,36 @@ async def run_stages(
                 print(f"  page {item.page_number}: {item.status.value}")
         if narration.stitched is None:
             print("  no story.mp3 written -- nothing was narrated")
+
+    # Last, because it consumes both of the stages above. Costs no API call: it
+    # reads the images and audio already on disk and encodes locally.
+    if args.animate and run_dir is not None:
+        if art is None or narration is None:
+            # Named rather than silently skipped: "nothing happened" is the
+            # failure mode a person spends ten minutes debugging.
+            missing = ", ".join(
+                name
+                for name, value in (("--illustrate", art), ("--narrate", narration))
+                if value is None
+            )
+            print(f"\n--animate needs {missing}; no video was made")
+        else:
+            video = await run_video_pipeline(
+                story, art, narration, run_dir, on_task_result=save_iteration
+            )
+            print(
+                f"\nanimated {video.pages_animated}/{len(video.items)} pages "
+                f"at {video.fps} fps"
+            )
+            # Every page, not only the failures: a page that is HELD or EXCLUDED
+            # is a success the person still needs told about, because the video
+            # is then shorter than the book they think they made.
+            for item in video.items:
+                if item.status is not VideoStatus.ANIMATED:
+                    detail = f" -- {item.reason}" if item.reason else ""
+                    print(f"  page {item.page_number}: {item.status.value}{detail}")
+            if video.path is None:
+                print("  no story.mp4 written -- nothing was animated")
 
     if run_dir is not None:
         (run_dir / "story.md").write_text(

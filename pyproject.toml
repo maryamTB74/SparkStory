@@ -113,10 +113,11 @@ asyncio_mode = "auto"
 # since Session 1 and is worth keeping true. Retrieval quality tests need real
 # embeddings, so they are marked `corpus` and excluded here; `make test-corpus`
 # runs them. A `-m` on the command line overrides this one.
-addopts = ["-m", "not corpus and not vision"]
+addopts = ["-m", "not corpus and not vision and not video"]
 markers = [
     "corpus: needs the built knowledge index and real embedding weights",
     "vision: needs a real vision model and the committed run images",
+    "video: needs ffmpeg and ffprobe on PATH",
 ]
 filterwarnings = [
     # fastmcp's JWT provider imports the deprecated authlib.jose module.

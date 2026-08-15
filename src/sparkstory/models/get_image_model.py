@@ -189,10 +189,13 @@ def get_image_model(model_id: str) -> ImageModel:
                     },
                     json={**body, **params},
                 )
-        # Every transport failure becomes the retryable class. Rule 10 wants that
-        # choice made deliberately: a timeout or a dropped connection to an image
-        # endpoint is exactly what a retry is for. A missing key never reaches
-        # here, having been rejected above as a ConfigurationError.
+        # Every transport failure becomes the retryable class, and that choice is
+        # made deliberately because the retry predicate treats an unrecognised
+        # exception as retryable: a config error left to fall through here would be
+        # attempted three times, printing a traceback per attempt for a problem
+        # whose fix is one line in .env. A timeout or a dropped connection to an
+        # image endpoint is exactly what a retry *is* for. A missing key never
+        # reaches here, having been rejected above as a ConfigurationError.
         except httpx.HTTPError as exc:
             raise ImageGenerationError(
                 f"Image model {model_id!r} could not be reached while {what}: {exc}"

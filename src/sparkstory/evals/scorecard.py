@@ -4,8 +4,8 @@ The computed half cannot fail: it is arithmetic over data Pydantic already
 validated. The judged half is a model call, so it can fail, and it can fail after
 the expensive part of a measurement is already done. Those two facts are why the
 halves are separate fields and why a judge failure degrades a scorecard rather than
-losing it -- the course does the same thing with a per-sample error string, so one
-bad sample does not cost the other nine.
+losing it: recording the error on the sample that failed means one bad sample does
+not cost the other nine.
 """
 
 import logging

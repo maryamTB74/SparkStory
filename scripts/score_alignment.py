@@ -4,8 +4,7 @@
         --labels tests/fixtures/evals/labels/2026-08-13 \\
         --scorecards tests/fixtures/evals/baseline/2026-08-13
 
-Reports nothing that gates anything. Lesson 30's own judge scored 62.5% and the
-lesson proceeded; a low number here is a result, not a failure.
+Reports nothing that gates anything. A low number here is a result, not a failure.
 
 Read the pooled row against the ceiling rather than against 1.0. A judge matching
 what one person scores against themselves is performing at human level, and the
@@ -153,8 +152,7 @@ def main() -> int:
             print(f"  {line}")
         print(
             "\nRead the pages behind these before concluding who was right. "
-            "Finding JJ is the precedent: the hand label was the thing that was "
-            "wrong."
+            "There is precedent for the hand label being the thing that was wrong."
         )
 
     if skipped:

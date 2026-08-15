@@ -1,15 +1,16 @@
 """Read-only introspection: what this server has made, and what it knows.
 
-**Everything returned here is prompt text** (non-obvious rule 1). A resource is
-read by a *client's model*, not by a developer tailing a log, so these are
-written as answers rather than as dumps.
+**Everything returned here is prompt text.** A resource is read by a *client's
+model*, not by a developer tailing a log, so these are written as answers rather
+than as dumps -- and anything they contain has left the machine.
 
 That constraint does real work in ``read_library``. A run directory is named
 after the premise -- ``20260811-231338-a-fox-who-wants-to-visit-the-moon`` --
 ``brief.json`` holds the child's name, and ``meta.json`` holds a ``child_id``.
 None of it may leave: the run id is the timestamp alone, the title comes from the
-story rather than the directory, and no brief is ever opened. Session 12 recorded
-the same hazard one door over, when Opik uploaded briefs carrying a child's name.
+story rather than the directory, and no brief is ever opened. The same hazard has
+already bitten one door over, when tracing uploaded briefs carrying a child's
+name.
 
 **Nothing here writes, takes a parameter, or reads ``data/``.** ``data/`` is real
 persistence and holds per-child memory; a read-only endpoint over it is a privacy
@@ -92,9 +93,9 @@ def read_library(outputs_root: Path | None = None) -> str:
 def read_corpus(corpus_root: Path | None = None) -> str:
     """Report what the retrieval corpus contains.
 
-    Finding 27 is why this exists: *check the fact count before comparing two
-    grounded runs*, because a run that retrieves nothing renders identically in
-    both world-rule modes and still reads as a successful control.
+    It exists to make one habit cheap: *check the fact count before comparing two
+    grounded runs*. A run that retrieves nothing renders identically in both
+    world-rule modes and still reads as a successful control.
     """
     root = _CORPUS if corpus_root is None else corpus_root
     if not root.is_dir():

@@ -243,10 +243,10 @@ def build_outline_workflow(
             request_id, brief, grounding=grounding, memory=memory_text
         )
 
-        # A plain `for` in the entrypoint body, as brown's generate_article.py
-        # does it. Safe against the resume trap: this body re-executes when a run
-        # resumes, but every @task inside is replayed from the checkpoint, so the
-        # control flow repeats without re-paying for a single call.
+        # A plain `for` in the entrypoint body. Safe against the resume trap:
+        # this body re-executes when a run resumes, but every @task inside is
+        # replayed from the checkpoint, so the control flow repeats without
+        # re-paying for a single call.
         #
         # `+ 1` so that *every* draft gets critiqued, including the last. Scoring
         # drafts to keep the best one is impossible if the final draft is never
@@ -304,13 +304,14 @@ def build_outline_workflow(
         # This is what carries research past `plan_story`. Until now the grounding
         # was computed, planned from, and dropped when this returned a bare outline,
         # so the Writer had never seen a fact and a craft device could only ever be
-        # described in a beat summary rather than used (findings J and Q).
+        # described in a beat summary rather than used -- a planner told to repeat a
+        # phrase wrote "they repeat the phrase" instead of repeating one.
         #
         # `is not None` rather than a truthiness check: empty grounding means
         # "research ran and found nothing", which is a correct and common answer,
-        # and it must stay distinguishable from "research never ran". Rule 27 needs
-        # that distinction -- a run that retrieved nothing renders identically in
-        # both world-rule modes, so comparing against it is vacuous.
+        # and it must stay distinguishable from "research never ran": a run that
+        # retrieved nothing renders identically in both world-rule modes, so
+        # comparing against it is vacuous.
         if grounding is not None:
             best_outline = best_outline.model_copy(update={"grounding": grounding})
 

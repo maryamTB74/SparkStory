@@ -45,8 +45,8 @@ async def illustrate_story_tool(
 
     ``output_directory`` is a required argument rather than a setting, because the
     images belong beside whatever the caller is assembling and only the caller knows
-    where that is. Rule 3 also applies: a setting here would be configuration for a
-    decision the caller already has to make.
+    where that is. A setting here would be configuration for a decision the caller
+    already has to make.
     """
     try:
         return await run_illustration_pipeline(brief, story, Path(output_directory))

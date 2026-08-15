@@ -7,15 +7,14 @@ never how the search works underneath. "Searches the vector index using hybrid
 BM25 and cosine similarity" would spend the model's attention on machinery it
 cannot act on.
 
-**Two tools rather than one with an index argument.** Lesson 9 describes an agent
-choosing between ``search_incident_runbooks`` and ``search_marketing_materials``,
-and the reason to follow it here is verification: "did it consult craft for a
-premise with no factual spine?" becomes a question about which tool appears in the
-transcript, rather than a judgement about a paragraph. Lesson 11's single unified
-tool is the multimodal case, which is not ours.
+**Two tools rather than one with an index argument.** One tool per index makes
+index selection verifiable: "did it consult craft for a premise with no factual
+spine?" becomes a question about which tool appears in the transcript, rather than
+a judgement about a paragraph. A single unified tool taking an index name hides
+that choice inside an argument.
 
-**Every candidate carries its source.** The task 1 spike's canned tool returned
-only ``[id] text``, and the model filled ``GroundedFact.source`` with the id --
+**Every candidate carries its source.** An early canned tool returned only
+``[id] text``, and the model filled ``GroundedFact.source`` with the id --
 ``"moon#1"`` where the design promises ``"NASA -- Earth's Moon"``. Nothing failed
 and the attribution was simply wrong. A model can only quote what it was given.
 """

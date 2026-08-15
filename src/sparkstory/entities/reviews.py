@@ -25,9 +25,10 @@ from sparkstory.entities.stories import StoryOutline, StoryProse
 #
 # `theme` (does not moralise) and `brief_adherence` (must_include / avoid / tone)
 # were considered and left out. The reviewed run had no `avoid` violations and
-# nobody has caught it moralising, so both are hypothesised defects -- and adding
-# a rubric for one is the mistake Rule 3 names for config. Add a third when a
-# real book fails in a third way.
+# nobody has caught it moralising, so both are hypothesised defects -- and a
+# rubric for a defect that has never been observed is the same mistake as config
+# for a feature that does not exist. Add a third when a real book fails in a
+# third way.
 class OutlineRubric(StrEnum):
     """What a story plan is judged against."""
 
@@ -95,8 +96,8 @@ class OutlineReviews(BaseModel):
 # deliberate. It is not a quality rubric but a guardrail: the cost of missing an
 # `avoid` item once, in a book written for a named five-year-old, is
 # categorically different from the cost of a flat sentence. `avoid` is currently
-# unenforced anywhere else in the system, and storyweave's lesson was fail-closed
-# guardrails for a kids' product.
+# unenforced anywhere else in the system, and a kids' product wants its
+# guardrails fail-closed.
 class ProseRubric(StrEnum):
     """What the finished words are judged against."""
 

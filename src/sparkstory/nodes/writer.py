@@ -13,9 +13,9 @@ rhythm.
 
 **Revision keeps that property rather than trading it away.** When a critic
 returns findings this node runs again with ``reviews`` set, and it regenerates
-the *whole* book, not the flagged pages -- following ``brown``, whose
-``edit_based_on_reviews`` rebuilds ``ArticleWriter`` rather than calling an editor
-node. Patching individual pages would reintroduce exactly the seam that one-call
+the *whole* book, not the flagged pages: the generator is the editor, rebuilt with
+``reviews=`` rather than handing off to a separate editor node. Patching
+individual pages would reintroduce exactly the seam that one-call
 generation exists to avoid. The cost is that untouched pages could drift, so the
 revision prompt insists they come back word for word.
 """
@@ -264,7 +264,7 @@ class WriterNode(Node):
         self.brief = brief
         self.outline = outline
         self.page_plan = page_plan
-        # Following brown, the generator is the editor. The whole book is
+        # The generator is the editor. The whole book is
         # rewritten rather than patched -- which is also what keeps the voice
         # consistent, since it was always one call for all pages anyway.
         self.reviews = reviews
@@ -289,8 +289,8 @@ class WriterNode(Node):
             ),
         ]
         if self.reviews is not None:
-            # The previous draft replayed as the model's own turn, following
-            # brown's article_writer.py: it edits something it owns.
+            # The previous draft replayed as the model's own turn, so it edits
+            # something it owns.
             messages += [
                 AIMessage(content=self.reviews.prose.model_dump_json(indent=2)),
                 HumanMessage(

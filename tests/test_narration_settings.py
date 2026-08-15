@@ -4,8 +4,8 @@ from sparkstory.config import Settings
 
 
 def test_narrator_model_defaults_to_an_xai_entry() -> None:
-    # Rule 21 and finding CC: `.env` pins every stage to Grok, and a Google
-    # default fails open, stores nothing, and leaves the run looking normal.
+    # The deployed `.env` pins every stage to Grok, and a Google default fails
+    # open, stores nothing, and leaves the run looking normal.
     settings = Settings()
     assert settings.narrator_model == "grok-speech"
     assert settings.narrator_model in settings.speech_configs

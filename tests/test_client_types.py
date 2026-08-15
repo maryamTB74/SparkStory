@@ -31,9 +31,8 @@ def test_a_turn_can_request_a_call_without_executing_it() -> None:
 
 
 def test_a_turn_with_no_tool_calls_is_a_plain_answer() -> None:
-    # This is the loop's stop condition, so it has to be representable. Rule 14's
-    # shape: a loop that ends on an empty list cannot end if an empty list is
-    # invalid.
+    # This is the loop's stop condition, so it has to be representable: a loop
+    # that ends on an empty list cannot end if an empty list is invalid.
     result = TurnResult(text="Here is the plan.", tool_calls=[], executed=[])
 
     assert result.text == "Here is the plan."

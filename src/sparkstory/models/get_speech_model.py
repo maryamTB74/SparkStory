@@ -34,13 +34,13 @@ xAI's documentation pages were partly wrong, in opposite directions:
 * ``optimize_streaming_latency`` is documented as ``0-2`` on one page and
   ``0 | 1`` on the other. It is never sent; we write files, not streams.
 
-This is the same lesson ``get_image_model`` records -- "documentation said up to 3
-source images; the live endpoint requires exactly two". On this provider, the
-endpoint is the specification.
+``get_image_model`` records the same thing from the other endpoint: the docs said
+up to 3 source images, the live endpoint requires exactly two. On this provider,
+the endpoint is the specification.
 
 **``language`` is the constant ``"en"``.** The API requires the field,
-``StoryBrief`` has no language, and multi-language storybooks do not exist. Rule 3
-forbids config for a feature that is not there.
+``StoryBrief`` has no language, and multi-language storybooks do not exist -- a
+setting for a feature that does not exist cannot be written meaningfully.
 """
 
 from collections.abc import Awaitable, Callable
@@ -71,8 +71,8 @@ _TIMEOUT = httpx.Timeout(120.0)
 _OUTPUT_FORMAT = {"codec": "mp3"}
 
 #: How much of an error body to quote. The measured failure is small JSON
-#: (`{"error": "TTS synthesis failed: ..."}`), but an HTML error page from a proxy
-#: would otherwise fill the log -- finding O's lesson about storing whole pages.
+#: (`{"error": "TTS synthesis failed: ..."}`), but a proxy returning an HTML
+#: error page would fill the log with markup nobody reads.
 _ERROR_EXCERPT = 300
 
 
@@ -87,8 +87,8 @@ class GeneratedAudio:
 
 
 #: ``(text, voice_id, speed) -> audio``. A bounded float rather than an
-#: instructions string, which is what an earlier design had: nothing a model reads
-#: reaches this seam, so there is nothing here for rule 13 to catch.
+#: instructions string, which is what an earlier design had: nothing a model
+#: writes reaches this seam, so there is no free-text field to be filled lazily.
 Speaker = Callable[[str, str, float], Awaitable[GeneratedAudio]]
 
 
@@ -127,7 +127,7 @@ def _audio_from_response(response: httpx.Response, model_id: str) -> GeneratedAu
 
     if not response.content:
         # A zero-byte file plays as silence, and silence is indistinguishable
-        # from success on a casual listen -- finding N's failure mode.
+        # from success on a casual listen, so this must not pass as a result.
         raise AudioGenerationError(
             f"Model {model_id!r} returned {response.status_code} carrying no audio."
         )
@@ -145,8 +145,8 @@ def get_speech_model(model_id: str) -> SpeechModel:
 
     Raises:
         AudioConfigurationError: the id is not in the registry, or its API key is
-            unset. Not retryable -- the fix is one line in ``.env``, and rule 10
-            records three tracebacks printed for a problem of exactly this shape.
+            unset. Not retryable -- the fix is one line in ``.env``, and a
+            missing key retried three times prints three tracebacks for it.
     """
     config: dict[str, Any] | None = settings.speech_configs.get(model_id)
     if config is None:
@@ -186,7 +186,7 @@ def get_speech_model(model_id: str) -> SpeechModel:
                 # A transport failure is the retryable class, like a 503 -- and it
                 # must not surface as a bare httpx error, or `_retry_on` would
                 # classify it by LangGraph's default, which returns True for
-                # everything it does not recognise (rule 10).
+                # everything it does not recognise.
                 raise AudioGenerationError(
                     f"Model {model_id!r} could not be reached: {exc}"
                 ) from exc

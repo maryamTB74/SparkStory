@@ -3,8 +3,9 @@
 `FakeModel` records the messages it was sent, which is what makes the important
 test here possible: asserting the image bytes were *actually attached*. A judge
 that silently sent text alone would pass every other test in this file and would be
-useless in a live run -- rule 33's trap, which shipped a corrupt `story.mp3` in
-Session 14 while three layers of offline tests passed.
+useless in a live run. The same trap once shipped a corrupt `story.mp3` while
+three layers of offline tests passed, because none of them checked what was
+actually handed to the provider.
 """
 
 import pytest
@@ -157,8 +158,8 @@ class TestThePrompt:
     to be load-bearing, so a later edit that drops one fails here."""
 
     def test_colour_is_checked_first(self) -> None:
-        """Finding HH: colour is the only attribute that ever drifted across three
-        runs. The ordering is the finding, so it is asserted."""
+        """Colour is the only attribute that ever drifted across three runs. The
+        ordering is the measured result, so it is asserted."""
         lowered = CONSISTENCY_JUDGE_SYSTEM_PROMPT.lower()
         assert lowered.index("colour") < lowered.index("markings")
         assert lowered.index("markings") < lowered.index("body shape")

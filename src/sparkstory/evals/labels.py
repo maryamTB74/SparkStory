@@ -47,9 +47,9 @@ class PageLabel(BaseModel):
     showing: Verdict = None
     momentum: Verdict = None
     #: Free text carrying no weight in any score. It exists so a disagreement is
-    #: readable later -- the argument `JudgedScores.reasons` already makes, and
-    #: what finding X showed is needed: a number localises a suspicion without
-    #: settling it, so the words have to be there to read.
+    #: readable later -- the argument `JudgedScores.reasons` already makes. A
+    #: number localises a suspicion without settling it, so the words have to be
+    #: there to read.
     note: str = ""
 
 

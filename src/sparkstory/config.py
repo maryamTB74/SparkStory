@@ -139,10 +139,10 @@ class Settings(BaseSettings):
     )
     # A fallback, used only when one of the two above is unusable -- never
     # because a search legitimately found nothing. Retrying an empty result on a
-    # second provider is pressure to invent, which is the failure finding I
-    # records: an instruction meant to stop invention stopped grounding instead,
-    # and the same lever pushed the other way would stop the empty answer being
-    # allowed at all.
+    # second provider is pressure to invent. The same lever has misfired once
+    # already in the other direction: an instruction meant to stop invention
+    # stopped grounding instead, and returned zero facts on a premise that
+    # plainly had some.
     tavily_api_key: SecretStr | None = Field(
         default=None,
         alias="TAVILY_API_KEY",
@@ -199,9 +199,10 @@ class Settings(BaseSettings):
     )
     # Runs after a book is finished and delivered, so it is the one model call in
     # the system whose failure cannot cost a parent their story -- the write path
-    # fails open. Rule 21 still applies to it: this default is Google while a .env
-    # pinning everything else to Grok would leave it the odd one out, so set it
-    # together with the other *_MODEL vars.
+    # fails open. That makes the provider default worth stating: it is Google while
+    # a .env pinning everything else to Grok would leave this stage the odd one out
+    # with no key, and because the write path fails open it would store nothing
+    # while the run looked completely normal. Set it with the other *_MODEL vars.
     memory_extractor_model: str = Field(
         default="gemini-3.5-flash",
         alias="MEMORY_EXTRACTOR_MODEL",
@@ -286,9 +287,8 @@ class Settings(BaseSettings):
     # The *planning* half runs on a chat model, because deciding how a book looks
     # is a writing task. Named separately from `illustrator_model` so the cheap
     # decision and the expensive drawing can be moved independently -- and it
-    # defaults to Grok rather than Google for the reason rule 21 exists: three
-    # stages have already died on a Google default while .env pinned everything
-    # else to xAI.
+    # defaults to Grok rather than Google because three stages have already died
+    # on a Google default while .env pinned everything else to xAI.
     illustration_director_model: str = Field(
         default="grok-3-mini",
         alias="ILLUSTRATION_DIRECTOR_MODEL",
@@ -323,9 +323,10 @@ class Settings(BaseSettings):
     # what it cannot see, so this is a *surface* decision rather than a runtime
     # check inside the tool.
     #
-    # **Rule 3 was asked and answered rather than skipped.** Session 1 removed
-    # `IMAGE_GENERATION_ENABLED` and `AUDIO_GENERATION_ENABLED` by name, for
-    # gating features that did not exist -- a flag cannot be meaningfully
+    # **"No config for features that do not exist" was asked and answered rather
+    # than skipped.** `IMAGE_GENERATION_ENABLED` and `AUDIO_GENERATION_ENABLED`
+    # were removed by name once, for gating features that did not exist -- a flag
+    # cannot be meaningfully
     # written before the thing it gates. Both features now exist and are verified
     # live, and the driver is concrete: a deployed server where a client must not
     # be *able* to spend money on images, plus a reduced tool surface for a
@@ -352,7 +353,7 @@ class Settings(BaseSettings):
     # speech model takes text and a voice and returns audio bytes. Four
     # registries, four factories.
     #
-    # Defaults to xAI for the reason rule 21 exists and finding CC bills. Four
+    # Defaults to xAI, and the bill for not doing so is already recorded. Four
     # stages have now defaulted to Google while `.env` pinned everything else to
     # Grok, and the memory extractor's version of this failed *open* -- storing
     # nothing while the run looked completely normal. There is no narration
@@ -372,7 +373,7 @@ class Settings(BaseSettings):
     # `IllustrationPlan` caps characters at 6, so no valid brief can exceed 30. A
     # setting defaulted above a bound the schema already enforces can never fire,
     # and lowering it would reject a valid brief with "illustrate a shorter book"
-    # after the book is already written. Rule 3 rejects config for a limit that
+    # after the book is already written. There is no point configuring a limit that
     # cannot bind; the structural half became `validate_illustration_plan`.
     # Illustration is turned off by not calling it -- the separate tool *is* the
     # switch.
@@ -416,8 +417,8 @@ class Settings(BaseSettings):
     )
 
     # --- Opik (observability) --------------------------------------------
-    # Off by default, and that default is what keeps the other three fields
-    # Rule 3-compliant: they gate code that exists rather than a hypothetical.
+    # Off by default, and that default is what earns the other three fields their
+    # place: they gate code that exists rather than a hypothetical.
     opik_enabled: bool = Field(
         default=False,
         alias="OPIK_ENABLED",
@@ -519,7 +520,7 @@ class Settings(BaseSettings):
             # A second provider, not merely a second model.
             # Reached through the OpenAI-compatible surface: xAI implements
             # OpenAI's API, so `openai:<model>` plus a base_url needs no new
-            # provider integration -- and `langchain-openai` is already a course
+            # provider integration -- and `langchain-openai` is already a
             # dependency. `base_url` travels in params like any other provider
             # parameter, so `get_chat_model` needs no change.
             "grok-4": {
@@ -549,7 +550,7 @@ class Settings(BaseSettings):
             # wants near-determinism -- but not 0.0: an agent choosing among tools
             # benefits from a little slack, and unlike a critic it has no
             # empty-list stop signal that noise could corrupt. Exists as a Grok
-            # entry for the same reason the Grok critic does (rule 21): the
+            # entry for the same reason the Grok critic does: the
             # defaults name Google while a working .env pins everything to Grok,
             # and research is now the *first* call in a book.
             "grok-3-mini-researcher": {
@@ -626,8 +627,8 @@ class Settings(BaseSettings):
 
         **There is no ``seed``**, and that is the provider's constraint rather than
         an omission. xAI abstracts seeds away server-side, and ``quality``,
-        ``size`` and ``style`` are unsupported too. This retires the "stored with
-        its prompt and seed" half of CLAUDE.md's consistency layer 1 -- the
+        ``size`` and ``style`` are unsupported too. This retires the original
+        plan of storing each portrait with its prompt *and seed* -- the
         multi-image edit endpoint replaces it, and is the stronger tool anyway: a
         seed reproduces an identical image, not the same character in a new pose,
         which is what every page after the first needs.

@@ -49,7 +49,7 @@ def test_judged_dimensions_match_page_score_fields() -> None:
 
 
 def test_scorecard_has_no_overall_score() -> None:
-    # Rule 18: the moment there is one number, that number becomes the target.
+    # The moment there is one number, that number becomes the target.
     for forbidden in ("overall", "total", "mean", "score"):
         assert forbidden not in BookScorecard.model_fields
 
@@ -112,8 +112,8 @@ async def test_judge_prompt_leaks_no_internal_terms(
     book_factory: Callable[..., Story],
 ) -> None:
     build = book_factory
-    # Rule 1: docstrings and Field descriptions are prompt text, and an earlier
-    # version of this project shipped "the Canon Agent" to a model as its task.
+    # Docstrings and Field descriptions become JSON-schema text sent to the model,
+    # and an earlier version of this project shipped "the Canon Agent" as its task.
     story = build(["The fox ran.", "Kit slept.", "Rain fell.", "Dawn came."])
     model = FakeModel(BookScores(pages=[_page(n) for n in range(1, 5)]))
     await BookJudge(model, story=story).ainvoke()

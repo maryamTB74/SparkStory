@@ -7,6 +7,7 @@ asserting on.
 
 import importlib
 import pkgutil
+import re
 
 import pytest
 
@@ -172,6 +173,22 @@ _INTERNAL_TERMS = (
     "agent",
     "node",
     "rubric",
+    # Shorthand for this project's own history -- a numbered rule, a lettered
+    # finding, a session. It reads as an instruction to a model that cannot
+    # resolve it, and it belongs in a `#` comment, which never reaches one.
+    # Note "finding" and "session" alone are ordinary words a prompt may use:
+    # a critic reports findings. Only the citation forms are banned, so the
+    # patterns below are matched as regexes rather than as substrings.
+    "non-obvious rule",
+    "claude.md",
+)
+
+#: Citation forms of the same shorthand, which a plain substring cannot catch
+#: without also banning the ordinary English words they are built from.
+_INTERNAL_PATTERNS = (
+    r"finding [a-z]{1,2}\b",
+    r"\bsession \d",
+    r"\brule \d",
 )
 
 
@@ -215,11 +232,20 @@ class TestNoInternalTermsLeak:
             for term in _INTERNAL_TERMS:
                 assert term not in lowered, f"{where} leaks {term!r} to the model"
 
+    def test_no_prompt_cites_our_own_history(self) -> None:
+        """A model cannot resolve "rule 13" or "finding Q", so such a citation
+        reads as an instruction referring to something absent."""
+        for where, text in _prompt_constants().items():
+            lowered = text.lower()
+            for pattern in _INTERNAL_PATTERNS:
+                match = re.search(pattern, lowered)
+                assert match is None, f"{where} cites {match.group()!r} to the model"
+
 
 class TestResourceTextIsPromptText:
-    """A resource is read by a *client's model*, so rule 1 covers it too.
+    """A resource is read by a *client's model*, so it is prompt text too.
 
-    The tools and prompts have been audited since Session 1; resources are a new
+    The tools and prompts have been audited from the start; resources are a newer
     surface with the same property, and it would be easy to treat their output as
     a debug dump because that is what an introspection endpoint usually is.
     """
@@ -230,7 +256,7 @@ class TestResourceTextIsPromptText:
         return {"library": read_library(), "corpus": read_corpus()}
 
     def test_the_audit_actually_reads_something(self) -> None:
-        # Rule 24: a sweep over empty strings passes without checking anything.
+        # A sweep over empty strings passes without checking anything.
         assert all(text for text in self._resource_text().values())
 
     def test_no_resource_mentions_our_machinery(self) -> None:
@@ -279,7 +305,8 @@ class TestRenderGrounding:
     The assertion that matters is ``test_the_claim_itself_is_never_rendered``. The
     planner prompt already says "do not have someone recite facts about planets",
     and the laziest way to satisfy "use what research found" is to have a character
-    recite it -- non-obvious rule 13. Splitting `claim` from `story_note` only
+    recite it, because an instruction gets satisfied the laziest legal way.
+    Splitting `claim` from `story_note` only
     helps if the claim genuinely never reaches the prompt.
     """
 
@@ -435,10 +462,11 @@ class TestProtagonistYieldsToThePremise:
     compromise made the eagle an "experiment visitor", which reads oddly and is
     not what was asked for.
 
-    **The floor stays.** Rule 19: every instruction that relaxes a constraint is
-    a licence to under-fix, and the obvious under-fix here is a passive child --
-    the exact defect the rubric was created for (Session 2 finding 7). So the
-    relaxation is about *exclusivity of the want*, never about the child acting.
+    **The floor stays.** Every instruction that relaxes a constraint is a licence
+    to under-fix, and the obvious under-fix here is a passive child -- the exact
+    defect the rubric was created for, where the want belonged to the animal and
+    the child only helped. So the relaxation is about *exclusivity of the want*,
+    never about the child acting.
     """
 
     def test_a_premise_naming_another_character_is_respected(self) -> None:

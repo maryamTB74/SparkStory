@@ -92,8 +92,8 @@ class TestWebLedger:
 
     def test_sources_are_listable_for_the_run_artifact(self) -> None:
         """The run writes the ledger to disk so a reader can see what was
-        fetched and what was rejected. Session 9's finding M: a run whose
-        artifacts do not record what happened is not evidence."""
+        fetched and what was rejected. A run whose artifacts do not record what
+        happened is not evidence."""
         ledger = WebLedger()
         ledger.add(WebSource(**a_source()))
         ledger.add(WebSource(**a_source(url="https://example.org/2", verified=False)))

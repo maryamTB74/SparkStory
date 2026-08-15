@@ -7,8 +7,8 @@ from sparkstory.models.fake_speech_model import MP3_SILENCE, FakeSpeechProvider
 
 
 async def test_speak_returns_decodable_mp3_bytes() -> None:
-    # Rule 22: a fake that is wrong in a plausible direction passes exact-match
-    # tests and fails only downstream. `_PNG_4X3`'s predecessor was a hand-copied
+    # A fake that is wrong in a plausible direction passes exact-match tests and
+    # fails only downstream. `_PNG_4X3`'s predecessor was a hand-copied
     # PNG that PIL rejected -- every test in its own module passed, and only the
     # renderer failed. So assert the frame header, not the length.
     provider = FakeSpeechProvider()
@@ -19,7 +19,7 @@ async def test_speak_returns_decodable_mp3_bytes() -> None:
     # 11 bits of frame sync, then MPEG-2 Layer III -- what any decoder reads first,
     # and what the live provider actually returns. This asserted MPEG-1 until a
     # live run showed the provider sends MPEG-2 at 24 kHz; the mismatch corrupted
-    # the stitched file while every offline test passed. Rule 22.
+    # the stitched file while every offline test passed.
     assert audio.data[0] == 0xFF
     assert audio.data[1] & 0xE0 == 0xE0
     assert (audio.data[1] >> 3) & 0x03 == 0b10  # MPEG-2

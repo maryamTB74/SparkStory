@@ -12,10 +12,10 @@ agent to decide appearances, a style bible and per-page prompts. A page's
 narration script is ``StoryPage.text``. Nothing is decided, so nothing is
 planned, and no model is involved between the finished book and the audio.
 
-**Paths, not bytes.** Following ``StoryArt`` for a reason finding O already
-recorded against the web ledger: base64 audio in a Pydantic model would reach
-``story.json``, every log line and every run artifact. An 80 KB page of audio is
-considerably worse than a scraped page snippet.
+**Paths, not bytes.** Following ``StoryArt``, for the reason the web ledger
+already demonstrated by filling a run directory with scraped page text: base64
+audio in a Pydantic model would reach ``story.json``, every log line and every run
+artifact. An 80 KB page of audio is considerably worse than a page snippet.
 
 **``sha256`` is what makes "the audio matches the printed page" checkable**
 rather than merely intended. Narration speaks ``page.text`` verbatim -- no model
@@ -58,7 +58,8 @@ class StoryNarration(BaseModel):
     # The provider id actually sent, not the `Voice` a parent chose. Recorded so a
     # run answers "which voice was this?" by reading a file rather than
     # re-deriving the mapping -- the same reason `meta.json` records
-    # `world_rules`, without which finding L could not have been written.
+    # `world_rules`. Without that record, two runs cannot be compared at all: you
+    # cannot tell which setting produced which output.
     voice_id: str
     speed: float
     items: list[NarrationItem]
@@ -76,9 +77,8 @@ class StoryNarration(BaseModel):
 
         The ``bool(self.items)`` half is load-bearing rather than defensive:
         ``all([])`` is ``True``, so without it a run that narrated nothing would
-        report as fully narrated. Rule 24 -- a check with no room to fail proves
-        nothing, and this one would have failed in the direction that looks like
-        success.
+        report as fully narrated. A check with no room to fail proves nothing, and
+        this one would have failed in the direction that looks like success.
         """
         return bool(self.items) and all(
             i.status is NarrationStatus.NARRATED for i in self.items

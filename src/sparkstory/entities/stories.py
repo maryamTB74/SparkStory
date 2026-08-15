@@ -19,9 +19,9 @@ downstream code branch deterministically.
 
 **3. Validation constraints on LLM output are load-bearing.** A model returning
 three beats when four is the minimum raises ``ValidationError`` rather than
-quietly producing a thin story. In this session that is desired: fail loudly.
-The evaluator-optimizer loop in a later session converts such failures into a
-retry carrying feedback.
+quietly producing a thin story. Failing loudly is the point: the revision loops
+convert such failures into a retry carrying the message as feedback, which only
+works if the failure is raised in the first place.
 """
 
 from enum import StrEnum
@@ -141,7 +141,7 @@ class ChildProfile(BaseModel):
     #
     # It appears in the MCP tool schema because a client must supply it, but
     # `render_story_brief` must NOT send it to the model -- there is a test
-    # asserting that, and the prompt audit (rule 1) would catch a leak.
+    # asserting that, and the prompt-text audit would catch a leak.
     #
     # Typed `ChildId` rather than `str`: the caller is an LLM agent and this value
     # scopes every memory read, so the guard belongs in the type.
@@ -220,16 +220,17 @@ class StoryBrief(BaseModel):
         ),
     )
     # On the brief rather than in settings, because it varies per story, a parent
-    # chooses it, and it crosses the MCP tool boundary -- the argument
-    # `world_rules` won in Session 9, which is why Rule 3's settings table does
-    # not apply to it.
+    # chooses it, and it crosses the MCP tool boundary. That is the same argument
+    # that put `world_rules` here, and it is what distinguishes a brief field from
+    # an operator setting.
     #
     # Two values rather than the four expressive ones first designed. The
     # provider's 26-voice roster carries no expressive metadata at all: every
     # entry is `multilingual` and the only distinguishing field is `gender`. A
-    # `warm`/`gentle`/`bright` split would have been invented and then presented
-    # as a mapping -- finding N's shape. Adding a value once a live listen shows
-    # it audibly differs is one row here and one in `_VOICES`.
+    # `warm`/`gentle`/`bright` split would have been invented here and then
+    # presented to a parent as though it described the audio -- an interface
+    # promising a distinction nothing behind it can deliver. Adding a value once a
+    # live listen shows it audibly differs is one row here and one in `_VOICES`.
     #
     # Optional with a default, because every existing brief carries no voice and
     # `world_rules` already demonstrated what a required new brief field costs.
@@ -345,7 +346,10 @@ class StoryOutline(BaseModel):
     # constraints the planner did. Before this the grounding died at the end of
     # `plan_story`: it was computed, planned from, and dropped when the pipeline
     # returned a bare outline -- which is why a craft device could only ever be
-    # *described* in a beat summary (findings J and Q). A refrain lives in prose.
+    # *described* in a beat summary rather than used. Handed "repeat a short phrase
+    # about the paper rocket", the planner wrote beats reading "They repeat the
+    # phrase that the paper rocket is ready". A refrain lives in prose, so the
+    # device has to reach the stage that writes prose.
     #
     # Nested here rather than passed beside the outline as a third `write_story`
     # argument. Three independently-assembled arguments let a client pair a genuine
@@ -361,7 +365,7 @@ class StoryOutline(BaseModel):
     # ungrounded run is the control arm of the A/B this feature is judged by.
     #
     # NOT filled by the planner, and the description below says so because a field
-    # description is prompt text (non-obvious rule 1). The planner is the one node
+    # description is prompt text. The planner is the one node
     # that both sees this schema and could invent a `chunk_id` -- which
     # `drop_unprovenanced` would then silently drop, losing a real fact with no
     # error anywhere. Its revision replay excludes this field for the same reason;
@@ -374,8 +378,9 @@ class StoryOutline(BaseModel):
     # established. Carried on the outline because `plan_story` already stops for a
     # parent's approval, and that is the human checkpoint this project already has
     # and has verified live -- rather than a new tool the `create_storybook` prompt
-    # would have to learn to call, which costs prompt length that Q4 has already
-    # shown is not free.
+    # would have to learn to call. Prompt length is not free there: an early
+    # instruction is the first thing a client drops as the prompt grows, and one
+    # of that prompt's steps has already been skipped by a client once.
     #
     # Never a reason to fail a run: two descriptions of one fox is a question for a
     # human, not a broken plan. Empty by default, so a first book and an

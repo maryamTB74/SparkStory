@@ -1,8 +1,8 @@
 """The image factory, and the request shape it builds.
 
 Every fact asserted here about the endpoint was measured against the live xAI API
-during Session 6, not read from documentation -- which was wrong about the model
-id, the reference count *and* the transport. These tests are what stop a future
+rather than read from documentation -- which was wrong about the model id, the
+reference count *and* the transport. These tests are what stop a future
 edit quietly reverting to the documented behaviour.
 
 No network: the transport is replaced, so nothing here leaves the process.
@@ -261,8 +261,8 @@ class TestFailures:
 
 class TestRetryClassification:
     def test_generation_errors_are_retried(self) -> None:
-        """Rule 10: the fall-through returns True for anything unrecognised, so
-        this must be asserted rather than assumed."""
+        """LangGraph's default retry predicate returns True for anything it does
+        not recognise, so this must be asserted rather than assumed."""
         from sparkstory.workflows.retries import _retry_on
 
         assert _retry_on(ImageGenerationError("503")) is True

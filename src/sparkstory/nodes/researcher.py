@@ -10,14 +10,13 @@ an injected *compiled agent* instead of an injected model -- the injection princ
 is unchanged, and the test seam moves from ``FakeModel`` to a stub agent, because a
 fake broad enough to represent tool-call exchanges would be a reimplementation of
 LangGraph. It still lives in ``nodes/`` rather than a new package: one directory for
-things that call models beats inventing a name with no counterpart in the course's
-reference app.
+things that call models beats a second one holding a single module.
 
 **Two prompt instructions carry the design**, and both are the kind a later edit
 drops without noticing:
 
 *Finding nothing is correct.* Most premises have nothing factual to get wrong. The
-course's own retrieval prompt says the opposite -- "never refuse on the assumption
+usual retrieval instruction says the opposite -- "never refuse on the assumption
 that you lack information" -- which is right for a research assistant and wrong
 here, because something asked for facts will produce facts.
 

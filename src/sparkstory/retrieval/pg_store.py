@@ -10,11 +10,10 @@ and Postgres's ``ts_rank`` each produce a ranking inside the database and RRF
 fuses them in a CTE. Nothing loads the corpus into memory to answer a query.
 
 **``ts_rank`` is not BM25, and that was the risk.** It has no ``k1``/``b``
-saturation parameters, and the ``english`` configuration drops ``no`` -- which
-non-obvious rule 23 records as deliberately *kept* in the hand-picked stoplist,
-because it carries the meaning of half the fact corpus ("the Moon has *no* air").
-Lesson 9's own reference [7] reaches Postgres-native BM25 through the VectorChord
-extension rather than through stock ``tsvector``.
+saturation parameters, and the ``english`` configuration drops ``no`` -- which the
+hand-picked stoplist deliberately *kept*, because it carries the meaning of half
+the fact corpus ("the Moon has *no* air"). Postgres-native BM25 exists only
+through an extension such as VectorChord, not through stock ``tsvector``.
 
 So it was measured before being specced, on the real corpus and the real 20
 labelled queries:
@@ -93,9 +92,9 @@ class PgVectorStore:
         """Embed every chunk and replace the table's contents.
 
         Whole-corpus replacement inside one transaction, not an upsert. Ingestion
-        is lesson 9's *offline* phase and runs on the whole corpus at once, so a
-        partial write is the one outcome that should be impossible: a half-written
-        index answers queries confidently and wrongly.
+        is an offline step that runs on the whole corpus at once, so a partial
+        write is the one outcome that should be impossible: a half-written index
+        answers queries confidently and wrongly.
 
         Embedding happens here rather than in the caller so vectors and rows
         cannot be assembled separately and drift out of step.
@@ -233,10 +232,9 @@ class PgVectorStore:
     ) -> list[SearchHit]:
         """Hybrid search: pgvector and ts_rank, fused by RRF, in one statement.
 
-        ``source_kind`` filters *before* scoring rather than after -- lesson 9's
-        metadata filtering. Filtering afterwards spends the top-k budget on rows
-        the caller cannot use, and can return fewer than ``top_k`` results while
-        relevant ones exist.
+        ``source_kind`` filters *before* scoring rather than after. Filtering
+        afterwards spends the top-k budget on rows the caller cannot use, and can
+        return fewer than ``top_k`` results while relevant ones exist.
 
         The keyword half **abstains structurally**. ``hybrid.py`` counted matched
         terms and skipped BM25 below two, because BM25 falls back to ranking by
@@ -357,8 +355,8 @@ def build_store(
 
     Raises:
         ConfigurationError: ``DATABASE_URL`` is unset. Deliberately *not* a bare
-            ``ValueError``: rule 5 -- never let a built-in exception type stand for
-            a domain condition, because the tool layer translates
+            ``ValueError``: a built-in exception type must never stand for a
+            domain condition, because the tool layer translates
             ``ConfigurationError`` into something an operator can act on and lets
             everything else surface as the bug it is.
     """

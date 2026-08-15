@@ -62,12 +62,12 @@ def words_per_page(story: Story) -> float:
 def words_per_sentence(story: Story) -> float:
     """Mean words per sentence across the book.
 
-    Added in Session 17 because it is the metric a human turned out to be using.
-    Asked what was wrong with the baseline books, Maryam said *"the sentences are
-    too short and seem not meaningful"* -- and her `delight` labels correlate
-    **+0.735** with this number across the five books, where the LLM judge's
-    correlate **+0.095**. So a free arithmetic count tracks a reader's judgement
-    better than the model does (finding OO).
+    Added because it is the metric a human turned out to be using. Asked what was
+    wrong with the baseline books, the reader said *"the sentences are too short
+    and seem not meaningful"* -- and her hand `delight` labels correlate **+0.735**
+    with this number across the five books, where the LLM judge's correlate
+    **+0.095**. So a free arithmetic count tracks a reader's judgement better than
+    the model does.
 
     Separate from `words_per_page`, which cannot see the difference: `seed-garden`
     and `eagle-planet` are 18.8 and 18.5 words per page, and 4.8 against 6.2 words

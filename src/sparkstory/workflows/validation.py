@@ -6,9 +6,9 @@ asked for, or which beats existed to be covered. These functions close that gap.
 
 **Why the workflow calls these and the nodes do not.** A node's job is to report
 what the model said. Deciding what to do about a malformed answer is
-orchestration. Keeping the check in the task is what lets a later session wrap it
-in a retry that carries the message back as feedback, instead of unpicking a
-raise buried inside an agent.
+orchestration. Keeping the check in the task is what leaves room to wrap it in a
+retry that carries the message back as feedback, instead of unpicking a raise
+buried inside an agent.
 
 Every failure raises ``StoryStructureError`` rather than returning a report,
 because there is nothing sensible to do with a broken plan today. Loud failure is
@@ -138,9 +138,10 @@ def validate_illustration_plan(story: Story, plan: IllustrationPlan) -> None:
     unreachable: the image count is derived, not chosen -- one picture per page plus
     one portrait per character -- and ``StoryBrief`` already caps pages at 24 while
     ``IllustrationPlan`` caps characters at 6, so a valid brief can never exceed 30.
-    A second cap over a quantity the schema already bounds is the trap non-obvious
-    rule 11 describes, and Rule 3 rejects config for a limit that cannot bind. What
-    was worth keeping was the structural check, which belongs here and raises.
+    A second cap over a quantity the schema already bounds can never fire, and
+    configuration for a limit that cannot bind is configuration for a feature that
+    does not exist. What was worth keeping was the structural check, which belongs
+    here and raises.
 
     Raises:
         StoryStructureError: the planned pages do not match the story's exactly,
@@ -156,8 +157,8 @@ def validate_illustration_plan(story: Story, plan: IllustrationPlan) -> None:
         )
 
     # A page naming a character with no appearance would be drawn from the prompt
-    # alone while looking conditioned in the artifact -- finding U's failure mode,
-    # which is that identity silently stops travelling. Caught here rather than
+    # alone while looking conditioned in the artifact: identity silently stops
+    # travelling and nothing in the record says so. Caught here rather than
     # tolerated, because the Director wrote both halves and disagreeing with itself
     # is a structural error, not a degraded provider.
     described = {character.name for character in plan.characters}

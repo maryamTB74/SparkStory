@@ -1,8 +1,8 @@
 """The embedding seam.
 
 ``FakeEmbedder`` is the reason the rest of the retrieval layer can be tested at
-all. Every course notebook makes live embedding calls; this project has kept "no
-network required" true since Session 1, and a retrieval layer is where that
+all. The obvious implementation makes live embedding calls; this project has kept
+"no network required" true from the start, and a retrieval layer is where that
 property is most at risk.
 """
 

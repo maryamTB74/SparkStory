@@ -254,10 +254,11 @@ class TestWebSearchSettings:
         """This default is what keeps the suite offline.
 
         At 0 no client is constructed and no key is read, so the whole test suite
-        keeps the no-network property it has held since Session 1. A default of
+        keeps the no-network property it has held from the start. A default of
         anything else would make every test that reaches research a live call --
-        which non-obvious rule 25 already caught once, when a test that faked only
-        `get_chat_model` reached a real provider and still looked like it passed.
+        which has happened once already, when a test that faked only
+        `get_chat_model` reached a real provider and still looked like it passed,
+        because research runs before planning.
 
         Asserted against the **field default**, not against `Settings()`. A bare
         `Settings()` reads `.env`, so this test used to assert "*this machine's*
@@ -290,7 +291,7 @@ class TestWebSearchSettings:
 
     @pytest.mark.parametrize("field", ["perplexity_api_key", "firecrawl_api_key"])
     def test_blank_web_keys_normalise_to_none(self, field: str) -> None:
-        """Non-obvious rule 3, for each new key separately.
+        """An empty env var is not an unset one, for each new key separately.
 
         `FIRECRAWL_API_KEY=` arrives as `""`, not as absent, and pydantic would
         build `SecretStr('')` -- which is not None, so every `is not None` check
@@ -335,8 +336,8 @@ class TestWebSearchSettings:
 class TestOpikSettings:
     def test_opik_is_disabled_by_default(self) -> None:
         """Opik is infrastructure, so the app must be unchanged when nobody
-        asked for it. This default is also what makes the other three fields
-        Rule 3-compliant: they gate code rather than describe a hypothetical.
+        asked for it. This default is also what justifies the other three fields
+        existing at all: they gate code rather than describe a hypothetical.
 
         Asserted against the **field defaults**, following
         `test_web_search_is_off_by_default` below. A bare `Settings()` reads
@@ -352,7 +353,7 @@ class TestOpikSettings:
         assert fields["opik_project_name"].default == "sparkstory"
 
     def test_blank_opik_key_normalises_to_none(self) -> None:
-        """Non-obvious rule 3, for this key specifically.
+        """An empty env var is not an unset one, for this key specifically.
 
         `OPIK_API_KEY=` arrives as `""` rather than as absent, and pydantic would
         build `SecretStr('')` -- which is not None, so `configure()` would treat

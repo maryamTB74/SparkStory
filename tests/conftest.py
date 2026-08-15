@@ -5,10 +5,17 @@ not depend on whatever happens to be configured on the machine running them.
 """
 
 from collections.abc import Callable, Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import Engine
 
+from sparkstory.entities.illustration import ArtItem, ArtStatus, StoryArt
+from sparkstory.entities.narration import (
+    NarrationItem,
+    NarrationStatus,
+    StoryNarration,
+)
 from sparkstory.entities.stories import (
     CharacterSketch,
     ChildProfile,
@@ -25,6 +32,7 @@ from sparkstory.entities.stories import (
     StoryProse,
     Tone,
 )
+from sparkstory.models.fake_speech_model import MP3_SILENCE
 from sparkstory.retrieval.chunks import Chunk, SourceKind
 from sparkstory.retrieval.types import SearchHit
 
@@ -39,9 +47,9 @@ def _tracing_off(monkeypatch: pytest.MonkeyPatch) -> None:
     37 threads uploaded per suite run, and it produced hundreds in a real
     project before anyone connected the two.
 
-    This is non-obvious rule 25 again -- a test that fakes only the model still
-    reaches a real service, because the seam it forgot is a different one. The
-    tests that need tracing on set it themselves, after this fixture runs.
+    The recurring shape: a test that fakes only the model still reaches a real
+    service, because the seam it forgot is a different one. The tests that need
+    tracing on set it themselves, after this fixture runs.
     """
     monkeypatch.setattr("sparkstory.config.settings.opik_enabled", False)
 
@@ -55,7 +63,7 @@ def memory_engine() -> Iterator[Engine]:
     that *skip* when ``DATABASE_URL`` is unset (``test_retrieval_eval.py``), so
     copying that seam would mean the guarantees this package exists for --
     determinism, scope isolation, append-only -- never run under ``make test``.
-    That is non-obvious rule 24: a check with no room to fail proves nothing.
+    A check with no room to fail proves nothing.
 
     The *semantic* tier makes this possible: it uses no pgvector and no tsvector,
     only plain columns fetched by equality, so ``embedding_dimensions=None``
@@ -290,6 +298,79 @@ def book_factory() -> Callable[..., Story]:
                 for i, text in enumerate(page_texts)
             ],
         )
+
+    return build
+
+
+@pytest.fixture
+def video_fixtures(
+    tmp_path: Path, book_factory: Callable[..., Story]
+) -> Callable[..., tuple[Story, StoryArt, StoryNarration]]:
+    """A ``Story``, ``StoryArt`` and ``StoryNarration`` that agree on page count.
+
+    A factory rather than a fixed trio, because every video test varies which
+    pages are missing what -- and the interesting cases are exactly the
+    *disagreements* between the three artifacts, since that is what page
+    selection exists to resolve.
+
+    **Real files are written**, not bare paths. Selection checks that a page's
+    audio and image exist on disk, so a fixture of paths pointing at nothing
+    could not tell a present file from an absent one -- and "the artifact says
+    the page has audio, and the file is gone" is a case a live run will meet.
+    """
+
+    def build(
+        *,
+        pages: int,
+        missing_audio: set[int] | None = None,
+        missing_image: set[int] | None = None,
+    ) -> tuple[Story, StoryArt, StoryNarration]:
+        absent_audio = missing_audio or set()
+        absent_image = missing_image or set()
+
+        story = book_factory([f"Page {n} says something." for n in range(1, pages + 1)])
+
+        art_items: list[ArtItem] = []
+        narration_items: list[NarrationItem] = []
+
+        for n in range(1, pages + 1):
+            if n in absent_image:
+                art_items.append(
+                    ArtItem(key=str(n), status=ArtStatus.FAILED, detail="test")
+                )
+            else:
+                image = tmp_path / f"page-{n:02d}.jpg"
+                image.write_bytes(b"\xff\xd8\xff\xdb" + b"\x00" * 64)
+                art_items.append(
+                    ArtItem(key=str(n), status=ArtStatus.CONDITIONED, path=image)
+                )
+
+            if n in absent_audio:
+                narration_items.append(
+                    NarrationItem(
+                        page_number=n,
+                        status=NarrationStatus.FAILED,
+                        path=None,
+                        sha256="0" * 64,
+                    )
+                )
+            else:
+                audio = tmp_path / f"page-{n:02d}.mp3"
+                audio.write_bytes(MP3_SILENCE)
+                narration_items.append(
+                    NarrationItem(
+                        page_number=n,
+                        status=NarrationStatus.NARRATED,
+                        path=audio,
+                        sha256="0" * 64,
+                    )
+                )
+
+        art = StoryArt(style_bible="a test style", portraits=[], pages=art_items)
+        narration = StoryNarration(
+            voice_id="eve", speed=1.0, items=narration_items, stitched=None
+        )
+        return story, art, narration
 
     return build
 

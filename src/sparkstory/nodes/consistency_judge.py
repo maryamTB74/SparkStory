@@ -25,8 +25,9 @@ that only compared pages to portraits would have called that book consistent.
 
 **The one thing this node must not do is agree.** Asked "does this match?", the
 cheapest defensible answer is always yes, and a judge that agrees costs a call and
-buys nothing -- the trap non-obvious rule 13 names. So the output requires the
-difference to be *named*, and the prompt says explicitly not to restate the
+buys nothing -- an instruction gets satisfied the laziest legal way, so ask what
+the laziest satisfying answer is before writing the rubric. So the output requires
+the difference to be *named*, and the prompt says explicitly not to restate the
 description as though it were what the picture shows. That instruction is load-
 bearing: the spike fed both models a description ("small black ant") that
 contradicted the image (a green ant), and both reported green. Weakening it would

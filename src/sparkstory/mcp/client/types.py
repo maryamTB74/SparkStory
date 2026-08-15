@@ -14,8 +14,10 @@ not do it*.
 **Frozen dataclasses rather than Pydantic models.** The three reasons this project
 reaches for Pydantic are crossing a process boundary, being bound as a model's
 output schema, and validating untrusted input. None applies: these are records
-built and read inside one client process. Nothing here is prompt text, so no
-docstring in this module reaches a model (non-obvious rule 1).
+built and read inside one client process. Nothing here is bound as a model's
+output schema, so -- unlike the domain entities, whose docstrings and field
+descriptions become JSON-schema text the model reads -- no docstring in this
+module reaches a model.
 """
 
 from dataclasses import dataclass, field
@@ -61,8 +63,9 @@ class TurnResult:
     """One model turn: what it said, what it asked for, what ran.
 
     ``tool_calls`` empty is the loop's stop condition, so it must stay a valid
-    value -- a reflexive "at least one" constraint would make termination
-    impossible, which is non-obvious rule 14 in a new place.
+    value. A reflexive "at least one" constraint here would make termination
+    impossible, and the symptom would read as a model that never stops rather
+    than as a schema defect.
     """
 
     text: str

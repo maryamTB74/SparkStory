@@ -53,13 +53,13 @@ def test_briefs_cover_a_premise_with_no_factual_spine() -> None:
 
 
 def test_uniform_opener_fixture_scores_low_on_distinct_openers() -> None:
-    # Finding G's shape, reconstructed: the original book is no longer on disk.
+    # A uniform-opener book, reconstructed: the original is no longer on disk.
     story = _fixture_story("uniform-openers")
     assert det.distinct_opener_ratio(story) <= 0.625
 
 
 def test_recited_fact_fixture_scores_high_on_beat_recital() -> None:
-    # Finding Q's shape: a story_note pasted verbatim into three beats.
+    # Fact recital: a story_note pasted verbatim into three beats.
     assert det.fact_recital_beats(_fixture_story("recited-fact"), [_NOTE]) >= 6
 
 

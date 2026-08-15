@@ -26,8 +26,8 @@ def test_a_genuine_contradiction_is_flagged() -> None:
 
 
 def test_an_identical_restatement_is_not_a_conflict() -> None:
-    """Rule 24: a conflict test where nothing can conflict proves nothing, so the
-    negative direction is asserted too."""
+    """A conflict test where nothing can conflict proves nothing, so the negative
+    direction is asserted too."""
     conflicts = find_conflicts(
         new=[_record("Kit has a white-tipped tail.")],
         stored=[_record("Kit has a white-tipped tail.")],

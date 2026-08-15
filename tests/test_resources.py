@@ -1,7 +1,8 @@
 """The two read-only resources, and what they must never say.
 
-A resource's text is read by a *client's model*, so non-obvious rule 1 applies to
-everything these return: it is prompt material, not a debug dump.
+A resource's text is read by a *client's model*, so everything these return is
+prompt material, not a debug dump -- the same hazard a Pydantic docstring carries
+when it becomes JSON-schema text sent to the model.
 
 Every test here builds its own run directory under ``tmp_path``. Pointing them at
 the real ``outputs/`` would make them depend on whatever was generated last --
@@ -60,8 +61,8 @@ class TestLibraryDoesNotLeak:
     Run directories on disk are named after the premise
     (``20260811-231338-a-fox-who-wants-to-visit-the-moon``), every ``brief.json``
     holds a child's name, and every ``meta.json`` holds a ``child_id``. None of
-    that may reach a client's model, which is the same hazard Session 12 recorded
-    one door over when Opik uploaded briefs containing a child's name.
+    that may reach a client's model -- the same hazard one door over, where trace
+    upload carried briefs containing a child's name off the machine.
     """
 
     def test_a_childs_name_does_not_reach_the_output(self, tmp_path: Path) -> None:

@@ -175,8 +175,9 @@ async def generate_and_score(
     # never given.
     #
     # research-1.json is still written here, because the fact count is what decides
-    # whether a grounded comparison meant anything (rule 27), and findings M and S
-    # are both what happens when nobody checks it.
+    # whether a grounded comparison meant anything. A run that retrieves zero facts
+    # renders identically under either mode -- the branch is inside `if
+    # grounding.facts` -- so it reads as a successful control while proving nothing.
     def capture(task_name: str, value: object) -> None:
         if task_name != "research":
             return
@@ -185,9 +186,9 @@ async def generate_and_score(
                 value.model_dump_json(indent=2) + "\n", encoding="utf-8"
             )
 
-    # Following the course, which tags its evaluation runs separately so a
-    # measurement is distinguishable from a real book. The pipelines build their
-    # own tracers; this records which fixture the spans underneath belong to.
+    # Tag evaluation runs separately so a measurement is distinguishable from a
+    # real book. The pipelines build their own tracers; this records which fixture
+    # the spans underneath belong to.
     logger.info("eval run for fixture %r", name)
 
     outline = await run_outline_pipeline(brief, on_task_result=capture)
@@ -252,9 +253,9 @@ async def main() -> int:
     configure_logging()
 
     # Before anything is generated. An upload that fails after a fixture run has
-    # paid for five books would be the expensive way to learn a key is missing,
-    # and finding P is the worked example: the untested script died at the live
-    # run, after the search had already been paid for.
+    # paid for five books would be the expensive way to learn a key is missing.
+    # This script has done exactly that once before: it died at the live run,
+    # after the search had already been paid for.
     if args.opik:
         if not args.fixtures:
             print("--opik applies to --fixtures runs only")
@@ -289,8 +290,8 @@ async def main() -> int:
 
     if args.fixtures:
         for name, brief in briefs.items():
-            # Per-book isolation, following the course: one brief that fails must
-            # not cost the books that would have succeeded after it.
+            # Per-book isolation: one brief that fails must not cost the books
+            # that would have succeeded after it.
             try:
                 cards.append(await generate_and_score(name, brief, args))
                 print(f"  scored {name}", flush=True)

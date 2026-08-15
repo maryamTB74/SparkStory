@@ -13,6 +13,7 @@ from sparkstory.entities.exceptions import (
     ImageGenerationError,
     StoryStructureError,
     UnsafeContentError,
+    VideoGenerationError,
 )
 
 
@@ -33,7 +34,7 @@ def _retry_on(exc: Exception) -> bool:
     ``StoryStructureError``
         Retrying re-sends an identical prompt and re-rolls the dice, while hiding
         how often an agent gets a page count wrong -- exactly the frequency data
-        the evaluator-optimizer loop of a later session is designed from.
+        the evaluator-optimizer loops are designed from.
 
     ``UnsafeContentError``
         Retrying cannot make content safe. It is raised only after the Writer was
@@ -47,8 +48,8 @@ def _retry_on(exc: Exception) -> bool:
         The first error here that **is** retried, and it is named explicitly rather
         than left to fall through. A 503 or a rate limit from an image endpoint is
         exactly what a retry is for. It would already be retried by the fall-through
-        below, but rule 10 exists because that fall-through is a trap -- it returns
-        ``True`` for everything it does not recognise, so silence here would be
+        below, but that fall-through is a trap -- it returns ``True`` for
+        everything it does not recognise, so silence here would be
         indistinguishable from an oversight. ``ImageConfigurationError`` is a
         ``ConfigurationError`` and so is excluded above; a missing key is not
         transient.
@@ -64,10 +65,21 @@ def _retry_on(exc: Exception) -> bool:
         id is a code defect caught offline rather than a runtime condition, and
         telling a permanent 404 from a transient one would mean parsing a
         provider's error prose.
+
+    ``VideoGenerationError``
+        Retried, and named explicitly for the third time for the same reason: the
+        fall-through below would retry it anyway, and silence here would be
+        indistinguishable from having forgotten to classify it. The failures it
+        covers are a killed subprocess, a full disk, a truncated write -- all
+        transient. ``VideoConfigurationError`` is a ``ConfigurationError`` and so
+        is excluded above: retrying cannot install ffmpeg, which is the missing-key
+        case above in a new costume.
     """
     if isinstance(exc, ConfigurationError | StoryStructureError | UnsafeContentError):
         return False
-    if isinstance(exc, ImageGenerationError | AudioGenerationError):
+    if isinstance(
+        exc, ImageGenerationError | AudioGenerationError | VideoGenerationError
+    ):
         return True
     return default_retry_on(exc)
 

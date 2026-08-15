@@ -190,9 +190,9 @@ def _grounded(outline: StoryOutline) -> StoryOutline:
     """The fixture outline with grounding attached, through validation.
 
     ``model_validate`` rather than ``model_copy(update=...)``, which skips
-    validation and would set the attribute whether or not the field existed --
-    rule 24's trap, and it made an earlier version of a schema test pass before
-    the field was added.
+    validation and would set the attribute whether or not the field existed. That
+    is a check with no room to fail, and it made an earlier version of a schema
+    test pass before the field was added.
     """
     return StoryOutline.model_validate(
         outline.model_dump() | {"grounding": _grounding().model_dump()}
@@ -247,8 +247,8 @@ class TestRenderProseGrounding:
 
     def test_the_two_modes_differ(self) -> None:
         """If they rendered identically the argument would be dead weight, and a
-        vacuous A/B would read as a real one -- findings M and S, one session
-        apart."""
+        vacuous A/B would read as a real one, which has happened twice on live
+        runs."""
         assert render_prose_grounding(
             _grounding(), WorldRules.REALISTIC
         ) != render_prose_grounding(_grounding(), WorldRules.IMAGINATIVE)
@@ -314,7 +314,7 @@ class TestWriterReceivesGrounding:
         page_plan: PagePlan,
         prose: StoryProse,
     ) -> None:
-        """Rule 4 question 6, and the one most likely to be missed.
+        """The verification question most likely to be missed.
 
         The prose loop replays the previous draft, so a constraint present on
         draft 1 and absent on draft 2 would look like success on any run that
@@ -345,9 +345,9 @@ class TestWriterReceivesGrounding:
 class TestPromptsDoNotLeakInternalTerms:
     """Docstrings and prompts are model-facing; our vocabulary is not.
 
-    Session 1 shipped "the Canon Agent" and "spend tokens" to the model as part of
-    its task. With prompt text now living on each node, the audit is this test
-    rather than a single file to read.
+    An early version shipped "the Canon Agent" and "spend tokens" to the model as
+    part of its task. With prompt text now living on each node, the audit is this
+    test rather than a single file to read.
     """
 
     def test_no_internal_vocabulary_in_any_system_prompt(self) -> None:

@@ -183,9 +183,9 @@ def build_story_workflow(
         # ledger=None deliberately, and this is the feature's accepted scope limit.
         # A WebLedger is per-run and in-memory, so a `web:<n>` id minted during
         # planning cannot be resolved here and its fact is dropped as though
-        # invented. Corpus facts only. It is logged rather than silent, because a
-        # book quietly losing its grounding with nothing to read afterwards is
-        # finding M's failure mode.
+        # invented. Corpus facts only. It is logged rather than silent: a book
+        # quietly losing its grounding, with nothing to read afterwards, is
+        # indistinguishable from one that was never grounded at all.
         if outline.grounding is not None:
             verified = drop_unprovenanced(
                 outline.grounding,
@@ -209,8 +209,8 @@ def build_story_workflow(
         prose = await write_prose(request_id, brief, outline, page_plan)
 
         # `+ 1` -- and this is the one place the two loops differ in shape.
-        # brown's loop, which the outline loop above copies, ends on an edit that
-        # nobody reviewed. Harmless there and harmless for the outline, but the
+        # The simpler shape -- which the outline loop above uses -- ends on an
+        # edit that nobody reviewed. Harmless for the outline, but the
         # safety gate below has to judge the draft we are actually returning: a
         # gate reading findings from before the final rewrite would destroy books
         # whose safety problem that rewrite had already fixed. So the prose loop

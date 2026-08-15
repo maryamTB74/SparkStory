@@ -1,10 +1,9 @@
 """Turning a finished `Story` into a book-shaped PDF.
 
-The name is `brown`'s, reserved in CLAUDE.md for book assembly. It lays out the
-pages and fills the upper 55% of each one with that page's illustration -- or
-leaves it blank when there is none, which is the text-only book Session 10
-shipped. Reserving the space before there was anything to put in it is why
-Session 6 filled a frame instead of forcing a relayout.
+Lays out the pages and fills the upper 55% of each one with that page's
+illustration -- or leaves it blank when there is none, which is the text-only
+book this shipped as first. Reserving the space before there was anything to put
+in it is why illustrations later filled a frame instead of forcing a relayout.
 
 Deliberately pure. It takes a `Story`, a path and optionally a `StoryArt`,
 imports nothing from the rest of the package except the entities, reads no
@@ -35,13 +34,13 @@ logger = get_logger(__name__)
 
 #: Square, because picture books are square or landscape far more often than
 #: A4, and square survives being read on a screen as well as printed. Fixed
-#: rather than configurable: Rule 3, one caller.
+#: rather than configurable: there is exactly one caller.
 _PAGE = 200 * mm
 
 _MARGIN = 18 * mm
 
-#: The illustration slot. Blank in a text-only book, an image frame in Session
-#: 6. Expressed as a fraction of the page so the two halves cannot drift apart.
+#: The illustration slot. Blank in a text-only book, an image frame otherwise.
+#: Expressed as a fraction of the page so the two halves cannot drift apart.
 _ART_FRACTION = 0.55
 
 #: Large because the audience is five and the *reader* is an adult holding the
@@ -79,8 +78,8 @@ def render_pdf(story: Story, path: Path, art: StoryArt | None = None) -> None:
         path: Where to write the PDF.
         art: Illustrations to place, if any. Optional and defaulted so the
             text-only behaviour stays reachable and tested unchanged -- a book
-            with no pictures is not an error state, it is the product Session 10
-            shipped. `None` and a `StoryArt` with no usable images behave
+            with no pictures is not an error state, it was the product before
+            illustration existed. `None` and a `StoryArt` with no usable images behave
             identically, deliberately: a fully failed illustration run must
             degrade to exactly the text-only book rather than to a third code
             path nobody tests.
@@ -155,11 +154,6 @@ def _draw_illustration(canvas: Canvas, image_path: Path | None) -> None:
         if source_width <= 0 or source_height <= 0:
             return
 
-        # Scaled to fit *inside* the frame and centred, never stretched to fill it.
-        # Grok returns 3:4 portrait images while this frame is wider than it is
-        # tall, so filling would distort every character in the book -- and a
-        # subtly stretched face is obvious to a reader while being invisible to a
-        # test that only asserts an image was placed.
         scale = min(frame_width / source_width, frame_height / source_height)
         width = source_width * scale
         height = source_height * scale

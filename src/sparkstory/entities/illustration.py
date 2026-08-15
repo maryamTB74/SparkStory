@@ -21,8 +21,9 @@ which defaults to ``None``, so a model can only ever add a verdict beside our
 facts and never overwrite ``status``, ``path`` or ``detail``. Keep that boundary:
 if a future judge wants to change what ``status`` says, it is doing our job.
 
-**Three field descriptions here exist to close a rule 13 trap.** Each was written
-by asking what the laziest thing that satisfies the field is:
+**Three field descriptions here exist to close the same trap**: an instruction
+gets satisfied by the laziest thing that technically meets it. Each was written by
+asking what that laziest answer would be:
 
 * ``appearance`` -- the lazy answer is "a majestic fox with soulful amber eyes":
   evaluative, unmatchable by a second artist. The description demands
@@ -38,8 +39,8 @@ by asking what the laziest thing that satisfies the field is:
 
 **Paths, not bytes.** ``StoryArt`` holds file paths. Base64 image data in a
 Pydantic model would reach ``story.json``, every log line and every run artifact
--- finding O already records the web ledger storing whole page snippets as
-something to truncate. A path is cheap and checkable.
+-- the web ledger already demonstrated the cost of storing whole payloads, filling
+a run directory with scraped page text. A path is cheap and checkable.
 """
 
 from enum import StrEnum
@@ -266,14 +267,14 @@ class ArtItem(BaseModel):
     consistency: ConsistencyVerdict | None = None
 
 
+# The point of this object is answering "was this book actually
+# reference-conditioned?" by reading a file rather than by looking at the pictures.
+# A degraded run is the reason: when the web search fell back to its unverified
+# path it produced entirely plausible output, and nothing in the artifact could
+# have flagged that the checking step never ran. An honest record has to be able
+# to say so.
 class StoryArt(BaseModel):
-    """Every image for one book, and an honest account of the run.
-
-    The point of this object is answering *"was this book actually
-    reference-conditioned?"* by reading a file rather than by looking at the
-    pictures. Finding N is why: the degraded web path produced plausible output
-    and nothing in it could have flagged the degradation.
-    """
+    """Every image for one book, and an honest account of the run."""
 
     style_bible: str
     portraits: list[ArtItem] = Field(default_factory=list)
@@ -320,7 +321,7 @@ class StoryArt(BaseModel):
         reporting "inconsistent" for a book nobody judged would be the same
         overclaim in the other direction. So this is True for a run with judging
         off, which is why it must be read alongside how many verdicts exist rather
-        than alone -- rule 24, a check that cannot fail proves nothing.
+        than alone: a check with no room to fail proves nothing.
         """
         judged = [i.consistency for i in self.portraits + self.pages if i.consistency]
         return all(v.matches for v in judged)

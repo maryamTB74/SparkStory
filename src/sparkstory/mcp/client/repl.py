@@ -8,11 +8,11 @@ Usage::
 
 **Deliberately thin.** Every branch worth testing lives in ``commands.py`` and
 ``session.py``; this module is an ``input()`` loop and some printing. That split
-is the lesson finding P records: ``scripts/write_one_story.py`` is untested by
-choice, and it died at a live run *after* the search had been paid for. An
-untestable surface should be as small as it can be, not as convenient.
+is what ``scripts/write_one_story.py`` taught: it is untested by choice, and it
+died at a live run *after* the search had been paid for. An untestable surface
+should be as small as it can be, not as convenient.
 
-**This writes to stdout, and that is correct.** Non-obvious rule 2 binds the
+**This writes to stdout, and that is correct.** The stdout ban binds the
 *server* -- under stdio transport its stdout carries JSON-RPC. A client is the
 other end of that pipe, and its terminal output is the whole point.
 """

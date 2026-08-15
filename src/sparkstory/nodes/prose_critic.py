@@ -6,8 +6,8 @@ outline sits a level above and this node is not judging structure -- that is the
 Outline Critic's job, one stage earlier. Fewer tokens, and a critic that cannot
 see an artifact cannot invent findings about it.
 
-**Why each page is rendered beside its own notes.** Session 2's book told the
-plan one page late: page 4's words were page 3's moment, all the way through.
+**Why each page is rendered beside its own notes.** An early book told the plan
+one page late: page 4's words were page 3's moment, all the way through.
 Nothing caught it, because ``validate_prose`` compares page *numbers* and those
 matched perfectly. Read as a continuous story the drift is invisible; read
 page-by-page against the notes it is obvious. The rendering is the check.

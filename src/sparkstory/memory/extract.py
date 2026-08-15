@@ -14,8 +14,8 @@ storing it would have a later book treat a passing mood as a permanent trait.
 outline would only re-read what the planner already wrote, and would miss the
 details the Writer invented -- which are often the memorable ones.
 
-**Rule 13 was asked of this prompt: what is the laziest thing that satisfies
-it?** Restating each ``CharacterSketch`` description verbatim. That would look
+**The laziest thing that would satisfy this prompt** is restating each
+``CharacterSketch`` description verbatim. That would look
 like success and store nothing the outline did not already have. The wording
 below asks for what is *permanently true* to push away from plot summary, and
 Task 9 step 3 checks the answer against exactly this failure -- because no test

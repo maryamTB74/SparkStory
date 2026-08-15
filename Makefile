@@ -21,7 +21,7 @@ QA_PATHS := src tests scripts alembic
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus test-vision score-books \
+        fix check test test-fast test-corpus test-vision test-video score-books \
         label-skeletons score-alignment migrate \
         migrate-down ingest \
         run ci-local clean
@@ -75,6 +75,10 @@ test-corpus: ## Run retrieval quality tests (needs a built index)
 
 test-vision: ## Judge the known drifts in committed runs (needs XAI_API_KEY)
 	$(PYTEST) -m vision || [ $$? -eq 5 ]
+
+
+test-video: ## Assemble video from committed run artifacts (needs ffmpeg, free)
+	$(PYTEST) -m video || [ $$? -eq 5 ]
 
 
 score-books: ## Score every past run on the computed metrics (free, no network)

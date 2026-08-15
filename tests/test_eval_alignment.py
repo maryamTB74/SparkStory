@@ -56,8 +56,8 @@ def test_one_page_differing_of_eight() -> None:
 def test_disagreements_are_reported_by_page_and_dimension() -> None:
     """A number localises a problem; the list is what makes it readable.
 
-    Finding X is the argument: a score does not settle a question, and the words
-    behind it have to be reachable.
+    A score does not settle a question, so the words behind it have to be
+    reachable.
     """
     result = agreement(_labels((1, 1, 0, 1)), _labels((1, 0, 0, 1)))
 
@@ -75,8 +75,9 @@ def test_missing_page_raises() -> None:
 def test_unlabelled_dimension_raises() -> None:
     """A null must not be scored as a match.
 
-    This is rule 24 inside the instrument itself: a comparison that cannot fail
-    in the direction it is most likely to be wrong proves nothing.
+    A check with no room to fail proves nothing, and that applies to the
+    instrument itself: a comparison that cannot fail in the direction it is most
+    likely to be wrong is worthless.
     """
     partial = BookLabels(
         book="b",

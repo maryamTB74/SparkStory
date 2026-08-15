@@ -97,9 +97,8 @@ class TestSystemPrompt:
         assert "recite" in lowered or "recited" in lowered
 
     def test_tells_it_to_search_before_deciding(self) -> None:
-        """Cheap insurance, following lesson 6's forced-tool-call and lesson 11's
-        "always search first": an agent that already knows about the Moon will
-        skip retrieval and cite nothing."""
+        """Cheap insurance: an agent that already knows about the Moon will skip
+        retrieval and cite nothing unless it is told to search first."""
         assert "search" in RESEARCHER_SYSTEM_PROMPT.lower()
 
     def test_forbids_inventing_an_identifier(self) -> None:
@@ -214,8 +213,7 @@ class TestResearcherNode:
     async def test_an_agent_error_propagates(self) -> None:
         """The *workflow* decides to fail open, not the node. Swallowing it here
         would hide a broken provider behind "no facts found", which is exactly the
-        failure that took 17 seconds to produce and an hour to understand in
-        Session 8."""
+        failure that took 17 seconds to produce and an hour to understand."""
         agent = StubAgent(RuntimeError("provider exploded"))
         with pytest.raises(RuntimeError, match="provider exploded"):
             await ResearcherNode(agent=agent, brief=a_brief()).ainvoke()
@@ -243,9 +241,9 @@ class TestWebSearchInstructions:
     def test_the_finding_i_guards_all_survive(self) -> None:
         """The prompt where under-grounding lived, checked rather than assumed.
 
-        Session 5's finding I was a prompt edit that stopped grounding entirely,
-        and Session 9's task 4 re-checked these for the same reason: this file is
-        one paragraph away from the wording that caused it.
+        A prompt edit here once stopped grounding entirely -- an "empty is fine"
+        instruction written to prevent invention, which returned zero facts on a
+        story about the Moon. This file is one paragraph away from that wording.
         """
         lowered = RESEARCHER_SYSTEM_PROMPT.lower()
         assert "empty" in lowered
@@ -255,10 +253,10 @@ class TestWebSearchInstructions:
 
 
 class TestModeDoesNotChangeWhatIsWorthKeeping:
-    """Finding S. The mode decides how a note is *written*, never whether a fact
-    is worth keeping.
+    """The mode decides how a note is *written*, never whether a fact is worth
+    keeping.
 
-    Task 4's wording said an imaginative story "is impossible on purpose" and
+    An earlier wording said an imaginative story "is impossible on purpose" and
     that a prohibition "is of no use here", which reads as *facts matter less*.
     Live result: the same eagle brief retrieved one fact under `realistic` and
     **zero** under `imaginative`, twice. The imaginative rendering then became

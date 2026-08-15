@@ -5,8 +5,8 @@ Offline throughout: the chat model is a `FakeModel` and the image provider is a
 
 The tests that matter most are the *failure* ones. Illustration is the only stage
 in this project that fails soft, so "a broken image leaves a blank frame and the
-book still renders" is a behaviour rather than an accident, and finding N is the
-worked example of why a degraded path nobody exercised is a path nobody can trust.
+book still renders" is a behaviour rather than an accident. A degraded path nobody
+exercised is a path nobody can trust.
 """
 
 from pathlib import Path
@@ -254,7 +254,7 @@ class TestConditioning:
         directed: None,
         tmp_path: Path,
     ) -> None:
-        """Finding U, from the first live run, and the reason this test exists.
+        """What the first live run cost, and the reason this test exists.
 
         A page prompt that only *names* its characters relies entirely on the
         reference image to carry identity. That held for the child and failed for the
@@ -270,8 +270,9 @@ class TestConditioning:
 
     # An undescribed character used to be tolerated here, on the reasoning that the
     # picture is still drawn. `validate_illustration_plan` now rejects it, and the
-    # validator is right: silently dropping the description is finding U's exact
-    # cause. The behaviour is asserted in TestValidatingThePlan instead. Two tests
+    # validator is right: silently dropping the description is exactly what left a
+    # character's identity to the reference image alone, and it drifted.
+    # The behaviour is asserted in TestValidatingThePlan instead. Two tests
     # asserting opposite things about one input is how a design decision gets lost.
 
     async def test_pages_are_bounded_by_the_providers_rate_limit(
@@ -281,7 +282,7 @@ class TestConditioning:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """Finding T: six concurrent requests hit `429 ... actual/limit 5/5`.
+        """Six concurrent requests hit `429 ... actual/limit 5/5` in a live run.
 
         A retry alone cannot fix an over-subscription -- it reproduces it. So the
         concurrency is bounded, and this asserts the bound rather than the symptom.
@@ -363,7 +364,7 @@ class TestValidatingThePlan:
             validate_illustration_plan(story, plan)
 
     def test_a_page_naming_an_undescribed_character_raises(self, story: Story) -> None:
-        """Finding U's failure mode as a structural error.
+        """Reference drift as a structural error rather than a silent one.
 
         A character with no appearance silently stops being described in its page
         prompt. When the *Director* caused that -- rather than a failed portrait --
@@ -442,8 +443,9 @@ class TestFailingSoft:
         directed: None,
         tmp_path: Path,
     ) -> None:
-        """Finding N's exact failure mode: the pictures still appear, but the
-        consistency mechanism did not run, and the artifact has to say so."""
+        """Output that looks complete while the mechanism did nothing: the
+        pictures still appear, but the consistency mechanism did not run, and the
+        artifact has to say so."""
         fake = FakeImageProvider(fail_on=("standing, facing forward",))
         monkeypatch.setattr(
             illustrate_module, "get_image_model", lambda _m: fake.as_model()
@@ -577,24 +579,24 @@ class TestRenderingArt:
 class TestRecordingConsistency:
     """The verdict field, and the contract it must not break.
 
-    Finding II is what these are for: every item in three live runs recorded
-    `conditioned` while a fox's paws changed colour between portrait and pages, so
-    the record had no way to say a picture missed its reference.
+    What these are for: every item in three live runs recorded `conditioned` while
+    a fox's paws changed colour between portrait and pages, so the record had no way
+    to say a picture missed its reference.
     """
 
     def test_a_verdict_is_optional_so_every_existing_item_is_unchanged(self) -> None:
         """The whole feature is additive or it is a migration.
 
         Built through `model_validate` rather than the constructor, because what is
-        under test is that an item *without* the field is still valid -- rule 31,
-        after a `model_copy(update=...)` fixture once passed before its field
-        existed.
+        under test is that an item *without* the field is still valid.
+        `model_copy(update=...)` skips validation, so a fixture built that way once
+        passed before its field existed.
         """
         item = ArtItem.model_validate({"key": "1", "status": "conditioned"})
         assert item.consistency is None
 
     def test_a_mismatch_does_not_change_fully_conditioned(self) -> None:
-        """Section 6a's contract, and the reason this is a field and not a status.
+        """The contract, and the reason this is a field and not a status.
 
         `fully_conditioned` is read by four call sites outside the entity, one of
         them a prompt telling a client to report it to the parent. It means "the
@@ -627,7 +629,7 @@ class TestRecordingConsistency:
     def test_an_unjudged_book_is_not_reported_inconsistent(self) -> None:
         """None means nobody looked, which is not the same as a mismatch.
 
-        Rule 24 is why this is asserted rather than assumed: with judging off every
+        Asserted rather than assumed: with judging off every
         verdict is None, and a property that returned False there would make a
         clean book indistinguishable from a broken one.
         """
@@ -641,7 +643,8 @@ class TestRecordingConsistency:
     def test_a_matching_verdict_needs_no_difference(self) -> None:
         """The empty string has to validate or the judge cannot report success.
 
-        Rule 14's shape: a reflexive `min_length=1` on `difference` would make
+        The stop signal has to stay reachable: a reflexive `min_length=1` on
+        `difference` would make
         "this picture is fine" unrepresentable, and the symptom would read as the
         judge never approving anything.
         """
@@ -651,7 +654,7 @@ class TestRecordingConsistency:
         assert verdict.attribute is None
 
     def test_colour_is_the_first_attribute_the_model_is_offered(self) -> None:
-        """Finding HH measured colour as the only attribute that ever drifts, and
+        """Live runs measured colour as the only attribute that ever drifts, and
         both spike verdicts returned it. Enum order reaches the model in the JSON
         schema, so it is prompt text and worth pinning."""
         assert list(ConsistencyAttribute)[0] is ConsistencyAttribute.COLOUR
@@ -716,7 +719,7 @@ class TestTheConsistencyGate:
         directed: None,
         tmp_path: Path,
     ) -> None:
-        """Rule 24: a gate that rejected everything would pass the test above while
+        """A gate that rejected everything would pass the test above while
         breaking the feature, so the approving case is asserted too."""
         art = await run_illustration_pipeline(brief, story, tmp_path)
 
@@ -732,8 +735,10 @@ class TestTheConsistencyGate:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """Finding II: the run must be able to say *why* it degraded, not only that
-        it did. The rejected portrait keeps its file and carries its verdict."""
+        """The run must be able to say *why* it degraded, not only that it did:
+        a status reporting that the mechanism ran has no room to report that it
+        did not work. The rejected portrait keeps its file and carries its
+        verdict."""
         monkeypatch.setattr(
             illustrate_module,
             "get_chat_model",

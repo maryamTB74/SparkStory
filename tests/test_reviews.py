@@ -1,4 +1,4 @@
-"""Session 4 schemas: the reshaped scene plan, and the review models.
+"""The reshaped scene plan, and the review models.
 
 These are Pydantic models bound with `with_structured_output`, so their
 docstrings and field descriptions are prompt text. The tests here guard both
@@ -223,7 +223,7 @@ class TestProseReviewEntities:
 
     def test_safety_is_addressable_in_code(self) -> None:
         """Fail-closed needs to single safety out of a mixed list, which is the
-        whole reason the rubric is an enum and not brown's free-text string."""
+        whole reason the rubric is an enum and not a free-text string."""
         mixed = [
             ProseReview(rubric=ProseRubric.READ_ALOUD, comment="This page drones."),
             ProseReview(rubric=ProseRubric.SAFETY, comment="A spider on page four."),
@@ -246,7 +246,7 @@ _VARIED = ["Maryam", "Softly", "Under", "The", "Up", "Pip", "Down", "Away", "In"
 
 class TestDeterministicProseReviews:
     def test_flags_repetitive_openings(self, page_plan: PagePlan) -> None:
-        """Session 2: six of eight pages opened with a character's name."""
+        """An early book opened six of its eight pages with a character's name."""
         reviews = deterministic_prose_reviews(_prose_opening_with(_DRONING), page_plan)
         assert [r.rubric for r in reviews] == [ProseRubric.READ_ALOUD]
 

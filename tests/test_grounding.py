@@ -53,8 +53,9 @@ class TestGroundedFact:
 
 class TestStoryGrounding:
     def test_finding_nothing_is_representable(self) -> None:
-        """Non-obvious rule 14, one level up from the review loops: the empty
-        answer must validate, or the agent is forced to invent one."""
+        """The same reachable-stop-signal argument the review loops need, one
+        level up: the empty answer must validate, or the agent is forced to
+        invent one."""
         assert StoryGrounding(facts=[]).facts == []
 
     def test_facts_defaults_to_empty(self) -> None:
@@ -62,8 +63,8 @@ class TestStoryGrounding:
         assert StoryGrounding().facts == []
 
     def test_caps_facts_at_three(self) -> None:
-        """The planner treats a budget as a target -- finding D, unchanged across
-        four live runs -- so the budget is small."""
+        """The planner treats a budget as a target rather than a maximum,
+        unchanged across four live runs -- so the budget is small."""
         facts = [a_fact(f"moon#{i}") for i in range(3)]
         assert len(StoryGrounding(facts=facts).facts) == 3
         with pytest.raises(ValidationError):
@@ -76,7 +77,7 @@ class TestOutlineCarriesGrounding:
     Before this, ``run_outline_pipeline`` returned a bare outline, so the grounding
     was computed, planned from, and dropped -- which is why the Writer had never
     seen a fact and why a craft device could only ever be *described* in a beat
-    summary (findings J and Q).
+    summary rather than used in the prose where it lives.
 
     Optional with a ``None`` default deliberately: ``MAX_RESEARCH_STEPS=0`` must
     stay a valid configuration, and an ungrounded run must be representable,
@@ -91,8 +92,8 @@ class TestOutlineCarriesGrounding:
 
         ``model_copy(update=...)`` skips validation and will happily set an
         attribute the model does not declare, so it passes whether or not the
-        field exists -- rule 24's trap (a check with no room to fail) inside a
-        test. Validation is what actually proves the field is declared.
+        field exists -- a check with no room to fail, inside a test. Validation
+        is what actually proves the field is declared.
         """
         payload = outline.model_dump()
         payload["grounding"] = StoryGrounding(facts=[a_fact()]).model_dump()

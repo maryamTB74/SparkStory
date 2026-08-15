@@ -96,17 +96,16 @@ def main() -> None:
     # write to it. FastMCP sends its banner to stderr, but stating the constraint
     # is cheaper than rediscovering it.
     if args.transport == "http":
-        # logger, never print(). The course's server.py prints its startup banner
-        # to stdout and *then* falls through to stdio in its else branch --
-        # non-obvious rule 2, which it survives only because stdio is its
-        # secondary path and ours is the default.
+        # logger, never print(): a startup banner written to stdout corrupts
+        # JSON-RPC the moment this process is launched over stdio instead, and
+        # stdio is the default path here.
         #
         # `run(transport="http", ...)` forwards host and port through
         # **transport_kwargs, so uvicorn is neither imported nor declared as a
-        # dependency. The course builds `mcp.http_app()` and calls uvicorn itself
-        # because it mounts Descope's OAuth discovery endpoints plus its own UI
-        # and download routes on the same app. SparkStory has none of those. If
-        # auth is ever added, this is the line that grows back.
+        # dependency. Building `mcp.http_app()` and calling uvicorn directly
+        # only pays off when extra routes -- OAuth discovery, a UI, downloads --
+        # are mounted on the same app. SparkStory has none of those. If auth is
+        # ever added, this is the line that grows back.
         logger.info(
             "Serving over HTTP on %s:%s", settings.server_host, settings.server_port
         )

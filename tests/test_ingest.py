@@ -173,8 +173,8 @@ class TestTheCommittedCorpus:
         assert all(chunk.licence for chunk in chunks)
 
     def test_no_chunk_is_too_long_to_be_one_idea(self) -> None:
-        """Lesson 9's "one logical unit per chunk". A chunk that has grown into
-        three facts retrieves for all three and grounds none of them well."""
+        """One logical unit per chunk. A chunk that has grown into three facts
+        retrieves for all three and grounds none of them well."""
         chunks = load_corpus(Path(__file__).resolve().parents[1] / "corpus")
         overlong = [c.chunk_id for c in chunks if len(c.text) > 400]
         assert not overlong, f"chunks too long: {overlong}"

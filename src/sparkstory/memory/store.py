@@ -49,8 +49,8 @@ class PgMemoryStore:
                 column. ``None`` on SQLite, which has no ``vector`` type.
 
         Raises:
-            ConfigurationError: no engine and no ``DATABASE_URL``. Rule 5 -- never
-                a bare ``ValueError``, because the tool layer translates this into
+            ConfigurationError: no engine and no ``DATABASE_URL``. Never a bare
+                ``ValueError``, because the tool layer translates this into
                 something an operator can act on.
         """
         if engine is None:

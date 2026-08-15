@@ -287,7 +287,7 @@ def _stub_research(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     ``get_chat_model`` would reach the real ``build_research_context`` -- loading
     embedding weights from disk and attempting a live provider call, then failing
     open so the test still *looked* fine. One such test took 25 seconds and quietly
-    broke the offline guarantee this suite has held since Session 1.
+    broke the offline guarantee this suite has held from the start.
 
     Patched once, reading a mutable holder, so ``fake_research`` can change the
     result without a second ``setattr`` whose ordering against this one would depend
@@ -414,7 +414,8 @@ class TestGroundingIsAttachedToTheReturnedOutline:
 
     It used to be computed, planned from, and dropped when the pipeline returned a
     bare outline -- so the Writer had never once seen a fact, and a craft device
-    could only ever be *described* in a beat summary (findings J and Q).
+    could only ever be *described* in a beat summary -- a planner told to repeat a
+    phrase wrote "they repeat the phrase" instead of repeating one.
 
     Attached to the outline rather than returned beside it, so the pair cannot come
     apart. ``world_rules`` lives on the brief, so a genre change re-runs retrieval
@@ -460,10 +461,10 @@ class TestGroundingIsAttachedToTheReturnedOutline:
         """Research ran and found nothing -- a correct and common answer for a
         premise with no factual spine.
 
-        Distinguishable from "research never ran", which matters because rule 27
-        says to check the fact count before comparing two runs: a run that
-        retrieved nothing renders identically in both world-rule modes, so a
-        comparison against it is vacuous. Findings M and S are both that mistake.
+        Distinguishable from "research never ran", which is why the fact count has
+        to be checked before comparing two runs: a run that retrieved nothing
+        renders identically in both world-rule modes, so a comparison against it is
+        vacuous. That mistake has been made twice on live runs.
         """
         outline_fakes()
         fake_research(StoryGrounding(facts=[]))
@@ -600,8 +601,8 @@ class TestMemoryReachesThePlanner:
     """Memory's read half: fetched before planning, rendered into the prompt.
 
     Patched at ``build_memory_store`` in this module -- the same seam shape as
-    ``build_research_context``, and for the same reason rule 25 gives: a test that
-    fakes only the model would reach a real database here.
+    ``build_research_context``, and for the same reason: a test that fakes only the
+    model would reach a real database here.
     """
 
     @staticmethod
@@ -704,7 +705,7 @@ class TestMemoryReachesThePlanner:
         brief: StoryBrief,
         outline: StoryOutline,
     ) -> None:
-        """Rule 24: the conflict path needs its negative direction asserted too,
+        """The conflict path needs its negative direction asserted too,
         or 'a conflict was reported' proves only that something was reported."""
         planned = outline.characters[0]
         monkeypatch.setattr(

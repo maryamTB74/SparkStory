@@ -29,9 +29,9 @@ from sparkstory.mcp.server import create_server
 
 #: How many times one ``send`` may go round the model-then-tools loop.
 #:
-#: A module constant rather than a setting, per Rule 3: nothing needs to vary it
-#: yet, and a flag cannot be meaningfully written before the thing it gates. The
-#: bound exists because a client that loops is a client that spends money --
+#: A module constant rather than a setting: nothing needs to vary it yet, and a
+#: flag cannot be meaningfully written before the thing it gates. The bound
+#: exists because a client that loops is a client that spends money --
 #: ``write_story`` is three to seven model calls per invocation, so an unbounded
 #: loop writes books until the key runs out.
 MAX_TOOL_TURNS = 6
@@ -50,7 +50,7 @@ INSPECT_ONLY = frozenset({"write_story", "illustrate_story"})
 #: The transports offered here, and the reason there are two. ``in-memory``
 #: shares a process with the server, which makes it fast and makes a stray
 #: ``print()`` in server startup invisible. ``stdio`` runs the server as a
-#: subprocess, and is therefore the only mode that can test non-obvious rule 2 --
+#: subprocess, and is therefore the only mode that can test the constraint that
 #: stdout carries JSON-RPC and nothing else may write to it.
 #:
 #: HTTP is deliberately absent, for the reason ``server.py`` already gives about
@@ -66,7 +66,7 @@ def _build_client(transport: str) -> Client:
 
     if transport == "stdio":
         # `_PROJECT_ROOT` is imported from config.py rather than recomputed.
-        # Non-obvious rule 6: that constant is depth-sensitive and a wrong
+        # That constant is depth-sensitive and a wrong
         # `parents[N]` raises nothing at all -- it silently resolves against the
         # wrong directory. A second copy here would be a second thing to get
         # wrong, and the failure would present as "the stdio server will not
@@ -139,9 +139,10 @@ class ClientSession:
         offline.
 
         Going through ``get_chat_model`` is not optional. A client constructing a
-        provider directly would bypass the registry, and rule 21 would fire on
-        the first ``.env`` that pins every stage to one provider -- which is
-        exactly what Maryam's does.
+        provider directly would bypass the registry, so it would keep reaching
+        for its own hardcoded provider on a deployment whose ``.env`` pins every
+        stage to a different one -- and fail with a missing-key error that names
+        a provider nobody configured.
         """
         from sparkstory.config import settings
         from sparkstory.models.get_model import get_chat_model
@@ -248,10 +249,11 @@ class ClientSession:
     def _record(self, call: ExecutedCall) -> None:
         """Put a tool's outcome back into history as a ``ToolMessage``.
 
-        **This is the line Q6 depends on.** The course client appends
+        **This is what keeps a returned outline byte-identical when the client
+        passes it back.** The obvious alternative -- appending
         ``f"Tool '{name}' executed successfully. Result: {result}"`` into a
-        ``role="user"`` text part, which turns a ``StoryOutline`` into prose the
-        model must retype -- reintroducing the "client rebuilds the outline from
+        ``role="user"`` text part -- turns a ``StoryOutline`` into prose the
+        model must retype, reintroducing the "client rebuilds the outline from
         its own summary" defect the whole design was changed to prevent, this
         time through our own client. JSON in a ``ToolMessage`` keeps it an object.
         """
@@ -286,15 +288,15 @@ class ClientSession:
             # result. Anything phrased as a *result* -- even "not executed" --
             # is something the model reasons onward from, and it will happily
             # announce a finished book it never received. The transcript would
-            # then read like a successful run, which is rule 24's shape: a mode
-            # that cannot visibly fail. Ending the turn is what makes the
+            # then read like a successful run -- a mode that cannot visibly
+            # fail. Ending the turn is what makes the
             # omission observable.
             withheld = [c for c in calls if self._is_withheld(c)]
             if withheld:
                 return TurnResult(text="", tool_calls=requested, executed=executed)
 
-            # Every call in the turn, not `calls[0]`. Session 5 measured the
-            # Researcher calling two to four tools in parallel in a single turn;
+            # Every call in the turn, not `calls[0]`. The Researcher has been
+            # observed calling two to four tools in parallel in a single turn;
             # taking only the first drops the rest silently, and the symptom
             # reads as a model problem rather than a client bug.
             for call in calls:
@@ -309,9 +311,8 @@ def as_openai_tools(tools: list[Any]) -> list[dict]:
     """Convert MCP tool definitions into the shape ``bind_tools`` accepts.
 
     Eleven lines, and the whole of what ``langchain-mcp-adapters`` would replace.
-    The course declares that dependency in ``mcp_client/pyproject.toml`` and
-    imports it nowhere, driving ``fastmcp.Client`` directly instead -- so
-    adopting it here would add a package to do what this function already does.
+    ``fastmcp.Client`` is driven directly instead, so adopting that package here
+    would add a dependency to do what this function already does.
     """
     return [
         {

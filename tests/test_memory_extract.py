@@ -91,9 +91,9 @@ def test_a_fact_keeps_its_subject_and_an_episode_has_none(
 def test_an_empty_extraction_is_legitimate(story: Story) -> None:
     """A book may establish nothing worth keeping, and that must not be an error.
 
-    The same reasoning as finding I, where "empty is fine" had to be a real
-    outcome rather than a failure -- except there the instruction caused
-    under-grounding, so the wording matters as much as the code path.
+    "Empty is fine" has to be a real outcome rather than a failure. Note the
+    wording matters as much as the code path: an "empty is fine" instruction
+    written to stop invention once stopped grounding entirely.
     """
     empty = ExtractedMemories(facts=[], episode="")
     assert _extractor(FakeModel(empty), story).to_records(empty) == []

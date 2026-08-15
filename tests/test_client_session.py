@@ -83,9 +83,8 @@ class TestCapabilities:
 
     async def test_it_reads_prompt_text_from_the_server(self) -> None:
         # Fetched rather than imported, which is what makes a prompt-obedience
-        # harness measure what a client is really handed. `try_prompt.py` has
-        # done this since Session 7 and it is the reason its results mean
-        # anything.
+        # harness measure what a client is really handed. `try_prompt.py` fetches
+        # it the same way, which is the reason its results mean anything.
         async with ClientSession() as session:
             text = await session.get_prompt("create_storybook")
 
@@ -144,17 +143,17 @@ def _outline_payload() -> dict[str, Any]:
 
 
 class TestOutlineRoundTrip:
-    """Q6, enforced at the client core.
+    """The approved outline must reach `write_story` byte-identical.
 
-    The course client appends tool results as
+    A tempting shortcut appends tool results as
     ``f"Tool '{name}' executed successfully. Result: {result}"`` inside a
-    ``role="user"`` text part. Do that here and a ``StoryOutline`` becomes prose
-    the model has to retype -- which is exactly the "client helpfully rebuilds
-    the outline from its own summary" failure Q6 exists to rule out, arriving
-    through our own client rather than a third party's.
+    ``role="user"`` text part. Do that and a ``StoryOutline`` becomes prose the
+    model has to retype -- which is exactly the "client helpfully rebuilds the
+    outline from its own summary" failure this rules out, arriving through our
+    own client rather than a third party's.
 
-    Session 8 retired that risk and Session 12 re-confirmed it byte-identical
-    with nested grounding present. These tests are what stop it coming back.
+    Live runs have confirmed the round trip byte-identical, nested grounding
+    included. These tests are what stop it coming back.
     """
 
     async def test_a_tool_result_re_enters_history_as_a_tool_message(
@@ -227,10 +226,10 @@ class TestToolLoop:
     async def test_it_executes_every_call_in_a_turn_not_just_the_first(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Session 5 measured the Researcher calling two to four tools *in
-        # parallel in a single turn*. The course client takes only the first
-        # (`extract_first_function_call`) and drops the rest silently -- and the
-        # symptom would read as a model problem rather than a client bug.
+        # The Researcher has been measured calling two to four tools *in parallel
+        # in a single turn*. A loop that takes only the first call drops the rest
+        # silently -- and the symptom would read as a model problem rather than a
+        # client bug.
         parallel = AIMessage(
             content="",
             tool_calls=[
@@ -281,10 +280,10 @@ class TestToolLoop:
 class TestInspectMode:
     """Which tools run by default, and which are only looked at.
 
-    `try_prompt.py` has inspected `write_story` rather than calling it since
-    Session 8, and its reasoning generalises: *its arguments answer the question,
-    and running it would buy a whole book to learn nothing more.* So inspect is
-    the default and `--execute` is the deliberate choice.
+    `try_prompt.py` inspects `write_story` rather than calling it, and its
+    reasoning generalises: *its arguments answer the question, and running it
+    would buy a whole book to learn nothing more.* So inspect is the default and
+    `--execute` is the deliberate choice.
     """
 
     async def test_plan_story_runs_by_default(
@@ -339,8 +338,8 @@ class TestInspectMode:
 
         If the "not executed" message reads like a *result*, the model reasons
         onward from it and invents a book -- and the transcript reads like a
-        successful run. That is non-obvious rule 24's shape: a mode that cannot
-        visibly fail. So the message is phrased as a halt, and the turn ends
+        successful run -- a mode that cannot visibly fail. So the message is
+        phrased as a halt, and the turn ends
         rather than looping.
         """
         model = FakeClientModel(

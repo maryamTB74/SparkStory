@@ -44,7 +44,8 @@ class TestConfigureFailsOpen:
     def test_a_blank_key_is_treated_as_missing(
         self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Rule 3 end to end: the validator normalises `OPIK_API_KEY=` to None,
+        """The blank-key path end to end: the validator normalises
+        `OPIK_API_KEY=` to None,
         and this is the half that proves configure() then does the right thing
         with it rather than authenticating with an empty string."""
         from sparkstory.config import Settings
@@ -63,7 +64,7 @@ class TestConfigureFailsOpen:
         monkeypatch: pytest.MonkeyPatch,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """The case brown guards, and the one that matters.
+        """The case that matters.
 
         An auth failure or an unreachable workspace must cost a trace, never a
         book. The error text is logged so the cause is recoverable.

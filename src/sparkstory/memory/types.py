@@ -2,9 +2,9 @@
 
 **Two tiers are built, not three.** ``PROCEDURAL`` is declared so adding it later
 is a row rather than a migration, and nothing writes or reads it. It was dropped
-because it would derive guidance from eval scorecards, and finding U measured the
-judge's noise floor at ~0.25 -- larger than the effects such a note would claim to
-detect. See the spec's *Procedural is dropped, deliberately*.
+because it would derive guidance from eval scorecards, and judging the same books
+twice at temperature 0 moved a dimension by up to 0.25 -- a noise floor larger
+than the effects such a note would claim to detect.
 """
 
 from datetime import UTC, datetime

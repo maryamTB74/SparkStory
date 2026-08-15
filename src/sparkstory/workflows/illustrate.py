@@ -1,7 +1,7 @@
 """Drawing a finished book: portraits first, then every page against them.
 
 A third `@entrypoint`, deliberately separate from `write_story` rather than a stage
-inside it. The reason is this project's own precedent: Session 8 split planning from
+inside it. The reason is this project's own precedent: planning was split from
 writing because one tool doing both meant a failure in either half destroyed the
 other half's work. Illustration has that property more sharply -- it is the most
 expensive and most failure-prone stage in the system, while prose is the part five
@@ -16,8 +16,7 @@ attributable. Under the coupled design every experiment re-rolls the prose.
 attempted before any page starts, because a page's references are portraits -- that
 is a genuine barrier, not a stylistic one. The pages are mutually independent, so
 they run concurrently under `asyncio.gather`; serial generation would make an 8-page
-book roughly 8x slower for nothing. This is lesson 05's parallel fan-out, which
-CLAUDE.md's course inventory already names as the shape for per-page illustration.
+book roughly 8x slower for nothing.
 
 **Illustration fails soft, and that is the point of the whole module.** A page whose
 image fails leaves that page's frame blank and the book still renders -- `render_pdf`
@@ -28,9 +27,9 @@ asked to exclude is in their child's book, while a missing picture on page 6 mea
 book with a missing picture.
 
 The exception is a **portrait** failure, which silently removes reference
-conditioning from every page that character appears on. That is finding N's failure
-mode -- output that looks fine while the mechanism did not run -- so it is logged as
-a warning and recorded in `StoryArt`, which is what lets a run answer "was this book
+conditioning from every page that character appears on. That is the dangerous
+failure mode -- output that looks fine while the mechanism did not run -- so it is
+logged as a warning and recorded in `StoryArt`, which lets a run answer "was this book
 actually reference-conditioned?" by reading a file.
 """
 
@@ -71,8 +70,9 @@ logger = get_logger(__name__)
 def _who_prefix(page: PageArt, appearances: dict[str, str]) -> str:
     """Restate what each character on this page looks like.
 
-    **Finding U is why this exists**, and it is the one thing the first live run
-    changed about the design. A page prompt names its characters without describing
+    **This exists because of what the first live run showed**, and it is the one
+    thing that run changed about the design. A page prompt names its characters
+    without describing
     them -- "Pip beside her on the sill" -- because the reference portrait is
     supposed to carry identity. That assumption is only half true. It held perfectly
     for a five-year-old girl across five pages, and failed for the fox beside her,
@@ -155,8 +155,8 @@ async def _draw_portrait(
         image = await model.generate(prompt)
     except ImageGenerationError as exc:
         # A warning, not an error, and never a raise. But it must be loud: every
-        # page this character appears on now loses its reference, which is exactly
-        # the silent degradation finding N is about.
+        # page this character appears on now loses its reference, and the book
+        # still looks fine while the conditioning it relied on never ran.
         logger.warning(
             "portrait for %r failed, pages with them will be unconditioned: %s",
             character.name,
@@ -294,7 +294,7 @@ async def _judge(
         )
         return await node.ainvoke()
     except Exception as exc:  # noqa: BLE001 -- a check may never break a book
-        # Loud, for finding N's reason: a check that silently stopped running
+        # Loud, for the usual reason: a check that silently stopped running
         # produces a book that looks judged and is not.
         logger.warning("could not judge %r, leaving it unjudged: %s", name, exc)
         return None
@@ -369,8 +369,8 @@ async def check_portraits(
 #:
 #: A bound rather than a retry alone. `RETRY_POLICY` already retries a 429, but N
 #: simultaneous requests against a 5/s ceiling collide again on every attempt --
-#: retrying an over-subscription reproduces it. Not a setting, per Rule 3: it
-#: describes the provider's limit, not a preference, and there is one provider.
+#: retrying an over-subscription reproduces it. Not a setting: it describes the
+#: provider's limit, not a preference, and there is one provider.
 _MAX_CONCURRENT_IMAGES = 4
 
 
@@ -415,11 +415,12 @@ async def check_pages(
 ) -> list[ArtItem]:
     """Stage 3b: does each page still show the character its portrait established?
 
-    **Report-only. Nothing is redrawn.** Deliberately, and the reason is rule 17: a
-    revision can be worse than what it replaced and the loop cannot tell. Prose
-    solves that with `draft_score`, and there is no equivalent for a picture --
-    "fewer findings from a judge whose noise floor is unmeasured" is exactly what
-    rule 29 warns against. So this measures first. Whether a redraw loop is worth
+    **Report-only. Nothing is redrawn.** Deliberately: a revision can be worse than
+    what it replaced and the loop cannot tell. Prose solves that with
+    `draft_score`, and there is no equivalent for a picture -- so a redraw loop
+    would be chasing "fewer findings from a judge whose noise floor is
+    unmeasured", which is not the same as a better book. So this measures first.
+    Whether a redraw loop is worth
     building is a decision to make once the false-positive rate is known, and the
     committed runs in `outputs/` are enough to measure it without generating
     anything.

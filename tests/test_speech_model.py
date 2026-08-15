@@ -87,8 +87,8 @@ def test_unknown_model_id_is_a_configuration_error() -> None:
 
 
 def test_missing_key_is_a_configuration_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Not retryable: the fix is one line in .env, and rule 10 records three
-    # tracebacks printed for exactly this shape of problem.
+    # Not retryable: the fix is one line in .env. Retrying it just prints a
+    # traceback per attempt for a problem no retry can solve.
     from sparkstory.config import settings
 
     monkeypatch.setattr(settings, "xai_api_key", None)
@@ -102,7 +102,8 @@ async def test_speak_sends_the_measured_request_shape(
     """The payload is asserted because every field in it was measured.
 
     No `model` key: the endpoint returns 200 without one. `language` is the
-    hardcoded "en" (Rule 3 -- the brief has no language field). `output_format`
+    hardcoded "en": the brief has no language field, and there is no point
+    adding configuration for a feature that does not exist. `output_format`
     is sent explicitly even though it is optional, so a provider changing its
     default cannot silently change what we write to disk.
     """

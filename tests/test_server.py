@@ -22,9 +22,9 @@ class TestToolRegistration:
 class TestExpensiveToolsCanBeWithheld:
     """Registration gates for the two tools that generate media.
 
-    Not Rule 3's forbidden shape. Rule 3 removed `IMAGE_GENERATION_ENABLED` and
-    `AUDIO_GENERATION_ENABLED` in Session 1 for gating features that did not
-    exist; both of these are built and live-verified. The driver is a deployed
+    Not a flag for a feature that does not exist. `IMAGE_GENERATION_ENABLED` and
+    `AUDIO_GENERATION_ENABLED` were removed early for gating nothing; both of
+    these tools are built and live-verified. The driver is a deployed
     server where a client must not be *able* to spend money on images, and a
     reduced tool surface for a served instance.
 
@@ -303,11 +303,11 @@ class TestTransportSelection:
     def test_default_transport_is_stdio(self) -> None:
         """The regression with the widest blast radius.
 
-        ``uv run sparkstory`` with no arguments is how ``.mcp.json.sample``, the
-        assignment's client config and ``make run`` all launch this. The course
-        defaults to http, so "align with the course" is a plausible future edit --
-        and its symptom would be every existing client hanging rather than an
-        error. This test makes that edit fail loudly instead.
+        ``uv run sparkstory`` with no arguments is how ``.mcp.json.sample``, every
+        client config and ``make run`` all launch this. Switching the default to
+        http is a plausible future edit, and its symptom would be every existing
+        client hanging rather than an error. This test makes that edit fail loudly
+        instead.
         """
         assert _build_parser().parse_args([]).transport == "stdio"
 
@@ -375,15 +375,14 @@ class TestTransportSelection:
 
 
 class TestStdoutStaysSilent:
-    """Non-obvious rule 2, as an executable check rather than a comment.
+    """Nothing may write to stdout, as an executable check rather than a comment.
 
     Under stdio transport stdout carries JSON-RPC, so a single stray ``print``
     corrupts the protocol into a JSON parse error that looks nothing like its
-    cause. This is not hypothetical: the course's own ``research_agent_part_3``
-    prints its startup banner to stdout and *then* falls through to
-    ``mcp.run(transport="stdio")`` in its else branch. It gets away with it
-    because http is its default; ours is stdio, so the same code would break
-    ``make run``.
+    cause. This is not hypothetical: it is easy to print a startup banner to
+    stdout and *then* fall through to ``mcp.run(transport="stdio")``. A server
+    defaulting to http gets away with that; ours defaults to stdio, so the same
+    code would break ``make run``.
     """
 
     def test_starting_on_stdio_writes_nothing_to_stdout(

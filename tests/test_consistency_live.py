@@ -1,25 +1,24 @@
 """The acceptance run: does the judge see what a person sees?
 
 **This is a gate, not an extra.** Every other test of this feature uses a fake and
-therefore proves plumbing, not perception. A `vision`-marked suite nobody runs is
-finding M's failure mode -- the check is *unfalsified rather than proven* -- so the
-judge may not be described as working until this has passed.
+therefore proves plumbing, not perception. A `vision`-marked suite nobody runs
+leaves the check *unfalsified rather than proven*, so the judge may not be
+described as working until this has passed.
 
 Marked `vision` and excluded from `make test` and `ci-local`, in the shape `corpus`
 already takes: it needs a key and a network. Run it with `make test-vision`.
 
 **Why these inputs.** They are images already committed in `outputs/`, from three
 runs made before this feature existed, whose defects were found by a person reading
-JPEGs and are recorded as finding HH. So the expectations here were written from the
-pictures rather than from what the code does -- which is the only reason a passing
-run means anything.
+JPEGs. So the expectations here were written from the pictures rather than from what
+the code does -- which is the only reason a passing run means anything.
 
 Two honest limits, both worth stating in the file rather than in a review nobody
 re-reads:
 
 * The expectations are **one person's labels**, written in the same session that
-  designed the rubric. That is not lesson 30's alignment score, which needs
-  independent labels from someone who did not write the prompt.
+  designed the rubric. That is not an alignment score, which needs independent
+  labels from someone who did not write the prompt.
 * A pass here is a pass on *four* known drifts. It says nothing about the rate of
   false positives across a whole book, which is why the Maryam case below is the
   most important test in the file.
@@ -95,7 +94,7 @@ class TestCheckAFindsAWrongPortrait:
         """The acceptance question of the whole feature, in one call.
 
         The Director wrote "small black ant" and the portrait came back green, and
-        every page then copied the green. This is also the rule 13 trap made
+        every page then copied the green. It also makes the lazy-answer trap
         concrete: the contradicting description is handed to the model, so a judge
         that restates its input rather than looking reports a match and fails here.
         """
@@ -112,7 +111,7 @@ class TestCheckAFindsAWrongPortrait:
         )
 
     async def test_a_correct_portrait_is_left_alone(self) -> None:
-        """Rule 24: without this, a judge that rejected every portrait would pass
+        """Without this, a judge that rejected every portrait would pass
         the test above and destroy every book by dropping all its references."""
         portrait = _FOX / "portrait-Maryam.jpg"
         _requires(portrait)
@@ -149,8 +148,8 @@ class TestCheckBFindsPageDrift:
         """Page 6's fox is inside a rocket, occupying roughly 4% of the frame.
 
         **This test asserts the opposite of what it was written to assert, and the
-        reversal is the finding.** Finding HH recorded page 6 as a `PROP` drift
-        (silver charm to gold) from a smaller view of the image. Looking at the full
+        reversal is the finding.** A hand label recorded page 6 as a prop drift
+        (silver charm to gold), read off a thumbnail. Looking at the full
         JPEG after the judge disagreed: the charm is a gold star in the portrait
         *too*, and the only candidate difference is the collar band, which is a few
         pixels at this scale. The label was wrong, not the verdict.
@@ -199,7 +198,7 @@ class TestTheJudgeDoesNotFlagEverything:
 
 
 class TestTheJudgeIsRepeatable:
-    """Rule 29, measured rather than assumed.
+    """Repeatability measured rather than assumed.
 
     `temperature 0.0` did not make the prose judge repeatable -- the same five books
     judged twice moved by up to 0.25 on `delight`, which is two pages of an

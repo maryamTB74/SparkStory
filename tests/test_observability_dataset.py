@@ -15,7 +15,8 @@ class TestUploadRefusesLoudly:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A flag that appears to work and uploads nothing is the failure this
-        project has recorded twice (finding M, rule 24). Raise instead.
+        project has recorded twice: a check that never rejects anything is
+        unfalsified rather than proven. Raise instead.
 
         The message names the setting, so the fix does not need a code read.
         """

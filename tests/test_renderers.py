@@ -3,8 +3,8 @@
 Structural assertions only. Extracting text back out of the PDF would need a
 second dependency and would mostly test reportlab; what these can prove is that
 a file was produced, that it is a PDF, and that it has one page per story page
-plus a title page. Whether it *looks* like a book is a Rule 4 question and is
-answered by opening it -- see the spec's Verification section.
+plus a title page. Whether it *looks* like a book cannot be reasoned about and
+is answered only by opening the file.
 """
 
 from pathlib import Path

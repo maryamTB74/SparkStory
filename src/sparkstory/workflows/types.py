@@ -6,6 +6,8 @@ so anything it needs travels in a single typed mapping.
 
 from typing import TypedDict
 
+from sparkstory.entities.illustration import StoryArt
+from sparkstory.entities.narration import StoryNarration
 from sparkstory.entities.stories import Story, StoryBrief, StoryOutline
 
 
@@ -61,6 +63,34 @@ class NarrationWorkflowInput(TypedDict):
     request_id: str
     brief: StoryBrief
     story: Story
+    directory: str
+
+
+class VideoWorkflowInput(TypedDict):
+    """What ``video_workflow`` is invoked with.
+
+    Three finished artifacts and nothing new to make. ``story`` supplies page
+    order and count, ``art`` supplies the picture per page, ``narration`` supplies
+    the length -- and none of the three is modified, for the reason illustration
+    and narration are each their own entrypoint: a failure here must not damage
+    work that already succeeded.
+
+    **There is no ``brief``, unlike every other input in this module.** Nothing
+    about the child changes the video. The picture, the words and the voice were
+    all decided upstream; this stage only measures them and assembles what it is
+    given. Passing a brief would put a child's name into a stage that has no use
+    for it.
+
+    ``directory`` is a ``str`` rather than a ``Path`` for the reason
+    :class:`IllustrationWorkflowInput` records: a workflow input has to survive a
+    checkpointer, and a ``Path`` works against an in-memory saver while failing
+    against SQLite.
+    """
+
+    request_id: str
+    story: Story
+    art: StoryArt
+    narration: StoryNarration
     directory: str
 
 

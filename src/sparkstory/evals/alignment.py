@@ -1,7 +1,6 @@
 """How often two labellers say the same thing about the same book.
 
-Lesson 30's alignment score, which the course states as a LaTeX formula in a
-markdown cell and never implements::
+How often the judge and a human give the same verdict::
 
     agreement = sum(human == judge) / n
 
@@ -9,10 +8,10 @@ Per dimension, compared **per page**. Book-level agreement would compare two
 averages, and two means can match while every page disagrees -- an error on one
 page cancelling an opposite error on another.
 
-Raw agreement, following the course, **plus chance-corrected agreement, which the
-design argued against and the first real measurement immediately needed.** The
-argument was that kappa adds a second number needing its own interpretation. That
-is true and it is outweighed: the first run scored raw agreement 0.475 on
+Raw agreement, **plus chance-corrected agreement, which the design argued against
+and the first real measurement immediately needed.** The argument was that kappa
+adds a second number needing its own interpretation. That is true and it is
+outweighed: the first run scored raw agreement 0.475 on
 ``delight``, which reads as *partial agreement* and is in fact **worse than
 chance** — two labellers with those base rates agree 0.507 of the time by luck
 alone. A raw number cannot distinguish "they half agree" from "they do not agree
@@ -26,8 +25,7 @@ are independent of the judge and not of the rubric they approved, so a judge
 scoring 100% here is a well-calibrated judge of whatever the rubric asks.
 Closing that gap needs a labeller who did not approve it.
 
-Nothing here gates anything. Lesson 30's own judge scored 62.5% and the lesson
-proceeded; a low number is a result, not a failure.
+Nothing here gates anything. A low number is a result, not a failure.
 """
 
 from pydantic import BaseModel, Field

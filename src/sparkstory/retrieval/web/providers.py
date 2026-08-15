@@ -1,28 +1,26 @@
 """Searching the web, behind one seam.
 
-Follows the course's ``web_search_handler.py`` in *shape*: one ``search_web``
-normalising whatever a provider returns into ``list[WebResult]``. There is one
-provider today, and the seam still earns its place -- adding a second should be
-one function and one settings value, which is the argument ``get_chat_model`` won
-in Session 1 and ``get_embedder`` won again in Session 5.
+One ``search_web`` normalising whatever a provider returns into
+``list[WebResult]``. There is one provider today, and the seam still earns its
+place -- adding a second should be one function and one settings value, the same
+argument that put ``get_chat_model`` and ``get_embedder`` behind single factories.
 
 **The URL that comes out of here is asserted by the model, not observed.**
 Perplexity reads the web and writes a synthesised answer; the per-source URL
-arrives in a structured-output field the model filled in. The course accepts that
-and stops there (``perplexity_handler.py`` parses no citation metadata -- it
-prompts the model to segment its own answer by source). This project cannot,
-because it already found the same defect once: in the Session 5 spike the model
-filled ``source`` with a chunk id, and a plausible fabrication would have survived
-any check that only looked for *a* source. So a ``WebResult`` is ``verified=False``
-by construction and stays that way until ``verify`` has fetched the page.
+arrives in a structured-output field the model filled in. There is no citation
+metadata to parse -- the model is prompted to segment its own answer by source.
+That cannot be trusted here, because this project already found the same defect
+once: an early spike had the model fill ``source`` with a chunk id, and a
+plausible fabrication would have survived any check that only looked for *a*
+source. So a ``WebResult`` is ``verified=False`` by construction and stays that
+way until ``verify`` has fetched the page.
 
 **Tavily was considered and dropped.** Its URLs come structurally from the search
 API's response rather than from a model, which would make fabrication impossible
 rather than merely detectable. But the fetch catches a fabrication anyway, so
 Tavily bought cheapness -- skipping the fetch -- not safety, and the fetch is
-being paid for regardless. Perplexity is also the course's own default (lesson
-18), so keeping only it is the smaller deviation. The dispatch shape below is
-what makes adding Tavily later cheap if that trade ever changes.
+being paid for regardless. The dispatch shape below is what makes adding Tavily
+later cheap if that trade ever changes.
 """
 
 from collections.abc import Awaitable, Callable
@@ -77,10 +75,9 @@ class WebResult(BaseModel):
 
 
 # Instructs the model to attribute each passage to exactly one page, which is
-# what makes per-source URLs possible at all. Taken from the course's
-# PROMPT_WEB_SEARCH, whose "never use multiple source citations in the same
-# source section" is the load-bearing line: a merged answer cannot be checked
-# against any single page, so it could never be verified afterwards.
+# what makes per-source URLs possible at all. The one-source-per-section rule is
+# the load-bearing line: a merged answer cannot be checked against any single
+# page, so it could never be verified afterwards.
 WEB_SEARCH_PROMPT = """\
 Question: {query}
 
@@ -122,9 +119,9 @@ async def search_web(
     **An empty primary result does not trigger the fallback**, and that is a
     deliberate refusal rather than an omission. Most premises have nothing to
     look up, the Researcher's prompt says so explicitly, and retrying "nothing
-    found" on a second provider is pressure to invent -- the same lever whose
-    other direction produced finding I, where an instruction meant to stop
-    invention stopped grounding entirely. Only an *unusable* provider falls
+    found" on a second provider is pressure to invent. That lever has already
+    been pulled too far in the other direction once, when an instruction meant to
+    stop invention stopped grounding entirely. Only an *unusable* provider falls
     through.
 
     A malformed row costs that row rather than the run, following the split this
@@ -179,9 +176,9 @@ def _tavily_provider() -> WebSearchProvider | None:
     the behaviour must be exactly what it was before the fallback existed, so an
     absent fallback cannot become a new failure mode of its own.
 
-    Follows the course's ``tavily_handler.py``. The important difference from
-    Perplexity is structural rather than stylistic -- ``result["url"]`` comes out
-    of the API's own response, so it is not something a model could invent.
+    The important difference from Perplexity is structural rather than stylistic
+    -- ``result["url"]`` comes out of the API's own response, so it is not
+    something a model could invent.
     """
     if settings.api_key_for("TAVILY_API_KEY") is None:
         return None
@@ -235,12 +232,13 @@ def _perplexity_provider() -> WebSearchProvider:
 
         api_key = settings.api_key_for("PERPLEXITY_API_KEY")
         if not api_key:
-            # ConfigurationError rather than a new ProviderError, decided
-            # consciously per Rule 3. `_retry_on` already excludes this class, so
-            # a missing key fails once instead of printing three tracebacks --
-            # the exact defect non-obvious rule 10 records. A *transient* network
-            # failure is a different thing and should retry, which it does:
-            # `default_retry_on` returns True for the client's own exceptions.
+            # ConfigurationError rather than a new ProviderError: an exception
+            # class arrives when something raises it, not in advance. `_retry_on`
+            # already excludes this class, so a missing key fails once instead of
+            # being retried and printing three tracebacks for a problem whose fix
+            # is one line in `.env`. A *transient* network failure is a different
+            # thing and should retry, which it does: `default_retry_on` returns
+            # True for the client's own exceptions.
             raise ConfigurationError(
                 "PERPLEXITY_API_KEY is not set, but MAX_WEB_SEARCHES is above 0. "
                 "Set the key or set MAX_WEB_SEARCHES=0 to disable web search."

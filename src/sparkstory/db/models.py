@@ -15,9 +15,9 @@ exists precisely so that swapping models stays configuration.
 Both are queryable at the same time, so "is the hosted embedder actually better?"
 is a direct A/B over the same corpus and the same 20 labelled queries. Under a
 single migrated column, adding a hosted embedder would change dimensions, storage
-and ranking at once, and a movement in hit-rate would be unattributable -- which
-is finding L's failure exactly: Session 5 attributed an effect to grounding and
-Session 9 showed the attribution was wrong.
+and ranking at once, and a movement in hit-rate would be unattributable. This
+project has already made that mistake once elsewhere, attributing an effect to a
+change that later runs showed was not the cause.
 
 **What this module honestly does not buy.** SQLAlchemy cannot express a pgvector
 column: ``postgresql.base.ischema_names`` contains ``tsvector`` but not
@@ -51,8 +51,8 @@ class Vector(UserDefinedType):
 
     SQLAlchemy has no built-in for it and the ``pgvector`` Python package is not a
     dependency: it supplies adapters we do not need, because a vector goes in as a
-    string literal (``str(v.tolist())``) and comes back only as an ordering. Rule
-    3 -- not a dependency until something needs it.
+    string literal (``str(v.tolist())``) and comes back only as an ordering. Not a
+    dependency until something needs it.
     """
 
     cache_ok = True
@@ -106,8 +106,8 @@ def chunks_table(
         Column("chunk_id", String, primary_key=True),
         Column("text", Text, nullable=False),
         Column("title", Text, nullable=False),
-        # Context-enriched, per lesson 9: "It has no air" embeds poorly alone and
-        # well as "The Moon: It has no air". Deliberately distinct from `text`,
+        # Context-enriched: "It has no air" embeds poorly alone and well as
+        # "The Moon: It has no air". Deliberately distinct from `text`,
         # which is what the agent is shown.
         Column("embed_text", Text, nullable=False),
         # Authoritative attribution. Never model-written -- the store overwrites

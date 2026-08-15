@@ -1,0 +1,16 @@
+{
+  "name": "seed-garden",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.75,
+    "question_ending_ratio": 0.875,
+    "words_per_page": 18.75,
+    "words_per_sentence": 4.838709677419355,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": null,
+  "judge_error": null,
+  "judged_pages": null
+}

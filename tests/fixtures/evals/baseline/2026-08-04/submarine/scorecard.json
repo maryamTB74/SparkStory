@@ -1,0 +1,16 @@
+{
+  "name": "submarine",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.625,
+    "question_ending_ratio": 0.125,
+    "words_per_page": 25.5,
+    "words_per_sentence": 10.736842105263158,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": null,
+  "judge_error": null,
+  "judged_pages": null
+}

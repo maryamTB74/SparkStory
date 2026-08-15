@@ -1,0 +1,71 @@
+{
+  "book": "teddy-bear",
+  "labeller": "maryam",
+  "pass_number": 1,
+  "pages": [
+    {
+      "page_number": 1,
+      "_text": "Sam holds Ted close.\nThey sit together.\nHome is quiet around them.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 2,
+      "_text": "The train starts moving.\nTed slips from the bag.\nSam reaches in and stops.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 3,
+      "_text": "Sam stands on the platform.\nHe waits by the track.\nTed climbs onto the next train.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 4,
+      "_text": "Ted rides along.\nA tall green tree passes by.\nTed watches it go.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 5,
+      "_text": "The tall green tree stays in sight.\nA shiny blue river appears.\nTed keeps watching.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 6,
+      "_text": "The tall green tree.\nThe shiny blue river.\nA round yellow sun joins them.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 7,
+      "_text": "Ted sees the station.\nThe train stops.\nSam picks him up.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 8,
+      "_text": "Sam hugs Ted tight.\nThey sit together again.\nHome waits for them.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    }
+  ]
+}

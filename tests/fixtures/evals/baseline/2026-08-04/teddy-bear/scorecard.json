@@ -1,0 +1,16 @@
+{
+  "name": "teddy-bear",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.375,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 13.375,
+    "words_per_sentence": 4.458333333333333,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": null,
+  "judge_error": null,
+  "judged_pages": null
+}

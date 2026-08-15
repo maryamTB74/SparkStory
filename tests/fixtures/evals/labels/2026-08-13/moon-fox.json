@@ -1,0 +1,71 @@
+{
+  "book": "moon-fox",
+  "labeller": "maryam",
+  "pass_number": 1,
+  "pages": [
+    {
+      "page_number": 1,
+      "_text": "Stars begin to shine. Maryam watches the fox step into the garden and lift its nose to the same moon.",
+      "delight": 1,
+      "showing": 1,
+      "momentum": 1,
+      "note": ""
+    },
+    {
+      "page_number": 2,
+      "_text": "Paper can carry the fox there. She steps back from the glass and reaches for the first sheet.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 3,
+      "_text": "Out in the garden she gathers the paper alone. The fox sits close and watches the sheets.",
+      "delight": 1,
+      "showing": 1,
+      "momentum": 1,
+      "note": ""
+    },
+    {
+      "page_number": 4,
+      "_text": "Fold by fold the paper holds its shape in her hands. The fox sits very still and watches.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 5,
+      "_text": "She gives the rocket a gentle push. It rises with the fox and she watches her idea fly.",
+      "delight": 0,
+      "showing": 0,
+      "momentum": 0,
+      "note": ""
+    },
+    {
+      "page_number": 6,
+      "_text": "The rocket settles on the moon. Maryam sees the fox step out under the quiet sky.",
+      "delight": 1,
+      "showing": 1,
+      "momentum": 1,
+      "note": ""
+    },
+    {
+      "page_number": 7,
+      "_text": "Maryam pictures the fox standing there now. Stars shine above the rocket the way she hoped.",
+      "delight": 1,
+      "showing": 1,
+      "momentum": 1,
+      "note": ""
+    },
+    {
+      "page_number": 8,
+      "_text": "Down comes the rocket again. Maryam watches the fox step out and the stars hold every wish in place.",
+      "delight": 1,
+      "showing": 1,
+      "momentum": 1,
+      "note": ""
+    }
+  ]
+}

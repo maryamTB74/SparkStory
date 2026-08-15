@@ -1,0 +1,175 @@
+{
+  "name": "moon-fox",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 1.0,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 17.75,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null,
+    "words_per_sentence": 8.875
+  },
+  "judged": {
+    "delight": 0.75,
+    "showing": 0.875,
+    "momentum": 0.75,
+    "reasons": {
+      "delight": [
+        "p1: The image of the fox lifting its nose to the same moon creates a quiet, repeatable visual moment.",
+        "p2: Paper can carry the fox there has a surprising, memorable line worth repeating.",
+        "p3: The fox sitting close and watching the sheets adds a gentle, repeatable image.",
+        "p4: Fold by fold creates a rhythmic phrase that invites repetition.",
+        "p5: Her idea fly offers a surprising, light phrase worth repeating.",
+        "p6: The page simply reports the rocket\u2019s arrival and the fox stepping out.",
+        "p7: The page reports what Maryam pictures without rhythmic or surprising language.",
+        "p8: Stars hold every wish in place offers a poetic, memorable closing image."
+      ],
+      "showing": [
+        "p1: Maryam\u2019s watching and the fox\u2019s action convey quiet connection without naming any feeling.",
+        "p2: Stepping back and reaching for the sheet shows her idea through action.",
+        "p3: Gathering alone while the fox watches conveys companionship through action.",
+        "p4: The fox sitting very still shows focused attention through posture.",
+        "p5: The gentle push and watching the rocket rise show her feeling through action.",
+        "p6: Maryam seeing the fox under the quiet sky conveys wonder through the image.",
+        "p7: The phrase the way she hoped names the feeling outright.",
+        "p8: Maryam watching the fox step out again conveys quiet satisfaction through action."
+      ],
+      "momentum": [
+        "p1: The shared gaze at the moon opens the possibility of what happens next.",
+        "p2: Reaching for the first sheet begins the making process.",
+        "p3: Gathering the paper leaves the folding still to come.",
+        "p4: The shape forming in her hands leaves the finished object open.",
+        "p5: The rocket rising with the fox leaves its destination unresolved.",
+        "p6: The scene of arrival closes on itself without opening further action.",
+        "p7: The completed picture of stars and rocket closes the thought.",
+        "p8: The final image of stars holding every wish closes the book satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null,
+  "judged_pages": {
+    "pages": [
+      {
+        "page_number": 1,
+        "delight": {
+          "score": 1,
+          "reason": "The image of the fox lifting its nose to the same moon creates a quiet, repeatable visual moment."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Maryam\u2019s watching and the fox\u2019s action convey quiet connection without naming any feeling."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The shared gaze at the moon opens the possibility of what happens next."
+        }
+      },
+      {
+        "page_number": 2,
+        "delight": {
+          "score": 1,
+          "reason": "Paper can carry the fox there has a surprising, memorable line worth repeating."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Stepping back and reaching for the sheet shows her idea through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Reaching for the first sheet begins the making process."
+        }
+      },
+      {
+        "page_number": 3,
+        "delight": {
+          "score": 1,
+          "reason": "The fox sitting close and watching the sheets adds a gentle, repeatable image."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Gathering alone while the fox watches conveys companionship through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Gathering the paper leaves the folding still to come."
+        }
+      },
+      {
+        "page_number": 4,
+        "delight": {
+          "score": 1,
+          "reason": "Fold by fold creates a rhythmic phrase that invites repetition."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "The fox sitting very still shows focused attention through posture."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The shape forming in her hands leaves the finished object open."
+        }
+      },
+      {
+        "page_number": 5,
+        "delight": {
+          "score": 1,
+          "reason": "Her idea fly offers a surprising, light phrase worth repeating."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "The gentle push and watching the rocket rise show her feeling through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The rocket rising with the fox leaves its destination unresolved."
+        }
+      },
+      {
+        "page_number": 6,
+        "delight": {
+          "score": 0,
+          "reason": "The page simply reports the rocket\u2019s arrival and the fox stepping out."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Maryam seeing the fox under the quiet sky conveys wonder through the image."
+        },
+        "momentum": {
+          "score": 0,
+          "reason": "The scene of arrival closes on itself without opening further action."
+        }
+      },
+      {
+        "page_number": 7,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports what Maryam pictures without rhythmic or surprising language."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "The phrase the way she hoped names the feeling outright."
+        },
+        "momentum": {
+          "score": 0,
+          "reason": "The completed picture of stars and rocket closes the thought."
+        }
+      },
+      {
+        "page_number": 8,
+        "delight": {
+          "score": 1,
+          "reason": "Stars hold every wish in place offers a poetic, memorable closing image."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Maryam watching the fox step out again conveys quiet satisfaction through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The final image of stars holding every wish closes the book satisfyingly."
+        }
+      }
+    ]
+  }
+}

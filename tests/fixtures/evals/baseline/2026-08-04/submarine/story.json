@@ -1,0 +1,196 @@
+{
+  "outline": {
+    "title": "Ada's Tub Sub",
+    "logline": "Ada wants to find out how a submarine sinks and rises, so she turns her bathtub into an ocean lab and discovers the answer herself.",
+    "theme": "figuring things out by trying an experiment",
+    "characters": [
+      {
+        "name": "Ada",
+        "role": "main character",
+        "description": "A six-year-old who loves submarines and oceans and wants to know exactly how they sink and rise."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Ada and her toy sub",
+        "summary": "Ada floats her toy submarine in a bucket of water and watches it bob, wishing she knew how real subs move up and down in the deep ocean.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "The question appears",
+        "summary": "Ada decides she must solve the sinking-and-rising mystery right now and wonders where she can test ideas without needing a real ocean.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "The first try fails",
+        "summary": "She pushes the toy under water with her hand, but it just pops up again and she cannot make it stay down or come up on its own.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "midpoint",
+        "title": "Bathtub plan",
+        "summary": "Ada carries her toy to the big bathtub, fills it with water, and decides to run a real experiment there instead of guessing.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "climax",
+        "title": "The tub experiment",
+        "summary": "Ada fills a small bottle with water, seals it inside a zip bag for ballast, and watches the toy sub sink when the bag is full and rise when she lets air in.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "resolution",
+        "title": "Ada knows",
+        "summary": "Ada smiles as the toy moves exactly as she planned and feels the answer settle in her mind without anyone else telling her.",
+        "characters_present": [
+          "Ada"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "bucket of water",
+        "visual_action": "Ada floats toy sub in bucket, watches it bob on surface",
+        "emotional_shift": "wonders how real subs sink and rise",
+        "page_turn_hook": "how to find out without a real ocean",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "bucket area",
+        "visual_action": "Ada stares at floating sub then looks up with determined face",
+        "emotional_shift": "decides to solve the mystery immediately",
+        "page_turn_hook": "where can she test ideas",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 3,
+        "setting": "bucket of water",
+        "visual_action": "Ada pushes toy under water by hand, toy pops back up",
+        "emotional_shift": "frustrated that it will not stay down or rise on its own",
+        "page_turn_hook": "what place lets her run a real test",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 4,
+        "setting": "hallway toward bathroom",
+        "visual_action": "Ada carries toy sub toward bathtub",
+        "emotional_shift": "realizes the big tub can be her test tank",
+        "page_turn_hook": "will the tub work for an experiment",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 4,
+        "setting": "bathtub",
+        "visual_action": "Ada fills bathtub with water and sets toy beside it",
+        "emotional_shift": "ready to try a controlled experiment instead of guessing",
+        "page_turn_hook": "what can serve as ballast to make the sub sink and rise",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 5,
+        "setting": "bathtub",
+        "visual_action": "Ada fills small bottle with water and seals it inside zip bag",
+        "emotional_shift": "thinks this ballast weight might control depth",
+        "page_turn_hook": "will the weighted sub stay down",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 5,
+        "setting": "bathtub",
+        "visual_action": "toy sub sinks with full bag then rises when air enters bag",
+        "emotional_shift": "excited to see the sub move exactly as planned",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 6,
+        "setting": "bathtub",
+        "visual_action": "Ada smiles at the working toy sub floating in the tub",
+        "emotional_shift": "understands how subs sink and rise on her own",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Ada"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Ada set the little submarine on the water in the bucket. It rocked gently on top and stayed there. How could a real one ever go down deep and then come back?"
+    },
+    {
+      "page_number": 2,
+      "text": "She leaned closer. Then she stood tall. There had to be a place to test what a submarine really does."
+    },
+    {
+      "page_number": 3,
+      "text": "She pressed it under with one finger. The moment she stopped, it shot right back up again. Nothing stayed where she wanted it."
+    },
+    {
+      "page_number": 4,
+      "text": "The bucket could not hold a proper test. Ada lifted the submarine and walked toward the bathroom door, sure the tub would serve as her ocean tank."
+    },
+    {
+      "page_number": 5,
+      "text": "Water splashed into the big tub. Ada placed the submarine on the rim and thought about what could make it sink on purpose and rise again."
+    },
+    {
+      "page_number": 6,
+      "text": "She filled a small bottle, sealed it tight in a bag, and clipped the bag to the submarine. That extra weight might pull it where she needed."
+    },
+    {
+      "page_number": 7,
+      "text": "Down went the submarine with the full bag! When air reached the bag it bobbed straight up again and Ada cheered at the sight."
+    },
+    {
+      "page_number": 8,
+      "text": "Ada watched the submarine move exactly as she had planned inside the tub. Her eyes widened at the rise and fall she had made happen."
+    }
+  ]
+}

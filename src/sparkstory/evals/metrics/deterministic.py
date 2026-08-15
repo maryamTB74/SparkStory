@@ -59,6 +59,35 @@ def words_per_page(story: Story) -> float:
     return sum(len(_words(page.text)) for page in story.pages) / len(story.pages)
 
 
+def words_per_sentence(story: Story) -> float:
+    """Mean words per sentence across the book.
+
+    Added in Session 17 because it is the metric a human turned out to be using.
+    Asked what was wrong with the baseline books, Maryam said *"the sentences are
+    too short and seem not meaningful"* -- and her `delight` labels correlate
+    **+0.735** with this number across the five books, where the LLM judge's
+    correlate **+0.095**. So a free arithmetic count tracks a reader's judgement
+    better than the model does (finding OO).
+
+    Separate from `words_per_page`, which cannot see the difference: `seed-garden`
+    and `eagle-planet` are 18.8 and 18.5 words per page, and 4.8 against 6.2 words
+    per sentence. The page budget was being spent on more, shorter sentences.
+
+    Sentences are split on `.`, `?` and `!` rather than on line breaks. The Writer
+    puts one sentence per line on most pages, so counting lines would usually agree
+    -- and be silently wrong on the pages where it does not.
+    """
+    pieces = [
+        piece
+        for page in story.pages
+        for piece in re.split(r"[.?!]+", page.text)
+        if piece.strip()
+    ]
+    if not pieces:
+        return 0.0
+    return sum(len(_words(piece)) for piece in pieces) / len(pieces)
+
+
 def beats_per_page(story: Story) -> float:
     """Beats per page. Below 1 leaves the plot planner room to pace a beat."""
     return len(story.outline.beats) / len(story.pages)
@@ -140,6 +169,7 @@ def deterministic_scores(story: Story, notes: list[str]) -> DeterministicScores:
         distinct_opener_ratio=distinct_opener_ratio(story),
         question_ending_ratio=question_ending_ratio(story),
         words_per_page=words_per_page(story),
+        words_per_sentence=words_per_sentence(story),
         beats_per_page=beats_per_page(story),
         fact_recital_beats=fact_recital_beats(story, notes),
         fact_recital_prose=fact_recital_prose(story, notes),

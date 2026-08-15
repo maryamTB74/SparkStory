@@ -83,6 +83,10 @@ class DeterministicScores(BaseModel):
     distinct_opener_ratio: float
     question_ending_ratio: float
     words_per_page: float
+    # Kept alongside words_per_page, which cannot see what this sees: two books can
+    # spend the same page budget on few long sentences or many short ones, and only
+    # the second reads as a list of declaratives. Finding OO.
+    words_per_sentence: float
     beats_per_page: float
     # Absolute word counts, not runs normalised by note length. Measured against
     # two real runs, normalising scores a genuine recital (6 shared words out of a
@@ -127,3 +131,13 @@ class BookScorecard(BaseModel):
     judged: JudgedScores | None = None
     #: Why `judged` is absent, so a null is never silent.
     judge_error: str | None = None
+    # The raw verdicts, kept alongside their average rather than instead of it.
+    # Measuring a judge against a human label is a per-page comparison, and two
+    # book-level means can agree while every page disagrees -- an error on one page
+    # cancelling an opposite error on another. Averaging first destroyed exactly the
+    # data the alignment score needs, which is why the 2026-08-04 baseline can only
+    # ever be compared average-to-average.
+    #
+    # `None` whenever `judged` is None, so the two halves of a judge's answer are
+    # present or absent together.
+    judged_pages: BookScores | None = None

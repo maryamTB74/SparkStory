@@ -1,0 +1,196 @@
+{
+  "outline": {
+    "title": "Seed in the Soil",
+    "logline": "Noor plants a seed and tends the spot each day by patting the soil soft until a green shoot appears.",
+    "theme": "steady care makes a seed grow",
+    "characters": [
+      {
+        "name": "Noor",
+        "role": "main character",
+        "description": "A four-year-old who plants one seed in the garden and tends the spot with daily care."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Seed in the soil",
+        "summary": "Noor presses a seed into the garden bed and steps back. The same short phrase 'Seed in the soil' appears here and will return changed at the end.",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "Water each day",
+        "summary": "Noor waters the spot every morning and says the repeating line 'Water the seed' while they work.",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "Pat the soil",
+        "summary": "Noor pats the soil soft each day after watering and repeats 'Pat the soil soft' so water and air can reach the seed.",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "midpoint",
+        "title": "Worm paths",
+        "summary": "Noor keeps patting and notices the soft lines worms have left in the dirt around the seed.",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "climax",
+        "title": "Green appears",
+        "summary": "After many days Noor pats the soil soft again and a small green shoot pushes up through the loosened earth.",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "resolution",
+        "title": "Shoot in the soil",
+        "summary": "Noor smiles at the shoot their care helped reveal and the book ends on the same short phrase now altered to 'Shoot in the soil'.",
+        "characters_present": [
+          "Noor"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "garden bed",
+        "visual_action": "Noor presses one seed down into loose soil, steps back",
+        "emotional_shift": "hopeful start, seed placed",
+        "page_turn_hook": "What happens next",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "garden bed",
+        "visual_action": "Noor tips watering can over the same spot",
+        "emotional_shift": "steady, ready to care",
+        "page_turn_hook": "Will water reach the seed",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 2,
+        "setting": "garden bed",
+        "visual_action": "Noor pours water again the next morning",
+        "emotional_shift": "repeat feels calm and sure",
+        "page_turn_hook": "What comes after water",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 3,
+        "setting": "garden bed",
+        "visual_action": "Noor pats soil gently with both hands",
+        "emotional_shift": "gentle, making room",
+        "page_turn_hook": "Does the pat help",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 3,
+        "setting": "garden bed",
+        "visual_action": "Noor pats the same spot soft again",
+        "emotional_shift": "patient, keeps the rhythm",
+        "page_turn_hook": "What will the soil show",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 4,
+        "setting": "garden bed",
+        "visual_action": "Noor sees thin worm lines near the seed while patting",
+        "emotional_shift": "notices quiet help in the dirt",
+        "page_turn_hook": "What will push through",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 5,
+        "setting": "garden bed",
+        "visual_action": "small green shoot rises through patted soil",
+        "emotional_shift": "quiet surprise, care worked",
+        "page_turn_hook": "What is now in the soil",
+        "characters_present": [
+          "Noor"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 6,
+        "setting": "garden bed",
+        "visual_action": "Noor smiles at the green shoot",
+        "emotional_shift": "warm, steady care complete",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Noor"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Noor sets the seed in the bed. Down it sinks. Soil settles around it. What comes after that?"
+    },
+    {
+      "page_number": 2,
+      "text": "Water runs over the spot. The can tips low. Again it flows. Does it reach the seed?"
+    },
+    {
+      "page_number": 3,
+      "text": "Morning comes. Noor tips the can once more. Water soaks in. What follows the water?"
+    },
+    {
+      "page_number": 4,
+      "text": "Noor presses both hands down. The soil shifts under them. Press and lift. Does the press change anything?"
+    },
+    {
+      "page_number": 5,
+      "text": "Noor presses the same place again. Hands move in the same way. Press and lift. What will the soil show?"
+    },
+    {
+      "page_number": 6,
+      "text": "Thin lines mark the soil near the seed. Noor follows one with a finger. Press and lift. What will push through next?"
+    },
+    {
+      "page_number": 7,
+      "text": "A thin green tip lifts the soil. It rises where the hands pressed. Noor watches it move. What stands in the garden now?"
+    },
+    {
+      "page_number": 8,
+      "text": "The green tip stands where pressed. Noor rests a hand beside it. The garden holds it steady."
+    }
+  ]
+}

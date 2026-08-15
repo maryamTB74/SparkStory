@@ -1,0 +1,221 @@
+{
+  "outline": {
+    "title": "Ada and the Eagle's Big Swim",
+    "logline": "Ada wants to help the eagle live in the ocean and runs bathtub tests until she finds the secret that lets the eagle's third try work.",
+    "theme": "testing ideas until you find what works",
+    "characters": [
+      {
+        "name": "Ada",
+        "role": "main character",
+        "description": "A six-year-old who loves oceans and submarines and wants to help the eagle make the water his home by testing what it needs."
+      },
+      {
+        "name": "Eagle",
+        "role": "adventurous visitor",
+        "description": "A bird who spots the ocean and decides to make it his new home."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Ada at the tub",
+        "summary": "Ada fills her bathtub and sends a small submarine under the bubbles. She hears an eagle call from the window and sees him land on the shore.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "New planet below",
+        "summary": "The eagle tells himself the water is a new planet he will live on. He takes a deep breath and dives for the first time.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "First try",
+        "summary": "The eagle kicks and flaps but meets nothing to push against. He pops up and tries again the same way while Ada watches.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "rising_action",
+        "title": "Second try",
+        "summary": "The eagle dives once more, flaps hard, and meets the same empty push. Ada decides she must test what the ocean planet needs so she can help.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "midpoint",
+        "title": "Bathtub test",
+        "summary": "Ada puts a jar over a toy submarine in the tub so a pocket of air stays inside. She sees the air lets the toy rise and move.",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "climax",
+        "title": "Ada brings the air",
+        "summary": "Ada fills a jar with air from her test, carries it to the shore, and sets it in the water near the eagle so a pocket forms.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "position": 7,
+        "function": "resolution",
+        "title": "Third try works",
+        "summary": "The eagle dives a third time, reaches the air Ada placed, and uses it to push with his wings. He stays and calls that the ocean planet works after all while Ada watches from the edge.",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "Ada's bathroom",
+        "visual_action": "submarine under bubbles in tub, eagle landing on shore through window",
+        "emotional_shift": "notices eagle, grows curious",
+        "page_turn_hook": "what will the eagle do next?",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "ocean shore",
+        "visual_action": "eagle takes breath and dives into water",
+        "emotional_shift": "feels brave about new home",
+        "page_turn_hook": "can he stay under?",
+        "characters_present": [
+          "Eagle"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 3,
+        "setting": "ocean surface",
+        "visual_action": "eagle kicks and flaps but finds no push, pops up",
+        "emotional_shift": "feels frustrated, tries again",
+        "page_turn_hook": "why does nothing work?",
+        "characters_present": [
+          "Eagle",
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 4,
+        "setting": "ocean surface",
+        "visual_action": "eagle dives and flaps again with same empty push",
+        "emotional_shift": "decides she must test what works",
+        "page_turn_hook": "how can Ada help the ocean planet?",
+        "characters_present": [
+          "Eagle",
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 5,
+        "setting": "Ada's bathroom",
+        "visual_action": "jar over toy sub holds air pocket in tub water",
+        "emotional_shift": "sees air lets it rise and move",
+        "page_turn_hook": "can she bring air to the eagle?",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 6,
+        "setting": "path from house to shore",
+        "visual_action": "Ada carries filled jar toward water",
+        "emotional_shift": "feels hopeful to share the test",
+        "page_turn_hook": "will the jar reach the eagle in time?",
+        "characters_present": [
+          "Ada"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 6,
+        "setting": "ocean edge",
+        "visual_action": "jar placed in water forms air pocket near eagle",
+        "emotional_shift": "waits to see if it helps",
+        "page_turn_hook": "will the third try work?",
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 7,
+        "setting": "ocean edge",
+        "visual_action": "eagle uses air pocket to push with wings and stays",
+        "emotional_shift": "feels glad the ocean planet works",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Ada",
+          "Eagle"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Bubbles rise over the submarine in the tub. Through the window an eagle lands. Ada notices and draws nearer."
+    },
+    {
+      "page_number": 2,
+      "text": "A deep breath fills him. The ocean waits as his home. He dives straight down."
+    },
+    {
+      "page_number": 3,
+      "text": "Kicks and flaps bring no forward push. He pops up to the surface. The eagle beats his wings harder."
+    },
+    {
+      "page_number": 4,
+      "text": "The eagle tries the same dive again. Still the water gives no help. Ada wonders what might change it."
+    },
+    {
+      "page_number": 5,
+      "text": "At home Ada sets a jar over the toy sub. Air stays trapped in the water. She watches it rise and slide."
+    },
+    {
+      "page_number": 6,
+      "text": "Ada carries the jar along the path. The air pocket stays inside. Closer and closer it travels."
+    },
+    {
+      "page_number": 7,
+      "text": "The jar touches the waves. A pocket of air opens near the eagle. Ada waits to see what follows."
+    },
+    {
+      "page_number": 8,
+      "text": "Wings reach the air pocket. He pushes and holds his place. The sea works for him at last."
+    }
+  ]
+}

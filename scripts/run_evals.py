@@ -49,6 +49,7 @@ _DET_COLUMNS = (
     ("openers", "distinct_opener_ratio", "{:.3f}"),
     ("q_end", "question_ending_ratio", "{:.3f}"),
     ("words/pg", "words_per_page", "{:.1f}"),
+    ("w/sent", "words_per_sentence", "{:.1f}"),
     ("beats/pg", "beats_per_page", "{:.3f}"),
     ("recite_b", "fact_recital_beats", "{}"),
     ("recite_p", "fact_recital_prose", "{}"),

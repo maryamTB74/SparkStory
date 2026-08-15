@@ -1,0 +1,175 @@
+{
+  "name": "teddy-bear",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.375,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 13.375,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null,
+    "words_per_sentence": 4.458333333333333
+  },
+  "judged": {
+    "delight": 0.125,
+    "showing": 0.5,
+    "momentum": 0.75,
+    "reasons": {
+      "delight": [
+        "p1: The page reports a quiet scene without rhythm, surprise, or a repeatable line.",
+        "p2: The page reports actions without sound or visual surprise to enjoy.",
+        "p3: The page reports actions without rhythm or surprise.",
+        "p4: The page reports watching without a line or image to repeat.",
+        "p5: The page reports scenery without rhythm or surprise.",
+        "p6: The listing of colors with the sun joining creates a rhythmic, visual surprise.",
+        "p7: The page reports actions without a repeatable line or surprise.",
+        "p8: The page reports the ending without rhythm or surprise."
+      ],
+      "showing": [
+        "p1: Closeness is shown through holding and sitting together rather than named.",
+        "p2: Sam reaching in and stopping conveys sudden realization through action.",
+        "p3: Actions are listed without conveying a clear feeling.",
+        "p4: Watching is described without showing an underlying feeling.",
+        "p5: Watching is stated without conveying feeling through action.",
+        "p6: The page describes scenery without conveying feeling.",
+        "p7: Sam picking Ted up shows reunion through action.",
+        "p8: The tight hug shows affection through action."
+      ],
+      "momentum": [
+        "p1: The page closes on the settled home scene.",
+        "p2: Ted slipping leaves what happens next open.",
+        "p3: Ted climbing onto the train leaves the outcome open.",
+        "p4: The page closes on the tree passing.",
+        "p5: The river appearing leaves the scene open.",
+        "p6: The sun joining leaves the view open.",
+        "p7: Being picked up leaves what follows open.",
+        "p8: The return home closes the book satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null,
+  "judged_pages": {
+    "pages": [
+      {
+        "page_number": 1,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports a quiet scene without rhythm, surprise, or a repeatable line."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Closeness is shown through holding and sitting together rather than named."
+        },
+        "momentum": {
+          "score": 0,
+          "reason": "The page closes on the settled home scene."
+        }
+      },
+      {
+        "page_number": 2,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports actions without sound or visual surprise to enjoy."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Sam reaching in and stopping conveys sudden realization through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Ted slipping leaves what happens next open."
+        }
+      },
+      {
+        "page_number": 3,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports actions without rhythm or surprise."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "Actions are listed without conveying a clear feeling."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Ted climbing onto the train leaves the outcome open."
+        }
+      },
+      {
+        "page_number": 4,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports watching without a line or image to repeat."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "Watching is described without showing an underlying feeling."
+        },
+        "momentum": {
+          "score": 0,
+          "reason": "The page closes on the tree passing."
+        }
+      },
+      {
+        "page_number": 5,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports scenery without rhythm or surprise."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "Watching is stated without conveying feeling through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The river appearing leaves the scene open."
+        }
+      },
+      {
+        "page_number": 6,
+        "delight": {
+          "score": 1,
+          "reason": "The listing of colors with the sun joining creates a rhythmic, visual surprise."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "The page describes scenery without conveying feeling."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The sun joining leaves the view open."
+        }
+      },
+      {
+        "page_number": 7,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports actions without a repeatable line or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Sam picking Ted up shows reunion through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Being picked up leaves what follows open."
+        }
+      },
+      {
+        "page_number": 8,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports the ending without rhythm or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "The tight hug shows affection through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The return home closes the book satisfyingly."
+        }
+      }
+    ]
+  }
+}

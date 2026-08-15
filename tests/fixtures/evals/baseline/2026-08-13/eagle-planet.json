@@ -1,0 +1,175 @@
+{
+  "name": "eagle-planet",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.875,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 18.5,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null,
+    "words_per_sentence": 6.166666666666667
+  },
+  "judged": {
+    "delight": 0.5,
+    "showing": 0.875,
+    "momentum": 1.0,
+    "reasons": {
+      "delight": [
+        "p1: The page only reports observations without rhythm, surprise, or a repeatable line.",
+        "p2: The line 'The ocean waits as his home' offers a poetic image worth repeating.",
+        "p3: The page simply reports the failed attempts without sound play or surprise.",
+        "p4: The text reports events without rhythm or memorable phrasing.",
+        "p5: Watching air rise and slide creates a vivid visual to enjoy.",
+        "p6: Closer and closer it travels supplies a rhythmic phrase.",
+        "p7: The page reports the action without added sound or surprise.",
+        "p8: The sea works for him at last offers a satisfying closing phrase."
+      ],
+      "showing": [
+        "p1: Ada drawing nearer shows curiosity through action rather than naming the feeling.",
+        "p2: Diving straight down conveys eagerness through action.",
+        "p3: Beating wings harder shows effort through repeated action.",
+        "p4: Ada wonders names her thought directly.",
+        "p5: Setting the jar and watching conveys curiosity through experiment.",
+        "p6: Carrying the jar shows purpose through action.",
+        "p7: Ada waiting shows anticipation through posture and stillness.",
+        "p8: Pushing and holding his place shows success through action."
+      ],
+      "momentum": [
+        "p1: The eagle landing and Ada noticing opens a new situation.",
+        "p2: The dive begins an action whose outcome remains unknown.",
+        "p3: The ongoing struggle leaves the next attempt open.",
+        "p4: Ada's question sets up an experiment to follow.",
+        "p5: The trapped air begins a new discovery.",
+        "p6: The air pocket travels toward an implied destination.",
+        "p7: The opened air pocket leaves the eagle's response unknown.",
+        "p8: The eagle's success closes the story satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null,
+  "judged_pages": {
+    "pages": [
+      {
+        "page_number": 1,
+        "delight": {
+          "score": 0,
+          "reason": "The page only reports observations without rhythm, surprise, or a repeatable line."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Ada drawing nearer shows curiosity through action rather than naming the feeling."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The eagle landing and Ada noticing opens a new situation."
+        }
+      },
+      {
+        "page_number": 2,
+        "delight": {
+          "score": 1,
+          "reason": "The line 'The ocean waits as his home' offers a poetic image worth repeating."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Diving straight down conveys eagerness through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The dive begins an action whose outcome remains unknown."
+        }
+      },
+      {
+        "page_number": 3,
+        "delight": {
+          "score": 0,
+          "reason": "The page simply reports the failed attempts without sound play or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Beating wings harder shows effort through repeated action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The ongoing struggle leaves the next attempt open."
+        }
+      },
+      {
+        "page_number": 4,
+        "delight": {
+          "score": 0,
+          "reason": "The text reports events without rhythm or memorable phrasing."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "Ada wonders names her thought directly."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Ada's question sets up an experiment to follow."
+        }
+      },
+      {
+        "page_number": 5,
+        "delight": {
+          "score": 1,
+          "reason": "Watching air rise and slide creates a vivid visual to enjoy."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Setting the jar and watching conveys curiosity through experiment."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The trapped air begins a new discovery."
+        }
+      },
+      {
+        "page_number": 6,
+        "delight": {
+          "score": 1,
+          "reason": "Closer and closer it travels supplies a rhythmic phrase."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Carrying the jar shows purpose through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The air pocket travels toward an implied destination."
+        }
+      },
+      {
+        "page_number": 7,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports the action without added sound or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Ada waiting shows anticipation through posture and stillness."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The opened air pocket leaves the eagle's response unknown."
+        }
+      },
+      {
+        "page_number": 8,
+        "delight": {
+          "score": 1,
+          "reason": "The sea works for him at last offers a satisfying closing phrase."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Pushing and holding his place shows success through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The eagle's success closes the story satisfyingly."
+        }
+      }
+    ]
+  }
+}

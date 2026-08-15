@@ -43,6 +43,60 @@ async def test_score_book_with_a_judge_reports_both_halves(
     assert card.judged.delight == 1.0
 
 
+async def test_scorecard_keeps_per_page_judge_verdicts(
+    book_factory: Callable[..., Story],
+) -> None:
+    """The raw verdicts survive, not only their average.
+
+    Alignment against a human label is a per-page comparison, so a scorecard that
+    keeps only the mean has thrown away the thing being validated -- and two
+    book-level means can agree while every page disagrees, one page's error
+    cancelling an opposite error on another.
+    """
+    story = book_factory(FOUR_PAGES)
+    mixed = BookScores(
+        pages=[
+            PageScore(
+                page_number=number,
+                delight=CriterionScore(score=number % 2, reason="r"),
+                showing=CriterionScore(score=1, reason="r"),
+                momentum=CriterionScore(score=0, reason="r"),
+            )
+            for number in range(1, 5)
+        ]
+    )
+    card = await score_book(
+        story, name="b", notes=[], judge=BookJudge(FakeModel(mixed), story=story)
+    )
+
+    assert card.judged_pages is not None
+    assert [page.page_number for page in card.judged_pages.pages] == [1, 2, 3, 4]
+    assert card.judged_pages.pages[0].delight.score == 1
+    assert card.judged_pages.pages[1].delight.score == 0
+    # The average keeps its existing meaning.
+    assert card.judged is not None
+    assert card.judged.delight == 0.5
+
+
+async def test_judge_failure_leaves_per_page_verdicts_absent(
+    book_factory: Callable[..., Story],
+) -> None:
+    """A judge that scored the wrong pages records nothing at all.
+
+    `judged` and `judged_pages` are present or absent together: a scorecard must
+    never carry verdicts that failed the coverage check, since those are exactly
+    the ones an alignment run would compare against the wrong denominator.
+    """
+    story = book_factory(FOUR_PAGES)
+    judge = BookJudge(FakeModel(BookScores(pages=[_page(1)])), story=story)
+    card = await score_book(story, name="b", notes=[], judge=judge)
+
+    assert card.judged is None
+    assert card.judged_pages is None
+    assert card.judge_error is not None
+    assert card.deterministic.words_per_page == 2.75
+
+
 async def test_judge_failure_keeps_the_computed_numbers(
     book_factory: Callable[..., Story],
 ) -> None:

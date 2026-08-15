@@ -1,0 +1,213 @@
+{
+  "outline": {
+    "title": "Maryam and the Moon Fox",
+    "logline": "Maryam sees a fox who longs for the moon and folds a paper rocket so she can send her new friend there.",
+    "theme": "turning a wish into flight with your own hands",
+    "characters": [
+      {
+        "name": "Maryam",
+        "role": "main character",
+        "description": "A five-year-old who loves the night sky and wants to send a fox all the way to the moon."
+      },
+      {
+        "name": "Fox",
+        "role": "friend with a wish",
+        "description": "A quiet fox who steps out under the dark sky and dreams of standing on the moon."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Night sky watch",
+        "summary": "Maryam sits by her window as the sky turns dark and stars appear. She sees a fox step out and look up at the moon.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "Maryam's idea",
+        "summary": "Maryam wants to help the fox reach the moon. She decides she will make a rocket from paper.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "Finding paper",
+        "summary": "Maryam and the fox gather big sheets of paper under the stars. She knows she will build the rocket herself.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "midpoint",
+        "title": "Folding the rocket",
+        "summary": "Maryam folds and tapes the paper rocket together fast with firm flaps. The fox watches the careful work under the quiet sky.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "climax",
+        "title": "Rocket ride",
+        "summary": "Maryam gives the rocket a gentle push and the fox rides it upward. The rocket lands softly on the moon with no flutter or sound.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "resolution",
+        "title": "Moonlight return",
+        "summary": "The fox stands on the moon, then rides the paper rocket back down. Maryam meets the fox again under the same stars after sending it on its trip.",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "bedroom window at dusk",
+        "visual_action": "Maryam at window, stars emerging, fox steps out and gazes upward at moon",
+        "emotional_shift": "notices fox sharing her sky-watching",
+        "page_turn_hook": "what will Maryam do about the fox",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "bedroom window",
+        "visual_action": "Maryam leans forward with sudden bright idea, fox still below",
+        "emotional_shift": "decides to help fox reach moon herself",
+        "page_turn_hook": "how will she make it happen",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 3,
+        "setting": "starlit garden",
+        "visual_action": "Maryam and fox collect large paper sheets together",
+        "emotional_shift": "knows she must build the rocket with her own hands",
+        "page_turn_hook": "what will the finished rocket look like",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 4,
+        "setting": "starlit garden",
+        "visual_action": "Maryam folds and tapes paper into rocket shape, fox watches closely",
+        "emotional_shift": "feels the rocket taking solid form",
+        "page_turn_hook": "will the rocket really fly",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 5,
+        "setting": "starlit garden",
+        "visual_action": "Maryam gives gentle push, rocket lifts fox upward",
+        "emotional_shift": "watches her wish become real flight",
+        "page_turn_hook": "where will the rocket land",
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 5,
+        "setting": "moon surface",
+        "visual_action": "paper rocket settles softly on moon, fox inside",
+        "emotional_shift": "knows the long journey has ended safely",
+        "page_turn_hook": "what will the fox do now",
+        "characters_present": [
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 6,
+        "setting": "moon surface",
+        "visual_action": "fox stands alone on moon under stars, rocket nearby",
+        "emotional_shift": "feels quiet wonder at standing on the moon",
+        "page_turn_hook": "how will the fox get back",
+        "characters_present": [
+          "Fox"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 6,
+        "setting": "starlit garden",
+        "visual_action": "fox returns on rocket, Maryam greets it again under same stars",
+        "emotional_shift": "feels the circle complete, wish fulfilled",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Maryam",
+          "Fox"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Stars begin to shine. Maryam watches the fox step into the garden and lift its nose to the same moon."
+    },
+    {
+      "page_number": 2,
+      "text": "Paper can carry the fox there. She steps back from the glass and reaches for the first sheet."
+    },
+    {
+      "page_number": 3,
+      "text": "Out in the garden she gathers the paper alone. The fox sits close and watches the sheets."
+    },
+    {
+      "page_number": 4,
+      "text": "Fold by fold the paper holds its shape in her hands. The fox sits very still and watches."
+    },
+    {
+      "page_number": 5,
+      "text": "She gives the rocket a gentle push. It rises with the fox and she watches her idea fly."
+    },
+    {
+      "page_number": 6,
+      "text": "The rocket settles on the moon. Maryam sees the fox step out under the quiet sky."
+    },
+    {
+      "page_number": 7,
+      "text": "Maryam pictures the fox standing there now. Stars shine above the rocket the way she hoped."
+    },
+    {
+      "page_number": 8,
+      "text": "Down comes the rocket again. Maryam watches the fox step out and the stars hold every wish in place."
+    }
+  ]
+}

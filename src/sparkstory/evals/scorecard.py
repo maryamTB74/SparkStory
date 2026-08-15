@@ -51,6 +51,11 @@ async def score_book(
     try:
         scores = await judge.ainvoke()
         card.judged = aggregate_page_scores(scores, page_count=len(story.pages))
+        # After aggregation, never before: `aggregate_page_scores` raises when the
+        # judge did not cover the book exactly once, and a scorecard must not carry
+        # verdicts that failed that check -- those are precisely the ones an
+        # alignment run would compare against the wrong denominator.
+        card.judged_pages = scores
     # Broad by intention: any judge failure -- provider, schema, or a response that
     # does not cover the book -- must leave the computed half intact, because those
     # numbers are already paid for and cost nothing to keep. The error is recorded

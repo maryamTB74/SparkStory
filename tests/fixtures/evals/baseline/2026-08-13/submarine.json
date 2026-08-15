@@ -1,0 +1,175 @@
+{
+  "name": "submarine",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.625,
+    "question_ending_ratio": 0.125,
+    "words_per_page": 25.5,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null,
+    "words_per_sentence": 10.736842105263158
+  },
+  "judged": {
+    "delight": 0.5,
+    "showing": 0.875,
+    "momentum": 0.875,
+    "reasons": {
+      "delight": [
+        "p1: The page reports setup and a question without rhythm, surprise, or a repeatable line.",
+        "p2: The page only describes actions and a statement with no sound play or surprise.",
+        "p3: The submarine shooting back up creates a quick visual surprise.",
+        "p4: The page reports a decision and movement without rhythmic or surprising language.",
+        "p5: Water splashing into the tub offers a brief sound image to enjoy.",
+        "p6: The page describes a sequence of actions without rhythm or surprise.",
+        "p7: Down went the submarine and bobbed up again has bouncy rhythm and action.",
+        "p8: Her eyes widening at the rise and fall gives a clear visual moment."
+      ],
+      "showing": [
+        "p1: The final question conveys curiosity through Ada's thought rather than naming the feeling.",
+        "p2: Leaning closer then standing tall shows determination through movement.",
+        "p3: Pressing and watching it pop up shows frustration through repeated action.",
+        "p4: Walking toward the bathroom with certainty shows confidence in her plan.",
+        "p5: The page names her thinking rather than showing feeling through action or speech.",
+        "p6: Filling, sealing, and clipping the bag shows problem-solving through steps.",
+        "p7: Ada cheering at the sight conveys joy through her reaction.",
+        "p8: Eyes widening shows amazement through expression rather than naming it."
+      ],
+      "momentum": [
+        "p1: The open question about how a submarine dives leaves the problem unresolved.",
+        "p2: The need to find a testing place begins a new search.",
+        "p3: The problem that nothing stays down opens the need for a solution.",
+        "p4: Heading to the tub starts the next stage of the experiment.",
+        "p5: Wondering how to make it sink and rise leaves the method open.",
+        "p6: The idea that the weight might work creates anticipation for the test.",
+        "p7: The successful test closes the immediate experiment on this page.",
+        "p8: The final image of her watching the working submarine closes the story satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null,
+  "judged_pages": {
+    "pages": [
+      {
+        "page_number": 1,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports setup and a question without rhythm, surprise, or a repeatable line."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "The final question conveys curiosity through Ada's thought rather than naming the feeling."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The open question about how a submarine dives leaves the problem unresolved."
+        }
+      },
+      {
+        "page_number": 2,
+        "delight": {
+          "score": 0,
+          "reason": "The page only describes actions and a statement with no sound play or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Leaning closer then standing tall shows determination through movement."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The need to find a testing place begins a new search."
+        }
+      },
+      {
+        "page_number": 3,
+        "delight": {
+          "score": 1,
+          "reason": "The submarine shooting back up creates a quick visual surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Pressing and watching it pop up shows frustration through repeated action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The problem that nothing stays down opens the need for a solution."
+        }
+      },
+      {
+        "page_number": 4,
+        "delight": {
+          "score": 0,
+          "reason": "The page reports a decision and movement without rhythmic or surprising language."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Walking toward the bathroom with certainty shows confidence in her plan."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Heading to the tub starts the next stage of the experiment."
+        }
+      },
+      {
+        "page_number": 5,
+        "delight": {
+          "score": 1,
+          "reason": "Water splashing into the tub offers a brief sound image to enjoy."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "The page names her thinking rather than showing feeling through action or speech."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "Wondering how to make it sink and rise leaves the method open."
+        }
+      },
+      {
+        "page_number": 6,
+        "delight": {
+          "score": 0,
+          "reason": "The page describes a sequence of actions without rhythm or surprise."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Filling, sealing, and clipping the bag shows problem-solving through steps."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The idea that the weight might work creates anticipation for the test."
+        }
+      },
+      {
+        "page_number": 7,
+        "delight": {
+          "score": 1,
+          "reason": "Down went the submarine and bobbed up again has bouncy rhythm and action."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Ada cheering at the sight conveys joy through her reaction."
+        },
+        "momentum": {
+          "score": 0,
+          "reason": "The successful test closes the immediate experiment on this page."
+        }
+      },
+      {
+        "page_number": 8,
+        "delight": {
+          "score": 1,
+          "reason": "Her eyes widening at the rise and fall gives a clear visual moment."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Eyes widening shows amazement through expression rather than naming it."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The final image of her watching the working submarine closes the story satisfyingly."
+        }
+      }
+    ]
+  }
+}

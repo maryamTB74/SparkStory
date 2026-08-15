@@ -1,0 +1,175 @@
+{
+  "name": "seed-garden",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.75,
+    "question_ending_ratio": 0.875,
+    "words_per_page": 18.75,
+    "beats_per_page": 0.75,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null,
+    "words_per_sentence": 4.838709677419355
+  },
+  "judged": {
+    "delight": 1.0,
+    "showing": 0.125,
+    "momentum": 1.0,
+    "reasons": {
+      "delight": [
+        "p1: The rhythmic sinking and settling plus the open question create a gentle, repeatable sound pattern.",
+        "p2: Repetition of tipping and flowing water gives a soothing rhythmic quality.",
+        "p3: The repeated tipping motion and question create a steady, chant-like rhythm.",
+        "p4: The short repeated phrase 'Press and lift' adds a satisfying rhythmic beat.",
+        "p5: The echoed 'Press and lift' continues the pleasing repetitive pattern.",
+        "p6: The recurring 'Press and lift' and finger-tracing image offer a gentle rhythmic moment.",
+        "p7: The vivid image of the green tip lifting soil creates a surprising, satisfying visual moment.",
+        "p8: The quiet image of the steady green tip and resting hand offers a calm, memorable close."
+      ],
+      "showing": [
+        "p1: No feeling is shown or named; the text only describes actions.",
+        "p2: No feeling is shown or named; the text only describes actions.",
+        "p3: No feeling is shown or named; the text only describes actions.",
+        "p4: No feeling is shown or named; the text only describes actions.",
+        "p5: No feeling is shown or named; the text only describes actions.",
+        "p6: No feeling is shown or named; the text only describes actions.",
+        "p7: No feeling is shown or named; the text only describes actions.",
+        "p8: Noor resting a hand beside the sprout conveys quiet care through action."
+      ],
+      "momentum": [
+        "p1: The question leaves the next step open.",
+        "p2: The question leaves the outcome uncertain.",
+        "p3: The question points forward to what follows.",
+        "p4: The question leaves the result of the press unresolved.",
+        "p5: The question anticipates a visible change.",
+        "p6: The question asks what will emerge next.",
+        "p7: The question asks what now stands in the garden.",
+        "p8: The final image of the steady plant closes the story satisfyingly."
+      ]
+    }
+  },
+  "judge_error": null,
+  "judged_pages": {
+    "pages": [
+      {
+        "page_number": 1,
+        "delight": {
+          "score": 1,
+          "reason": "The rhythmic sinking and settling plus the open question create a gentle, repeatable sound pattern."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question leaves the next step open."
+        }
+      },
+      {
+        "page_number": 2,
+        "delight": {
+          "score": 1,
+          "reason": "Repetition of tipping and flowing water gives a soothing rhythmic quality."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question leaves the outcome uncertain."
+        }
+      },
+      {
+        "page_number": 3,
+        "delight": {
+          "score": 1,
+          "reason": "The repeated tipping motion and question create a steady, chant-like rhythm."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question points forward to what follows."
+        }
+      },
+      {
+        "page_number": 4,
+        "delight": {
+          "score": 1,
+          "reason": "The short repeated phrase 'Press and lift' adds a satisfying rhythmic beat."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question leaves the result of the press unresolved."
+        }
+      },
+      {
+        "page_number": 5,
+        "delight": {
+          "score": 1,
+          "reason": "The echoed 'Press and lift' continues the pleasing repetitive pattern."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question anticipates a visible change."
+        }
+      },
+      {
+        "page_number": 6,
+        "delight": {
+          "score": 1,
+          "reason": "The recurring 'Press and lift' and finger-tracing image offer a gentle rhythmic moment."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question asks what will emerge next."
+        }
+      },
+      {
+        "page_number": 7,
+        "delight": {
+          "score": 1,
+          "reason": "The vivid image of the green tip lifting soil creates a surprising, satisfying visual moment."
+        },
+        "showing": {
+          "score": 0,
+          "reason": "No feeling is shown or named; the text only describes actions."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The question asks what now stands in the garden."
+        }
+      },
+      {
+        "page_number": 8,
+        "delight": {
+          "score": 1,
+          "reason": "The quiet image of the steady green tip and resting hand offers a calm, memorable close."
+        },
+        "showing": {
+          "score": 1,
+          "reason": "Noor resting a hand beside the sprout conveys quiet care through action."
+        },
+        "momentum": {
+          "score": 1,
+          "reason": "The final image of the steady plant closes the story satisfyingly."
+        }
+      }
+    ]
+  }
+}

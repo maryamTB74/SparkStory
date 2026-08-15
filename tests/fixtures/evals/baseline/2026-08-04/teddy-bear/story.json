@@ -1,0 +1,222 @@
+{
+  "outline": {
+    "title": "Ted Comes Home",
+    "logline": "Lost teddy Ted rides the train looking for home while Sam rides after him and waits at the station until they meet and come home together.",
+    "theme": "helping someone you love find the way home",
+    "characters": [
+      {
+        "name": "Sam",
+        "role": "main character",
+        "description": "A little boy who wants to find his lost teddy and bring him home, so he rides the train and waits at the station."
+      },
+      {
+        "name": "Ted",
+        "role": "loyal companion",
+        "description": "Sam's teddy bear who wants to get back home and rides the train while looking for the way."
+      }
+    ],
+    "beats": [
+      {
+        "position": 1,
+        "function": "setup",
+        "title": "Home together",
+        "summary": "The book opens and closes on the line 'Ted sat safe at home with Sam.' Sam holds Ted close at home before the trip.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 2,
+        "function": "inciting_incident",
+        "title": "Lost on the train",
+        "summary": "Sam and Ted ride the train together. Ted falls from the bag and is left behind. Sam sees Ted is gone and rides the train to the station to wait for him while Ted gets back on a train to go home.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 3,
+        "function": "rising_action",
+        "title": "First look",
+        "summary": "Ted rides the train looking for the way home and sees one new thing: a tall green tree. Sam rides toward the station.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 4,
+        "function": "rising_action",
+        "title": "Second look",
+        "summary": "Ted rides the train looking for the way home and sees the tall green tree plus one new thing: a shiny blue river. Sam rides toward the station.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 5,
+        "function": "midpoint",
+        "title": "Third look",
+        "summary": "Ted rides the train looking for the way home and sees the tall green tree, the shiny blue river, plus one new thing: a round yellow sun. Sam rides toward the station.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 6,
+        "function": "climax",
+        "title": "The right station",
+        "summary": "Ted rides the train looking for the way home and sees all the things plus one new thing: the station at Sam's red door. Sam gets off his train and waits on the platform. Ted's train stops and Sam picks him up.",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "position": 7,
+        "function": "resolution",
+        "title": "Back where he belongs",
+        "summary": "Sam hugs Ted tight and takes him straight home. The book ends on the same line: 'Ted sat safe at home with Sam.'",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      }
+    ]
+  },
+  "page_plan": {
+    "pages": [
+      {
+        "page_number": 1,
+        "beat_position": 1,
+        "setting": "home",
+        "visual_action": "Sam holds Ted close",
+        "emotional_shift": "feels happy and safe together",
+        "page_turn_hook": "what happens when they leave",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 2,
+        "beat_position": 2,
+        "setting": "train",
+        "visual_action": "Ted falls from the bag",
+        "emotional_shift": "Sam notices Ted is missing",
+        "page_turn_hook": "where did Ted go",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 3,
+        "beat_position": 2,
+        "setting": "station platform and train",
+        "visual_action": "Sam waits on platform while Ted boards another train",
+        "emotional_shift": "Sam decides to wait; Ted looks for the way",
+        "page_turn_hook": "what will Ted see first",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 4,
+        "beat_position": 3,
+        "setting": "train",
+        "visual_action": "Ted sees the tall green tree",
+        "emotional_shift": "Ted notices something familiar",
+        "page_turn_hook": "what else is on the way",
+        "characters_present": [
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 5,
+        "beat_position": 4,
+        "setting": "train",
+        "visual_action": "Ted sees the tall green tree and the shiny blue river",
+        "emotional_shift": "Ted recognizes more signs",
+        "page_turn_hook": "what comes next",
+        "characters_present": [
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 6,
+        "beat_position": 5,
+        "setting": "train",
+        "visual_action": "Ted sees the tall green tree, shiny blue river, and round yellow sun",
+        "emotional_shift": "Ted feels closer to home",
+        "page_turn_hook": "what is the final landmark",
+        "characters_present": [
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 7,
+        "beat_position": 6,
+        "setting": "station at red door",
+        "visual_action": "Ted sees the station, train stops, Sam picks him up",
+        "emotional_shift": "relief and joy at reunion",
+        "page_turn_hook": "where do they go now",
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      },
+      {
+        "page_number": 8,
+        "beat_position": 7,
+        "setting": "home",
+        "visual_action": "Sam hugs Ted and they sit safe at home",
+        "emotional_shift": "peace and belonging restored",
+        "page_turn_hook": null,
+        "characters_present": [
+          "Sam",
+          "Ted"
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "Sam holds Ted close.\nThey sit together.\nHome is quiet around them."
+    },
+    {
+      "page_number": 2,
+      "text": "The train starts moving.\nTed slips from the bag.\nSam reaches in and stops."
+    },
+    {
+      "page_number": 3,
+      "text": "Sam stands on the platform.\nHe waits by the track.\nTed climbs onto the next train."
+    },
+    {
+      "page_number": 4,
+      "text": "Ted rides along.\nA tall green tree passes by.\nTed watches it go."
+    },
+    {
+      "page_number": 5,
+      "text": "The tall green tree stays in sight.\nA shiny blue river appears.\nTed keeps watching."
+    },
+    {
+      "page_number": 6,
+      "text": "The tall green tree.\nThe shiny blue river.\nA round yellow sun joins them."
+    },
+    {
+      "page_number": 7,
+      "text": "Ted sees the station.\nThe train stops.\nSam picks him up."
+    },
+    {
+      "page_number": 8,
+      "text": "Sam hugs Ted tight.\nThey sit together again.\nHome waits for them."
+    }
+  ]
+}

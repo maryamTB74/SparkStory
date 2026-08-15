@@ -1,0 +1,16 @@
+{
+  "name": "eagle-planet",
+  "page_count": 8,
+  "deterministic": {
+    "distinct_opener_ratio": 0.875,
+    "question_ending_ratio": 0.0,
+    "words_per_page": 18.5,
+    "words_per_sentence": 6.166666666666667,
+    "beats_per_page": 0.875,
+    "fact_recital_beats": null,
+    "fact_recital_prose": null
+  },
+  "judged": null,
+  "judge_error": null,
+  "judged_pages": null
+}

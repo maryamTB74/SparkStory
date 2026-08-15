@@ -8,6 +8,8 @@ order.
 
 from collections.abc import Callable
 
+import pytest
+
 from sparkstory.entities.stories import Story
 from sparkstory.evals.metrics import deterministic as det
 
@@ -161,3 +163,49 @@ def test_deterministic_scores_reports_every_metric(
     assert scores.words_per_page == 2.75
     assert scores.beats_per_page == 1.0
     assert scores.fact_recital_beats is None
+
+
+def test_words_per_sentence_counts_sentences_not_lines(
+    book_factory: Callable[..., Story],
+) -> None:
+    """A page is several sentences, and line breaks are not sentence ends.
+
+    The Writer sets one sentence per line on most pages, so counting lines would
+    usually agree -- and would be silently wrong on any page that does not.
+    """
+    story = book_factory(["Down it sinks. Soil settles.", "Water runs over the spot."])
+
+    # 3 sentences, 10 words: "Down it sinks" (3) + "Soil settles" (2)
+    # + "Water runs over the spot" (5)
+    assert det.words_per_sentence(story) == pytest.approx(10 / 3)
+
+
+def test_words_per_sentence_treats_question_and_exclamation_as_ends(
+    book_factory: Callable[..., Story],
+) -> None:
+    story = book_factory(["Does it reach the seed? Yes!"])
+
+    # "Does it reach the seed" (5) + "Yes" (1) over 2 sentences
+    assert det.words_per_sentence(story) == 3.0
+
+
+def test_words_per_sentence_ignores_empty_fragments(
+    book_factory: Callable[..., Story],
+) -> None:
+    """Trailing punctuation must not create a zero-word sentence.
+
+    An empty fragment would inflate the denominator and report the prose as
+    terser than it is -- an error in the direction the metric exists to detect.
+    """
+    story = book_factory(["Press and lift...", "The soil shifts."])
+
+    assert det.words_per_sentence(story) == 3.0
+
+
+def test_words_per_sentence_on_a_page_with_no_sentence(
+    book_factory: Callable[..., Story],
+) -> None:
+    """Never divide by zero; a book with no readable sentence reports 0.0."""
+    story = book_factory(["..."])
+
+    assert det.words_per_sentence(story) == 0.0

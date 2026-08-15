@@ -318,6 +318,35 @@ class Settings(BaseSettings):
         alias="JUDGE_PAGES",
         description="Judge each finished page against its reference portraits",
     )
+    # --- Tool surface ----------------------------------------------------
+    # Whether the two media tools are registered at all. A client cannot call
+    # what it cannot see, so this is a *surface* decision rather than a runtime
+    # check inside the tool.
+    #
+    # **Rule 3 was asked and answered rather than skipped.** Session 1 removed
+    # `IMAGE_GENERATION_ENABLED` and `AUDIO_GENERATION_ENABLED` by name, for
+    # gating features that did not exist -- a flag cannot be meaningfully
+    # written before the thing it gates. Both features now exist and are verified
+    # live, and the driver is concrete: a deployed server where a client must not
+    # be *able* to spend money on images, plus a reduced tool surface for a
+    # served instance. That is the condition the original removal was waiting on.
+    #
+    # **Default True, unlike `max_web_searches`, and the difference is the
+    # trigger.** Web search defaults to 0 because it reaches the network during
+    # research, on a path the caller never asked for. These two run only when a
+    # client calls them by name, so defaulting them off would hide working
+    # features from every existing installation to serve a deployment that does
+    # not exist yet. Set them false on the instance that needs it.
+    illustration_enabled: bool = Field(
+        default=True,
+        alias="ILLUSTRATION_ENABLED",
+        description="Offer the illustrate_story tool to clients",
+    )
+    narration_enabled: bool = Field(
+        default=True,
+        alias="NARRATION_ENABLED",
+        description="Offer the narrate_story tool to clients",
+    )
     # --- Narration -------------------------------------------------------
     # Names an entry in `speech_configs`, not `llm_configs` or `image_configs`: a
     # speech model takes text and a voice and returns audio bytes. Four

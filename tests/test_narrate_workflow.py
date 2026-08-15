@@ -5,9 +5,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from fastmcp.exceptions import ToolError
 
+from sparkstory.entities.exceptions import AudioConfigurationError
 from sparkstory.entities.narration import NarrationStatus
 from sparkstory.entities.stories import ReadingLevel, Story, StoryBrief, Voice
+from sparkstory.mcp.tools.narrate_story import narrate_story_tool
 from sparkstory.models.fake_speech_model import MP3_SILENCE, FakeSpeechProvider
 from sparkstory.workflows import narrate as narrate_module
 from sparkstory.workflows.narrate import (
@@ -313,3 +316,71 @@ async def test_it_writes_a_narration_record_to_disk(
     loaded = json.loads(record.read_text())
     assert loaded["voice_id"] == _VOICES[Voice.FEMALE]
     assert len(loaded["items"]) == len(story.pages)
+
+
+class TestToolErrorTranslation:
+    """The MCP tool layer, which translates only what a caller can act on.
+
+    Same rule as `write_story_tool` and `illustrate_story_tool`: a
+    `ConfigurationError` names a variable an operator can set, so it becomes a
+    `ToolError`; anything else is our own defect and propagates as one.
+    """
+
+    async def test_a_missing_key_becomes_a_tool_error(
+        self,
+        tmp_path: Path,
+        story: Story,
+        brief: StoryBrief,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """An unset XAI_API_KEY reaches a client as a sentence, not a traceback."""
+
+        def raise_missing_key(*_: object, **__: object) -> None:
+            raise AudioConfigurationError(
+                "Model 'grok-speech' requires XAI_API_KEY, which is not set."
+            )
+
+        monkeypatch.setattr(narrate_module, "build_speech_model", raise_missing_key)
+
+        with pytest.raises(ToolError, match="XAI_API_KEY"):
+            await narrate_story_tool(brief, story, str(tmp_path))
+
+    async def test_a_partly_failed_narration_returns_rather_than_raises(
+        self,
+        tmp_path: Path,
+        story: Story,
+        brief: StoryBrief,
+        monkeypatch: pytest.MonkeyPatch,
+        speak: Callable[..., FakeSpeechProvider],
+    ) -> None:
+        """Narration fails soft, so the tool must not convert partial success
+        into an error. The `StoryNarration` returned IS the report -- a client
+        reads `is_complete`. Verified live by the `live-rejected` run.
+        """
+        speak(monkeypatch, fail_on=(story.pages[1].text[:20],))
+
+        narration = await narrate_story_tool(brief, story, str(tmp_path))
+
+        assert narration.is_complete is False
+        assert narration.pages_narrated == len(story.pages) - 1
+
+    async def test_it_passes_its_arguments_through_in_the_right_order(
+        self,
+        tmp_path: Path,
+        story: Story,
+        brief: StoryBrief,
+        monkeypatch: pytest.MonkeyPatch,
+        speak: Callable[..., FakeSpeechProvider],
+    ) -> None:
+        """`run_narration_pipeline` takes (story, brief, directory) while
+        `run_illustration_pipeline` takes (brief, story, directory). Two
+        adjacent tools whose pipelines disagree on argument order is exactly the
+        swap a type checker cannot catch, since both are Pydantic models.
+        """
+        speak(monkeypatch)
+
+        narration = await narrate_story_tool(brief, story, str(tmp_path))
+
+        assert narration.voice_id == _VOICES[brief.voice]
+        assert len(narration.items) == len(story.pages)
+        assert (tmp_path / "narration.json").exists()

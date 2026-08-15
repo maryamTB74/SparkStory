@@ -8,9 +8,12 @@ without an MCP server running.
 
 from fastmcp import FastMCP
 
+from sparkstory.config import settings
 from sparkstory.entities.illustration import StoryArt
+from sparkstory.entities.narration import StoryNarration
 from sparkstory.entities.stories import Story, StoryBrief, StoryOutline
 from sparkstory.mcp.tools.illustrate_story import illustrate_story_tool
+from sparkstory.mcp.tools.narrate_story import narrate_story_tool
 from sparkstory.mcp.tools.plan_story import plan_story_tool
 from sparkstory.mcp.tools.write_story import write_story_tool
 
@@ -45,25 +48,59 @@ def register_mcp_tools(mcp: FastMCP) -> None:
         """
         return await write_story_tool(brief, outline)
 
-    @mcp.tool()
-    async def illustrate_story(
-        brief: StoryBrief, story: Story, output_directory: str
-    ) -> StoryArt:
-        """Draw the pictures for a story `write_story` has already written.
+    # The two media tools are registered conditionally, so a server can be
+    # deployed unable to spend money on images rather than merely asked not to.
+    # A client cannot call what `list_tools` never showed it.
+    if settings.illustration_enabled:
 
-        Decides one shared visual style for the whole book, draws a reference
-        portrait of each character, then draws every page from those portraits so
-        the same character looks the same throughout. Images are written into
-        `output_directory` as files; the result records where each one went.
+        @mcp.tool()
+        async def illustrate_story(
+            brief: StoryBrief, story: Story, output_directory: str
+        ) -> StoryArt:
+            """Draw the pictures for a story `write_story` has already written.
 
-        Call this only after the story is written, and pass that story through
-        unchanged. It is the slowest and most expensive tool here -- roughly one
-        image per page plus one per character -- so confirm with the user before
-        illustrating a long book.
+            Decides one shared visual style for the whole book, draws a reference
+            portrait of each character, then draws every page from those portraits
+            so the same character looks the same throughout. Images are written
+            into `output_directory` as files; the result records where each went.
 
-        A picture that cannot be drawn is reported rather than fatal: that page
-        simply has no illustration. Check `fully_conditioned` on the result to see
-        whether every picture was drawn from the character portraits; when it is
-        false, `detail` on each item says what happened.
-        """
-        return await illustrate_story_tool(brief, story, output_directory)
+            Call this only after the story is written, and pass that story through
+            unchanged. It is the slowest and most expensive tool here -- roughly
+            one image per page plus one per character -- so confirm with the user
+            before illustrating a long book.
+
+            A picture that cannot be drawn is reported rather than fatal: that
+            page simply has no illustration. Check `fully_conditioned` on the
+            result to see whether every picture was drawn from the character
+            portraits; when it is false, `detail` on each item says what happened.
+            """
+            return await illustrate_story_tool(brief, story, output_directory)
+
+    # A separate switch rather than one shared "media" flag: narration is two
+    # orders of magnitude cheaper than illustration, so an installation that
+    # cannot afford pictures may still want a book read aloud.
+    if settings.narration_enabled:
+
+        @mcp.tool()
+        async def narrate_story(
+            brief: StoryBrief, story: Story, output_directory: str
+        ) -> StoryNarration:
+            """Read a story `write_story` has already written aloud.
+
+            Speaks every page in the voice the brief asks for, at a pace chosen
+            for the child's reading level, and writes one audio file per page plus
+            a single `story.mp3` of the whole book into `output_directory`. The
+            text is spoken exactly as written -- nothing is rephrased.
+
+            Call this only after the story is written, and pass that story through
+            unchanged. It does not need the pictures, so it can run before, after
+            or instead of `illustrate_story`.
+
+            A page that cannot be narrated is reported rather than fatal: that
+            page simply has no audio. Check `is_complete` on the result to see
+            whether the whole book was narrated; when it is false,
+            `pages_narrated` says how many pages have audio and each item's
+            `detail` says what happened. When no page could be narrated at all,
+            there is no `story.mp3` rather than a silent one.
+            """
+            return await narrate_story_tool(brief, story, output_directory)

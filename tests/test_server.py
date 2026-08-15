@@ -8,6 +8,7 @@ separate from ``main``.
 import pytest
 from fastmcp import Client
 
+from sparkstory.mcp.routers import tools as tools_router
 from sparkstory.mcp.server import _build_parser, create_server, main
 
 
@@ -16,6 +17,69 @@ class TestToolRegistration:
         async with Client(create_server()) as client:
             names = [t.name for t in await client.list_tools()]
         assert {"plan_story", "write_story"} <= set(names)
+
+
+class TestExpensiveToolsCanBeWithheld:
+    """Registration gates for the two tools that generate media.
+
+    Not Rule 3's forbidden shape. Rule 3 removed `IMAGE_GENERATION_ENABLED` and
+    `AUDIO_GENERATION_ENABLED` in Session 1 for gating features that did not
+    exist; both of these are built and live-verified. The driver is a deployed
+    server where a client must not be *able* to spend money on images, and a
+    reduced tool surface for a served instance.
+
+    Both default to True, unlike `max_web_searches` which defaults to off. Web
+    search reaches the network during research, on a path the caller did not ask
+    for; these run only when a client calls them by name.
+    """
+
+    async def _tool_names(self) -> set[str]:
+        async with Client(create_server()) as client:
+            return {t.name for t in await client.list_tools()}
+
+    async def test_by_default_every_tool_is_registered(self) -> None:
+        assert {
+            "plan_story",
+            "write_story",
+            "illustrate_story",
+            "narrate_story",
+        } <= await self._tool_names()
+
+    async def test_illustration_can_be_withheld(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(tools_router.settings, "illustration_enabled", False)
+        assert "illustrate_story" not in await self._tool_names()
+
+    async def test_narration_can_be_withheld(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(tools_router.settings, "narration_enabled", False)
+        assert "narrate_story" not in await self._tool_names()
+
+    async def test_one_gate_does_not_close_the_other(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two independent switches, not one shared 'media' switch.
+
+        The failure this rules out is a copy-paste sharing one setting, which
+        would look correct in whichever test ran first.
+        """
+        monkeypatch.setattr(tools_router.settings, "illustration_enabled", False)
+        names = await self._tool_names()
+        assert "illustrate_story" not in names
+        assert "narrate_story" in names
+
+    async def test_the_core_tools_are_never_gated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A server with no media tools still plans and writes books.
+
+        This is what makes the gate a surface decision rather than a kill switch.
+        """
+        monkeypatch.setattr(tools_router.settings, "illustration_enabled", False)
+        monkeypatch.setattr(tools_router.settings, "narration_enabled", False)
+        assert {"plan_story", "write_story"} <= await self._tool_names()
 
     @pytest.mark.parametrize("tool_name", ["plan_story", "write_story"])
     async def test_tool_has_description_and_output_schema(self, tool_name: str) -> None:
@@ -161,10 +225,23 @@ class TestPromptContent:
         If a later tool is deliberately outside this workflow, add it to an
         explicit exclusion set here rather than deleting the test.
         """
+        # Deliberately outside the guided workflow, as this test's docstring
+        # provides for. `narrate_story` was added as a callable tool without
+        # touching the prompt: the prompt is 421 words and Q4 (asking for
+        # pronouns) already failed one run of two on a small client, so growing
+        # it costs the six verdicts `try_prompt.py` measures. Chaining narration
+        # into `create_storybook` is a separate decision needing its own harness
+        # run -- until then a client reaches this tool by asking for it.
+        outside_the_guided_workflow = {"narrate_story"}
+
         async with Client(create_server()) as client:
             registered = {t.name for t in await client.list_tools()}
 
-        missing = {name for name in registered if name not in text}
+        missing = {
+            name
+            for name in registered - outside_the_guided_workflow
+            if name not in text
+        }
         assert not missing, (
             f"the create_storybook prompt never mentions {sorted(missing)}, so a "
             "client following it cannot reach those tools"

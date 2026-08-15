@@ -10,10 +10,21 @@ One call per book rather than one per page. Cheaper, and ``momentum`` is a quest
 about sequence -- whether this page pulls toward the next -- which a judge shown a
 single page in isolation cannot answer.
 
-**Unvalidated by construction.** No alignment score against human labels exists
-yet, so a judged number moving is not by itself evidence that a book changed. That
-is why ``BookScorecard`` keeps these values apart from the computed ones and why
-nothing here may gate a build.
+**Measured against human labels on 2026-08-13, and it failed.** Cohen's kappa was
+**-0.066 delight, +0.121 showing, -0.060 momentum** over 40 pages of five books --
+agreement no better than chance. ``momentum`` scored 1 on 35 of 40 pages, so it is
+close to a constant. See findings KK, LL and MM.
+
+So a judged number moving is **not** evidence that a book changed, and this is now
+a measurement rather than a caveat. That is why ``BookScorecard`` keeps these
+values apart from the computed ones and why nothing here may gate a build.
+
+Two things worth knowing before revising the rubric. The disagreement on
+``momentum`` is a genuine ambiguity in the wording rather than a judge error -- a
+page ending "What comes after that?" does literally leave something open, so a 1
+follows the rubric as written. And the human ceiling has not been measured, so
+``delight``'s failure may be a question with no stable answer rather than a judge
+that cannot answer it.
 """
 
 from typing import Any

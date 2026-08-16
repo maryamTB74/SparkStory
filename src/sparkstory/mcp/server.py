@@ -14,6 +14,7 @@ from sparkstory.config import settings
 from sparkstory.mcp.routers.prompts import register_mcp_prompts
 from sparkstory.mcp.routers.resources import register_mcp_resources
 from sparkstory.mcp.routers.tools import register_mcp_tools
+from sparkstory.mcp.routers.ui import register_ui_routes
 from sparkstory.utils.logging_utils import configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -50,6 +51,9 @@ def create_server() -> FastMCP:
     register_mcp_tools(mcp)
     register_mcp_prompts(mcp)
     register_mcp_resources(mcp)
+    # Custom HTTP routes, not MCP. Served only under --transport http; see the
+    # module docstring for the auth and binding caveat.
+    register_ui_routes(mcp)
 
     logger.info(
         "%s v%s ready (planner model: %s)",

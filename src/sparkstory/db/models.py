@@ -35,10 +35,12 @@ from sqlalchemy import (
     Computed,
     DateTime,
     Index,
+    Integer,
     MetaData,
     String,
     Table,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.types import UserDefinedType
@@ -189,4 +191,88 @@ def memories_table(
         *columns,
         # The exact-fetch access path: every read is (child_id, kind).
         Index("ix_memories_child_kind", "child_id", "kind"),
+    )
+
+
+def worlds_table(metadata: MetaData | None = None) -> Table:
+    """Describe the worlds table -- one approved space of stories per row.
+
+    No vector column and no generated column, so this and its two companions
+    build on SQLite unchanged. That is deliberate: the guarantees these tables
+    carry are *approval* and *ordering*, neither of which needs Postgres, and a
+    seam that only runs when ``DATABASE_URL`` is set is a seam that does not run
+    under ``make test``.
+
+    Args:
+        metadata: Where to register the table. Pass a fresh ``MetaData`` to build
+            it twice in one process, as a test and a second store both do.
+    """
+    return Table(
+        "worlds",
+        metadata if metadata is not None else Base.metadata,
+        Column("world_id", String, primary_key=True),
+        # Indexed and present in every read, for the reason `memories.child_id`
+        # is: this is the scope, and a leaked scope is one child's show in
+        # another child's app.
+        Column("child_id", String, nullable=False, index=True),
+        Column("title", Text, nullable=False),
+        Column("premise", Text, nullable=False),
+        Column("tone", String, nullable=False),
+        Column("world_rules", String, nullable=False),
+        # JSON-encoded lists. A child table for two short string lists that are
+        # only ever read whole would buy nothing but a join.
+        Column("avoid", Text, nullable=False),
+        Column("must_include", Text, nullable=False),
+        Column("status", String, nullable=False),
+        Column("created_at", DateTime(timezone=True), nullable=False),
+        # Null until a parent approves. The presence of this timestamp is the
+        # audit trail for "who let this world exist".
+        Column("approved_at", DateTime(timezone=True), nullable=True),
+        Index("ix_worlds_child_status", "child_id", "status"),
+    )
+
+
+def seasons_table(metadata: MetaData | None = None) -> Table:
+    """Describe the seasons table -- ten chapters that become one book."""
+    return Table(
+        "seasons",
+        metadata if metadata is not None else Base.metadata,
+        Column("season_id", String, primary_key=True),
+        Column("world_id", String, nullable=False, index=True),
+        Column("ordinal", Integer, nullable=False),
+        Column("title", Text, nullable=False),
+        Column("chapter_target", Integer, nullable=False),
+        Column("created_at", DateTime(timezone=True), nullable=False),
+        Column("completed_at", DateTime(timezone=True), nullable=True),
+        # Two season twos in one world is a numbering bug that would otherwise
+        # surface as a book with the wrong chapters in it. Caught at the
+        # database rather than trusted to the store.
+        UniqueConstraint("world_id", "ordinal", name="uq_seasons_world_ordinal"),
+    )
+
+
+def chapters_table(metadata: MetaData | None = None) -> Table:
+    """Describe the chapters table -- one episode per row."""
+    return Table(
+        "chapters",
+        metadata if metadata is not None else Base.metadata,
+        Column("chapter_id", String, primary_key=True),
+        Column("season_id", String, nullable=False, index=True),
+        # Denormalised from the season on purpose. Every read of a child's shelf
+        # filters by world, and carrying it here turns that into one indexed
+        # scan instead of a join through seasons.
+        Column("world_id", String, nullable=False, index=True),
+        Column("ordinal", Integer, nullable=False),
+        Column("seed", Text, nullable=False),
+        Column("state", String, nullable=False),
+        # Ties the chapter to the pipeline run that made it, and so to the
+        # memories that run wrote. Null until the run starts.
+        Column("request_id", String, nullable=True),
+        Column("created_at", DateTime(timezone=True), nullable=False),
+        Column("ready_at", DateTime(timezone=True), nullable=True),
+        # Chapter ordinals are what a child counts. Two chapter fours is the
+        # kind of defect that is invisible in code review and obvious on a
+        # shelf.
+        UniqueConstraint("season_id", "ordinal", name="uq_chapters_season_ordinal"),
+        Index("ix_chapters_world_state", "world_id", "state"),
     )

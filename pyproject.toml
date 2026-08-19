@@ -118,6 +118,7 @@ markers = [
     "corpus: needs the built knowledge index and real embedding weights",
     "vision: needs a real vision model and the committed run images",
     "video: needs ffmpeg and ffprobe on PATH",
+    "web: exercises the web-search half; the searching tests need TAVILY_API_KEY",
 ]
 filterwarnings = [
     # fastmcp's JWT provider imports the deprecated authlib.jose module.

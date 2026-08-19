@@ -19,6 +19,7 @@ from conftest import FakeChunkStore
 
 from sparkstory.retrieval.chunks import Chunk, SourceKind
 from sparkstory.retrieval.tools import NOTHING_FOUND, build_retrieval_tools
+from sparkstory.retrieval.types import SearchHit
 from sparkstory.retrieval.web.ledger import WebLedger
 from sparkstory.retrieval.web.providers import WebResult
 
@@ -294,3 +295,69 @@ class TestWebTool:
         second = await tools["search_web"].ainvoke({"query": "b"})
         assert "web:1" in first
         assert "web:2" in second
+
+
+class TestAThinResultIsDistinguishableFromAStrongOne:
+    """The Researcher is told to search again when a search comes back weak, and
+    it can only do that if a weak search *looks* different from a good one.
+
+    Before this, one hit and five hits rendered as the same shape -- labelled
+    blocks, no total -- so "notice that the collection barely covers this" was an
+    instruction with nothing to act on.
+    """
+
+    @staticmethod
+    def _hits(n: int) -> list[SearchHit]:
+        return [
+            SearchHit(
+                chunk=Chunk(
+                    chunk_id=f"moon#{i}",
+                    text="The Moon has no air, so nothing can flutter.",
+                    title="Moon",
+                    source="NASA -- Earth's Moon",
+                    licence="public domain",
+                    source_kind=SourceKind.FACT,
+                ),
+                similarity=0.5,
+            )
+            for i in range(1, n + 1)
+        ]
+
+    def test_the_count_is_stated(self) -> None:
+        from sparkstory.retrieval.tools import _render
+
+        assert _render(self._hits(3)).startswith("3 candidates found.")
+
+    def test_one_hit_says_candidate_singular(self) -> None:
+        """Pedantic on purpose: "1 candidates found" reads as a bug in the tool,
+        and an agent that distrusts its instrument reasons around it."""
+        from sparkstory.retrieval.tools import _render
+
+        assert _render(self._hits(1)).startswith("1 candidate found.")
+
+    def test_every_candidate_still_renders_its_own_labelled_block(self) -> None:
+        """The count is added *beside* the blocks, not instead of one. Merging
+        candidates into a summary is what invites a fact whose claim comes from
+        one chunk and whose id comes from another.
+        """
+        from sparkstory.retrieval.tools import _render
+
+        rendered = _render(self._hits(2))
+
+        assert "id: moon#1" in rendered
+        assert "id: moon#2" in rendered
+
+    def test_nothing_found_is_still_phrased_as_an_answer(self) -> None:
+        """Guards the change that invited a second search from breaking the
+        wording that stopped over-searching.
+
+        An earlier instruction here said coming back with nothing was "a good
+        outcome and a common one", which stopped invention and also stopped
+        grounding: a story about visiting the Moon came back with zero facts. The
+        fix was a discriminating question rather than a blanket permission. This
+        message must keep reading as a result rather than a failure, or the
+        Researcher will treat an empty collection as something to try harder at.
+        """
+        assert "There may be nothing to find" in NOTHING_FOUND
+        for word in ("error", "failed", "unavailable", "try again"):
+            assert word not in NOTHING_FOUND.lower()

@@ -197,6 +197,18 @@ class Settings(BaseSettings):
         alias="JUDGE_MODEL",
         description="Model used by the offline book judge",
     )
+    # Reorders retrieval candidates before the Researcher sees them. Defaults to a
+    # zero-temperature entry deliberately: retrieval is otherwise deterministic --
+    # the embedder is local and the same query has produced the same vector since
+    # the first session -- and a reranker that answers differently on identical
+    # input would convert that into a stage whose output nobody can reproduce.
+    # Whether temperature 0 is *enough* is measured rather than assumed; see the
+    # repeatability check in tests/test_retrieval_eval.py.
+    reranker_model: str = Field(
+        default="grok-3-mini-critic",
+        alias="RERANKER_MODEL",
+        description="Model that reorders retrieval candidates",
+    )
     # Runs after a book is finished and delivered, so it is the one model call in
     # the system whose failure cannot cost a parent their story -- the write path
     # fails open. That makes the provider default worth stating: it is Google while

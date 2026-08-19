@@ -28,6 +28,24 @@ page ending "What comes after that?" does literally leave something open, so a 1
 follows the rubric as written. And the human ceiling has not been measured, so
 ``delight``'s failure may be a question with no stable answer rather than a judge
 that cannot answer it.
+
+**``momentum`` was rewritten on 2026-08-16 to resolve that ambiguity** (finding
+MM). It now judges the *situation* a page leaves behind rather than the
+punctuation it ends on, and names the lazy reading it must reject -- a tacked-on
+question over a settled scene -- the way ``showing`` already names "she felt
+proud". Two reasons it is worded that way. A criterion with only a positive
+description gets satisfied by its cheapest reading (rule 13), and that is exactly
+how the old wording failed. And ``question_ending_ratio`` already counts question
+marks deterministically and for free, so a judge scoring punctuation would spend
+a model call duplicating a metric that cannot be gamed -- while measuring the
+tic's *presence* rather than whether it does any work.
+
+**The revision is unmeasured.** Nothing here is evidence until the harness is
+re-run against labels, and the ceiling problem is untouched by it: finding NN put
+one labeller's self-agreement on ``momentum`` at kappa **0.000**, so a rewritten
+rubric could improve the judge and still score ~0 against an unstable target.
+Re-label before concluding anything, and expect the 35-of-40 constant to move
+first -- if it does not, the wording is not what was wrong.
 """
 
 from typing import Any
@@ -56,9 +74,16 @@ showing: is feeling conveyed through action, image or speech rather than named?
 Score 1 when a child could tell how someone feels from what they do or say. Score
 0 when a feeling is named outright, as in "she felt proud" or "joy filled him".
 
-momentum: does this page make a listener want to turn it? Score 1 when something
-is left open or begun. Score 0 when the page closes on itself. Judge the final
-page instead on whether it closes the book satisfyingly, and score 1 if it does.
+momentum: does this page make a listener want to turn it? Judge the *situation*
+the page leaves behind, not the punctuation it ends on. Score 1 when something
+is unresolved after the page: a character wants something they have not got, has
+just tried something whose outcome is unknown, or faces a change they have not
+answered yet. Score 0 when the page settles -- the want is met, the attempt has
+landed, nothing is pending -- even if the last sentence is phrased as a question.
+A question mark is not momentum. "What comes after that?" tacked onto a page
+where nothing is outstanding scores 0, because the words invite a turn while the
+story gives no reason for one. Judge the final page instead on whether it closes
+the book satisfyingly, and score 1 if it does.
 
 Score each page on its own words. Do not reward a page for what a neighbouring
 page does, and do not lower a score because the book as a whole disappoints you.

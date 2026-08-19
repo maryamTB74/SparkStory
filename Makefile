@@ -21,7 +21,8 @@ QA_PATHS := src tests scripts alembic
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus test-vision test-video score-books \
+        fix check test test-fast test-corpus test-vision test-video test-web \
+        corpus-manifest score-books \
         label-skeletons score-alignment migrate \
         migrate-down ingest \
         run ci-local clean
@@ -79,6 +80,14 @@ test-vision: ## Judge the known drifts in committed runs (needs XAI_API_KEY)
 
 test-video: ## Assemble video from committed run artifacts (needs ffmpeg, free)
 	$(PYTEST) -m video || [ $$? -eq 5 ]
+
+
+test-web: ## Measure the web-search half (the searching tests need TAVILY_API_KEY)
+	$(PYTEST) -m web || [ $$? -eq 5 ]
+
+
+corpus-manifest: ## Regenerate corpus/chunk_manifest.json after a deliberate corpus edit
+	uv run python scripts/write_chunk_manifest.py
 
 
 score-books: ## Score every past run on the computed metrics (free, no network)

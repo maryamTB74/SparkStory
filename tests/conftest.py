@@ -440,3 +440,32 @@ class FakeChunkStore:
             SearchHit(chunk=chunk, similarity=float(score))
             for score, chunk in ranked[:top_k]
         ]
+
+
+@pytest.fixture
+def serial_engine() -> Iterator[Engine]:
+    """An in-memory SQLite database holding empty worlds/seasons/chapters tables.
+
+    SQLite for the reason ``memory_engine`` gives, and here with no caveat at
+    all: none of these three tables has a vector or a generated column, so what
+    runs offline is the same schema that runs in Postgres. The guarantees under
+    test -- that an unapproved world takes no chapters, and that ordinals stay
+    contiguous -- are enforced by the store and by two unique constraints, both
+    of which SQLite honours.
+
+    Function-scoped, so no test can observe another's rows. That matters most
+    for the scope test, whose whole subject is which worlds are visible.
+    """
+    from sqlalchemy import MetaData, create_engine
+
+    from sparkstory.db.models import chapters_table, seasons_table, worlds_table
+
+    engine = create_engine("sqlite://")
+    metadata = MetaData()
+    for factory in (worlds_table, seasons_table, chapters_table):
+        factory(metadata=metadata)
+    metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()

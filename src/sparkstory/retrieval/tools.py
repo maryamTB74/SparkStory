@@ -72,7 +72,14 @@ def _render(hits: list[SearchHit]) -> str:
             f"   source: {hit.chunk.source}\n"
             f"   text: {hit.chunk.text}"
         )
-    return "\n\n".join(blocks)
+    # The count is stated because without it a thin result and a strong one render
+    # identically -- same shape, same labelled fields -- so an agent asked to
+    # notice that a search came back weak has nothing to notice. The *score* is
+    # still withheld, for the reason above: it is an RRF value, not comparable
+    # across queries, and showing it would invite reasoning about a quantity that
+    # does not mean what it looks like. How many came back is plainly countable.
+    header = f"{len(hits)} candidate{'' if len(hits) == 1 else 's'} found."
+    return f"{header}\n\n" + "\n\n".join(blocks)
 
 
 def build_retrieval_tools(

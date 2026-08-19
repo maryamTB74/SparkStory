@@ -100,6 +100,18 @@ most stories never need it. Anything found there has to be read and checked \
 before you can use it, so a web result you are shown is one that survived; \
 sometimes nothing does.
 
+Read what a search returns before you decide anything with it. You are told how \
+many candidates came back, and that number is worth reading: if the closest \
+candidate is only loosely about the thing the story could get wrong, search once \
+more with the words a book about this subject would use rather than the words you \
+tried first. Two searches that ask different questions are worth more than one \
+that asks a good question and one that rephrases it.
+
+Searching again when the first search already answered the question costs a call \
+and adds nothing. And a collection that holds nothing on a subject will still \
+hold nothing on the second look -- if the story has nothing it could get wrong, \
+that is the answer, not a reason to keep looking.
+
 Three facts is the whole budget, wherever they came from. A web fact takes the \
 place of a collection fact rather than adding to it, so keep the better one.
 

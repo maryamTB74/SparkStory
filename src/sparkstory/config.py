@@ -263,8 +263,17 @@ class Settings(BaseSettings):
     # Names an entry in `embedding_configs`, not `llm_configs`: an embedder takes
     # no messages and binds no output schema, so it cannot be built by
     # `get_chat_model`. Two registries, two factories.
+    # Defaults to the hosted model from 2026-08-19, at Maryam's request. The
+    # local `potion-base-8M` entry remains in the registry, so reverting is one
+    # env var and no re-ingest -- each embedder owns its own table.
+    #
+    # Note what this default costs, because it is the opposite of every other
+    # `*_model` default here: retrieval now needs a network call and a credential
+    # on the cheapest path in the system, and open item 3 records that Google has
+    # historically 503'd in this project. `EMBEDDING_MODEL=potion-base-8M` is the
+    # one-line recovery.
     embedding_model: str = Field(
-        default="potion-base-8M",
+        default="gemini-embedding",
         alias="EMBEDDING_MODEL",
         description="Model used to embed corpus chunks and search queries",
     )
@@ -596,23 +605,91 @@ class Settings(BaseSettings):
         and returns vectors. Sharing one registry would mean one factory had to
         branch on which kind an entry was.
 
-        No ``api_key_env_var``, and that absence is the point: these models run
-        locally. Every Google call in this project's history has failed with a
-        503, and xAI has no embeddings endpoint at all -- so an embedder that
-        needed a credential would put the whole retrieval layer behind the least
-        reliable dependency we have.
+        ``provider`` is what ``get_embedder`` dispatches on, and it exists
+        because there are now two genuinely different construction paths: local
+        weights loaded once into numpy, and a hosted endpoint called per batch.
+        Adding it is what keeps that a registry fact rather than an ``isinstance``
+        check inside the factory.
 
-        ``dimensions`` is recorded because the store writes one ``.npy`` of that
-        width. Changing it silently makes an existing index unreadable rather
-        than merely different, so it is pinned and tested.
+        ``dimensions`` is recorded because it is pinned into both the pgvector
+        column width *and* the table name (``chunks_<model>_<dims>``). Changing
+        it makes an existing index unreachable rather than merely different --
+        which is deliberate: a missing table is a clear failure, where a reused
+        one would be a dimension mismatch discovered at query time.
+
+        **On credentials, and this is a decision that reversed.** The local entry
+        was chosen partly because it needs no key: every Google call in this
+        project's history had failed with a 503 (open item 3), and xAI still has
+        no embeddings endpoint at all -- verified again 2026-08-19 against
+        ``docs.x.ai``, which exposes only chat and responses. So there is no Grok
+        embedder to move to, and this registry is Google or local.
+
+        Maryam has asked for the hosted model as the default anyway, and the cost
+        of being wrong is now much lower than it was when the local entry was
+        written: ``db/models.py`` gives every embedder *its own table*, so both
+        indexes coexist and ``EMBEDDING_MODEL`` switches between them with no
+        migration and no re-ingest of the other. Retrieval quality is measurable
+        (``make test-corpus``), so this is a reversible choice with a number
+        attached rather than a preference.
+
+        **What is genuinely at risk and cannot be argued away:** retrieval stops
+        being free, offline and deterministic. The local embedder has produced the
+        same vector for the same query since Session 1, which is what made a
+        falling hit-rate mean something. See the ``gemini-embedding`` entry.
         """
         return {
             # 256-dim static embeddings, distilled so inference is essentially
             # numpy. Measured in the task 1 spike: 3/3 at rank 1 on fact,
             # paraphrase and structural-craft queries, 3.6s to load.
+            #
+            # Kept, not deleted, now that the default has moved to the hosted
+            # model. It is the only embedder here that has never failed, it costs
+            # nothing to retain, and its table still exists -- so it is both the
+            # A/B control and the fallback an operator can reach for with one env
+            # var if Google is down.
             "potion-base-8M": {
+                "provider": "model2vec",
                 "identifier": "minishlab/potion-base-8M",
                 "dimensions": 256,
+            },
+            # The default from 2026-08-19, at Maryam's request.
+            #
+            # **`-001` rather than `-2`, and that was decided by running both.**
+            # The newer `gemini-embedding-2` returns exactly ONE embedding per
+            # request however many texts it is given -- verified live: a list of
+            # three came back as one. It is not broken, and one text at a time
+            # gives correct distinct vectors; it simply does not batch. `-001`
+            # returns three for three.
+            #
+            # That matters because ingest embeds the whole corpus. On `-2` a
+            # 58-chunk ingest is 58 sequential round trips, and every search
+            # query at runtime is its own request either way. Choosing the older
+            # model buys batching, which is the difference between ~2 requests
+            # and 58 per ingest.
+            #
+            # Written down because it is invisible from the documentation, which
+            # describes `-2` as current and says nothing about this: it is rule
+            # 34's lesson repeating on a third provider. The first version of
+            # this entry named `-2` and the batching code was written around a
+            # list-in-list-out contract that endpoint does not honour.
+            #
+            # `-001` does not auto-normalise below 3072 dimensions, unlike `-2`.
+            # That costs nothing here because `GeminiEmbedder` normalises anyway
+            # rather than trusting a provider to -- which is exactly the reason
+            # that decision was made.
+            #
+            # 768 rather than 3072: the model is Matryoshka-trained, so a
+            # truncated vector keeps most of its quality, while 3072 costs four
+            # times the storage and index size. At 58 chunks quality is decided
+            # by curation rather than dimensionality -- hit-rate@3 is already
+            # 1.00 on the local 256-dim model, so the headroom being bought is at
+            # @1 only. Verified live at 768: unit-length vectors, and two
+            # unrelated sentences at cosine 0.58 rather than collapsed together.
+            "gemini-embedding": {
+                "provider": "google",
+                "identifier": "gemini-embedding-001",
+                "dimensions": 768,
+                "api_key_env_var": "GOOGLE_API_KEY",
             },
         }
 

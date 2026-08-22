@@ -203,31 +203,72 @@ class TestCriticSettings:
 
 
 class TestEmbeddingRegistry:
-    """The second registry. Mirrors `llm_configs`, minus the credential."""
+    """The second registry. Mirrors `llm_configs`, and since 2026-08-19 it does
+    *not* mirror it "minus the credential" -- see the api-key test below."""
 
     def test_the_default_embedder_exists(self) -> None:
-        fresh = Settings()
-        assert fresh.embedding_model == "potion-base-8M"
+        """The default moved to the hosted model on 2026-08-19, at Maryam's
+        request. Asserted as a literal rather than merely "is in the registry",
+        because which one is default is the decision -- a looser assertion would
+        have passed unchanged through this swap and told nobody.
+
+        ``_env_file=None`` so this reads the *code* default rather than whatever
+        the developer's `.env` pins. Without it this test asserts a property of
+        one machine: it failed on first run here precisely because `.env` sets
+        `EMBEDDING_MODEL` explicitly, which is a real thing to know -- changing
+        the code default does not switch an existing installation -- but it is
+        not what this test is for."""
+        fresh = Settings(_env_file=None)
+        assert fresh.embedding_model == "gemini-embedding"
         assert fresh.embedding_model in fresh.embedding_configs
+
+    def test_the_local_embedder_is_still_available(self) -> None:
+        """Kept as both the A/B control and the recovery path. Retrieval now sits
+        behind a network call and a credential on the cheapest path in the
+        system, and open item 3 records that Google has 503'd here before --
+        `EMBEDDING_MODEL=potion-base-8M` is the one-line way back, which only
+        works while this entry exists."""
+        assert "potion-base-8M" in Settings().embedding_configs
 
     def test_every_entry_is_well_formed(self) -> None:
         for name, cfg in Settings().embedding_configs.items():
             assert cfg.get("identifier"), f"{name} missing identifier"
             assert cfg.get("dimensions"), f"{name} missing dimensions"
+            assert cfg.get("provider"), f"{name} missing provider"
 
-    def test_no_entry_needs_an_api_key(self) -> None:
-        """A local model needs no credential, and that is the whole reason it was
-        chosen: every Google call in this project's history has failed, and xAI
-        has no embeddings endpoint. An entry that grew an `api_key_env_var` would
-        mean that property had quietly been given up."""
+    def test_every_hosted_entry_declares_its_key_and_every_local_one_does_not(
+        self,
+    ) -> None:
+        """This replaces `test_no_entry_needs_an_api_key`, and the replacement is
+        the point rather than an incidental edit.
+
+        That test asserted no embedder needs a credential, which was the whole
+        argument for the local model: it kept retrieval off the least reliable
+        dependency in the project. Adding a hosted default gives that property
+        up deliberately, so the test asserting it had to go -- but deleting it
+        outright would leave nothing checking that a hosted entry says *which*
+        key it needs, which is what turns a missing credential into an
+        actionable message instead of a stack trace."""
         for name, cfg in Settings().embedding_configs.items():
-            assert "api_key_env_var" not in cfg, f"{name} requires a key"
+            if cfg["provider"] == "model2vec":
+                assert "api_key_env_var" not in cfg, f"{name} should need no key"
+            else:
+                assert cfg.get("api_key_env_var"), f"{name} must name its key"
 
     def test_dimensions_match_the_model_that_was_measured(self) -> None:
-        """Pinned from the task 1 spike, which measured 256. The store writes
-        one .npy of this width, so a silent change would make an existing index
-        unreadable rather than merely different."""
+        """Pinned from the task 1 spike, which measured 256. `dimensions` is
+        built into both the pgvector column and the table name, so a silent
+        change makes an existing index unreachable rather than merely
+        different."""
         assert Settings().embedding_configs["potion-base-8M"]["dimensions"] == 256
+
+    def test_the_hosted_width_matches_its_migration(self) -> None:
+        """768 is asserted in two places -- here and in revision 9c4a1f7b2d10,
+        which names the table `chunks_gemini_embedding_768`. This is the test
+        that fails if the spike says the endpoint returns something else and only
+        the registry gets updated, leaving ingest writing into a table whose name
+        no longer matches its contents."""
+        assert Settings().embedding_configs["gemini-embedding"]["dimensions"] == 768
 
 
 class TestResearchSettings:

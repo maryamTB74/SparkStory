@@ -8,7 +8,9 @@ What only this file can catch: **wiring**. Each node can be perfect while the
 workflow hands stage 3 the wrong stage-2 output, and no per-node test would notice.
 """
 
+import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -23,6 +25,7 @@ from sparkstory.entities.exceptions import (
     VideoGenerationError,
 )
 from sparkstory.entities.grounding import GroundedFact, StoryGrounding
+from sparkstory.entities.illustration import ArtItem, ArtStatus, StoryArt
 from sparkstory.entities.reviews import (
     ProseReview,
     ProseReviewsOutput,
@@ -36,6 +39,9 @@ from sparkstory.entities.stories import (
     StoryPage,
     StoryProse,
 )
+from sparkstory.mcp.tools import destinations as destinations_module
+from sparkstory.mcp.tools import pdf as pdf_module
+from sparkstory.mcp.tools.pdf import render_pdf_beside
 from sparkstory.mcp.tools.write_story import write_story_tool
 from sparkstory.memory.extract import ExtractedFact, ExtractedMemories
 from sparkstory.models.exceptions import MissingAPIKeyError
@@ -295,7 +301,11 @@ class TestRetryPolicy:
 
 class TestToolErrorTranslation:
     async def test_missing_api_key_becomes_tool_error(
-        self, monkeypatch: pytest.MonkeyPatch, brief: StoryBrief, outline: StoryOutline
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
     ) -> None:
         def raise_missing_key(*_: Any, **__: Any) -> None:
             raise MissingAPIKeyError(
@@ -304,7 +314,7 @@ class TestToolErrorTranslation:
 
         monkeypatch.setattr(WORKFLOW_FACTORY, raise_missing_key)
         with pytest.raises(ToolError, match="GOOGLE_API_KEY"):
-            await write_story_tool(brief, outline)
+            await write_story_tool(brief, outline, str(tmp_path))
 
     async def test_structure_errors_are_not_dressed_up_as_config_errors(
         self,
@@ -312,19 +322,21 @@ class TestToolErrorTranslation:
         brief: StoryBrief,
         outline: StoryOutline,
         page_plan: PagePlan,
+        tmp_path: Path,
     ) -> None:
         """No operator can fix malformed output by editing .env."""
         fakes = looping_fakes()
         fakes[PagePlan] = FakeModel(PagePlan(pages=page_plan.pages[:-1]))
 
         with pytest.raises(StoryStructureError):
-            await write_story_tool(brief, outline)
+            await write_story_tool(brief, outline, str(tmp_path))
 
     async def test_a_mismatched_outline_is_a_client_error_not_a_bug(
         self,
         fakes: dict[type, FakeModel],
         brief: StoryBrief,
         outline: StoryOutline,
+        tmp_path: Path,
     ) -> None:
         """The outline comes from an LLM client, so a mismatch is its mistake.
 
@@ -338,7 +350,7 @@ class TestToolErrorTranslation:
         )
 
         with pytest.raises(ToolError, match="beats"):
-            await write_story_tool(cramped, five_beats)
+            await write_story_tool(cramped, five_beats, str(tmp_path))
 
 
 class TestUnsafeContentClassification:
@@ -502,6 +514,7 @@ class TestUnsafeContentTranslation:
         brief: StoryBrief,
         outline: StoryOutline,
         looping_fakes: Callable[..., dict[type, FakeModel]],
+        tmp_path: Path,
     ) -> None:
         """Unlike StoryStructureError this is not a bug: it means the system
         worked and the answer is no, which the caller needs to hear. The caller
@@ -512,7 +525,7 @@ class TestUnsafeContentTranslation:
             ]
         )
         with pytest.raises(ToolError) as caught:
-            await write_story_tool(brief, outline)
+            await write_story_tool(brief, outline, str(tmp_path))
         assert "safety" in str(caught.value).lower()
 
     async def test_the_comment_reaches_the_client(
@@ -520,6 +533,7 @@ class TestUnsafeContentTranslation:
         brief: StoryBrief,
         outline: StoryOutline,
         looping_fakes: Callable[..., dict[type, FakeModel]],
+        tmp_path: Path,
     ) -> None:
         """'We could not do it' without saying why leaves the parent unable to
         adjust the brief and try again."""
@@ -529,7 +543,7 @@ class TestUnsafeContentTranslation:
             ]
         )
         with pytest.raises(ToolError) as caught:
-            await write_story_tool(brief, outline)
+            await write_story_tool(brief, outline, str(tmp_path))
         assert _prose_finding().comment in str(caught.value)
 
 
@@ -857,3 +871,364 @@ class TestVideoErrorClassification:
         """No operator fixes a broken encode by editing .env."""
         assert issubclass(VideoGenerationError, SparkStoryError)
         assert not issubclass(VideoGenerationError, ConfigurationError)
+
+
+class TestTheBookIsSavedToDisk:
+    """``write_story`` writes the finished book, and says where it went.
+
+    Before this, the prose was the one artifact that existed only as a tool
+    result: a client reported "your story is ready" with no path to give, and
+    closing the session lost the book. The two media tools already took an
+    ``output_directory`` and wrote files, so the surprising part was that the
+    book itself did not.
+    """
+
+    async def test_the_story_lands_in_the_directory(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        story = await write_story_tool(brief, outline, "a-book")
+
+        saved = tmp_path / "a-book" / "story.json"
+        assert saved.is_file()
+        # The directory, not the file: the folder now holds two artifacts, and a
+        # client sends this same string back as `illustrate_story`'s
+        # `output_directory` so a book and its pictures stay together.
+        assert story.saved_to == str(tmp_path / "a-book")
+
+    async def test_what_was_written_is_what_was_returned(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A file that does not round-trip is worse than no file: it looks like
+        a book until something tries to read it."""
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        story = await write_story_tool(brief, outline, "a-book")
+
+        reloaded = Story.model_validate_json(
+            (tmp_path / "a-book" / "story.json").read_text()
+        )
+        assert reloaded.pages == story.pages
+        assert reloaded.outline == story.outline
+
+    async def test_a_missing_directory_is_created(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The caller is an LLM client naming a directory per book, so requiring
+        it to exist already would fail on the common path, not an edge case."""
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        story = await write_story_tool(brief, outline, "run-1/book")
+
+        assert (tmp_path / "run-1" / "book" / "story.json").is_file()
+        assert story.saved_to is not None
+
+    async def test_an_unwritable_directory_is_a_client_error(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The caller chose the path and can choose a better one -- the same
+        test this tool applies to a mismatched outline. It must arrive as a
+        sentence, because the book has already been paid for by then."""
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+        blocker = tmp_path / "story-output"
+        blocker.write_text("not a directory")
+
+        with pytest.raises(ToolError):
+            await write_story_tool(brief, outline, "story-output")
+
+
+class TestTheDestinationIsConfined:
+    """``output_directory`` is chosen by an LLM client, so it is a name inside
+    ``outputs/`` rather than a path anywhere on disk.
+
+    Observed live: told to use ``outputs/<name>``, the model passed
+    ``tara_star_river`` and the book landed in the repo root. The prompt asks;
+    it cannot enforce. This is the same argument that made ``ChildId`` a type
+    rather than a sanitising call in the store -- when the caller is an agent,
+    the guard belongs in code.
+    """
+
+    async def test_a_bare_name_lands_under_outputs(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        story = await write_story_tool(brief, outline, "tara-star-river")
+
+        assert (tmp_path / "tara-star-river" / "story.json").is_file()
+        assert story.saved_to is not None
+        assert "tara-star-river" in story.saved_to
+
+    async def test_an_outputs_prefix_is_not_doubled(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A client that follows the prompt writes `outputs/<name>`; one that
+        does not writes `<name>`. Both must reach the same directory, or the
+        obedient client is the one that gets a surprising path."""
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        await write_story_tool(brief, outline, "outputs/tara-star-river")
+
+        assert (tmp_path / "tara-star-river" / "story.json").is_file()
+
+    @pytest.mark.parametrize(
+        "escape", ["../elsewhere", "/etc/sparkstory", "book/../../escape"]
+    )
+    async def test_an_escaping_path_is_refused(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        escape: str,
+    ) -> None:
+        """Refused rather than silently rewritten: a client that asked for a
+        path it cannot have should be told, not quietly redirected."""
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        with pytest.raises(ToolError):
+            await write_story_tool(brief, outline, escape)
+
+
+def _one_pixel_jpeg() -> bytes:
+    """A real, decodable JPEG.
+
+    `conftest`'s image fixture writes a plausible JPEG *header* and no image,
+    which is right for asserting a path was recorded and useless here: an
+    undecodable file takes `_draw_illustration`'s exception path, leaves the
+    frame blank, and produces exactly the text-only PDF this test is trying to
+    tell apart from the illustrated one. Rule 33's shape -- a fake that is wrong
+    in a plausible direction passes the weaker assertion.
+
+    Encoded rather than pasted as a base64 constant, because a hand-split
+    constant has silently lost bytes in this repository before.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (64, 48), (200, 120, 60)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def _pdf_pages(raw: bytes) -> bytes:
+    """A PDF's content, minus the parts that differ between identical renders.
+
+    reportlab stamps a creation date and a document id derived from the path and
+    the clock, so two renders of the same story never compare equal byte for
+    byte. Everything before the trailer is the drawn content.
+    """
+    return raw.split(b"trailer")[0]
+
+
+class TestTheBookIsAlsoRenderedAsAPdf:
+    """``write_story`` writes ``story.pdf`` beside ``story.json``.
+
+    The JSON is what every other stage reads -- illustration, narration, the
+    evals, ``scripts/build_pdf.py``. The PDF is the one artifact a *parent* can
+    open, and before this it existed only for runs made through
+    ``scripts/write_one_story.py``: a book made through MCP was a file no reader
+    could read.
+    """
+
+    async def test_a_pdf_lands_beside_the_json(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        story = await write_story_tool(brief, outline, "a-book")
+
+        pdf = tmp_path / "a-book" / "story.pdf"
+        assert pdf.is_file()
+        assert story.pdf_saved_to == str(pdf)
+        # Asserting the magic bytes rather than only the path, because an empty
+        # or truncated file would satisfy `is_file` and satisfy nothing else --
+        # the same reason the JSON has a round-trip test rather than an
+        # existence check.
+        assert pdf.read_bytes().startswith(b"%PDF")
+
+    async def test_illustrating_re_renders_the_pdf_with_the_pictures_in_it(
+        self,
+        story: Story,
+        tmp_path: Path,
+    ) -> None:
+        """The illustrated PDF, and the reason this is not covered by the renderer's
+        own tests.
+
+        `render_pdf` has always accepted a `StoryArt` and placed its images, and
+        `scripts/write_one_story.py` has always passed one. What did not work was
+        the MCP path: `write_story` renders before any picture exists and
+        `illustrate_story` had no re-render, so a book made through the tools got
+        a text-only PDF for ever and the images sat beside it unused. A real run
+        produced exactly that -- six JPEGs, a `story.json`, and no illustrated
+        book -- and every test passed throughout, because each half worked.
+
+        Asserted by *size against the text-only render of the same story*, not by
+        `is_file` or the `%PDF` magic bytes. Both of those pass on the text-only
+        book, so they could not fail if the art were dropped -- which is the one
+        thing this test exists to catch.
+        """
+        image = tmp_path / "page-01.jpg"
+        image.write_bytes(_one_pixel_jpeg())
+
+        art = StoryArt(
+            style_bible="soft watercolour",
+            pages=[
+                ArtItem(
+                    key=str(story.pages[0].page_number),
+                    status=ArtStatus.CONDITIONED,
+                    path=image,
+                    detail="conditioned on: Kim",
+                )
+            ],
+        )
+
+        plain_dir = tmp_path / "plain"
+        plain_dir.mkdir()
+        illustrated_dir = tmp_path / "illustrated"
+        illustrated_dir.mkdir()
+
+        assert render_pdf_beside(story, plain_dir) is not None
+        result = render_pdf_beside(story, illustrated_dir, art)
+
+        assert result == str(illustrated_dir / "story.pdf")
+        plain = (plain_dir / "story.pdf").stat().st_size
+        illustrated = (illustrated_dir / "story.pdf").stat().st_size
+        assert illustrated > plain, (
+            f"the illustrated PDF ({illustrated} bytes) is no larger than the "
+            f"text-only one ({plain}), so the image was not embedded"
+        )
+
+    async def test_an_all_failed_art_run_renders_the_text_only_book(
+        self,
+        story: Story,
+        tmp_path: Path,
+    ) -> None:
+        """A run where every image failed must render byte-for-byte as text-only.
+
+        `illustrate_story` passes its `StoryArt` unconditionally rather than
+        checking whether anything drew, on the strength of `render_pdf`'s
+        documented promise that `None` and an all-failed `StoryArt` behave
+        identically. That promise is what makes the unconditional call safe, so
+        it is asserted here rather than trusted -- and a byte comparison is the
+        only assertion that can fail if a blank frame ever starts drawing
+        something.
+        """
+        art = StoryArt(
+            style_bible="soft watercolour",
+            pages=[
+                ArtItem(
+                    key=str(page.page_number),
+                    status=ArtStatus.FAILED,
+                    path=None,
+                    detail="resource-exhausted",
+                )
+                for page in story.pages
+            ],
+        )
+
+        plain_dir = tmp_path / "plain"
+        plain_dir.mkdir()
+        failed_dir = tmp_path / "failed"
+        failed_dir.mkdir()
+
+        render_pdf_beside(story, plain_dir)
+        render_pdf_beside(story, failed_dir, art)
+
+        # Excluding the trailing PDF id, which reportlab derives from the file
+        # path and the clock, so two renders of identical content differ there.
+        assert _pdf_pages((plain_dir / "story.pdf").read_bytes()) == _pdf_pages(
+            (failed_dir / "story.pdf").read_bytes()
+        )
+
+    async def test_a_failed_pdf_does_not_lose_the_book(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The one soft failure in this tool, and the reason it is soft: the
+        book is already written and saved by the time a PDF can fail, and
+        ``scripts/build_pdf.py`` rebuilds the PDF from that JSON alone. Raising
+        here would discard a correct book over a rendering.
+        """
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        def refuse_to_render(*_: object, **__: object) -> None:
+            raise StoryStructureError("page 3 does not fit its frame")
+
+        monkeypatch.setattr(pdf_module, "render_pdf", refuse_to_render)
+
+        story = await write_story_tool(brief, outline, "a-book")
+
+        assert (tmp_path / "a-book" / "story.json").is_file()
+        assert story.saved_to == str(tmp_path / "a-book")
+        # The field is what a client acts on. Without it, a client reading only
+        # `saved_to` would tell a parent the PDF is in that folder, and be
+        # wrong -- which is the failure the field exists to prevent.
+        assert story.pdf_saved_to is None
+
+    async def test_a_failed_pdf_is_logged_loudly(
+        self,
+        fakes: dict[type, FakeModel],
+        brief: StoryBrief,
+        outline: StoryOutline,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """An absent field says *that* the PDF is missing; only the log says
+        why. A soft failure with no log is the shape of finding CC, where a
+        stage failed open and the run looked completely normal.
+        """
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        def refuse_to_render(*_: object, **__: object) -> None:
+            raise OSError("no space left on device")
+
+        monkeypatch.setattr(pdf_module, "render_pdf", refuse_to_render)
+
+        with caplog.at_level(logging.ERROR):
+            await write_story_tool(brief, outline, "a-book")
+
+        assert "no space left on device" in caplog.text

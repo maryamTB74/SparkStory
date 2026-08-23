@@ -106,18 +106,24 @@ class TestExpensiveToolsCanBeWithheld:
         assert tool.description is not None
         assert "plan_story" in tool.description
 
-    async def test_write_story_takes_brief_and_outline(self) -> None:
+    async def test_write_story_takes_brief_outline_and_a_destination(self) -> None:
         """A client must pass the approved plan, not just the brief.
 
         This is the schema half of the whole design: if `outline` were optional
         the server would silently fall back to building a book the parent never
         saw, which is precisely the defect this replaced.
+
+        `output_directory` is required for a narrower reason: optional would
+        mean a client that omits it gets a book that is never written to disk
+        and no error saying so -- the tool reporting success while the parent
+        loses the book when the session closes.
         """
         async with Client(create_server()) as client:
             tool = next(t for t in await client.list_tools() if t.name == "write_story")
 
-        assert {"brief", "outline"} <= set(tool.inputSchema["properties"])
-        assert set(tool.inputSchema.get("required", [])) == {"brief", "outline"}
+        expected = {"brief", "outline", "output_directory"}
+        assert expected <= set(tool.inputSchema["properties"])
+        assert set(tool.inputSchema.get("required", [])) == expected
 
 
 class TestClientVisibleSchema:
@@ -225,14 +231,17 @@ class TestPromptContent:
         If a later tool is deliberately outside this workflow, add it to an
         explicit exclusion set here rather than deleting the test.
         """
-        # Deliberately outside the guided workflow, as this test's docstring
-        # provides for. `narrate_story` was added as a callable tool without
-        # touching the prompt: the prompt is 421 words and Q4 (asking for
-        # pronouns) already failed one run of two on a small client, so growing
-        # it costs the six verdicts `try_prompt.py` measures. Chaining narration
-        # into `create_storybook` is a separate decision needing its own harness
-        # run -- until then a client reaches this tool by asking for it.
-        outside_the_guided_workflow = {"narrate_story"}
+        # Empty, and it was `{"narrate_story"}` until narration was folded into
+        # step 6. The note it replaces was right about the cost -- the prompt is
+        # longer again and Q4 (asking for pronouns) is still the earliest
+        # instruction in it -- and wrong about what a client would do without
+        # the step: the reasoning assumed a parent would ask for narration, and
+        # in practice the prompt's closing "that is the end of the job" ended
+        # the turn after the pictures, so a finished book was simply never read
+        # aloud. Restoring an exclusion here is legitimate for a tool genuinely
+        # outside this workflow; do not restore it to paper over a prompt that
+        # forgot a tool.
+        outside_the_guided_workflow: set[str] = set()
 
         async with Client(create_server()) as client:
             registered = {t.name for t in await client.list_tools()}

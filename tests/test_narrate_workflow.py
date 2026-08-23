@@ -10,6 +10,7 @@ from fastmcp.exceptions import ToolError
 from sparkstory.entities.exceptions import AudioConfigurationError
 from sparkstory.entities.narration import NarrationStatus
 from sparkstory.entities.stories import ReadingLevel, Story, StoryBrief, Voice
+from sparkstory.mcp.tools import destinations as destinations_module
 from sparkstory.mcp.tools.narrate_story import narrate_story_tool
 from sparkstory.models.fake_speech_model import MP3_SILENCE, FakeSpeechProvider
 from sparkstory.workflows import narrate as narrate_module
@@ -341,10 +342,11 @@ class TestToolErrorTranslation:
                 "Model 'grok-speech' requires XAI_API_KEY, which is not set."
             )
 
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
         monkeypatch.setattr(narrate_module, "build_speech_model", raise_missing_key)
 
         with pytest.raises(ToolError, match="XAI_API_KEY"):
-            await narrate_story_tool(brief, story, str(tmp_path))
+            await narrate_story_tool(brief, story, "a-book")
 
     async def test_a_partly_failed_narration_returns_rather_than_raises(
         self,
@@ -358,9 +360,10 @@ class TestToolErrorTranslation:
         into an error. The `StoryNarration` returned IS the report -- a client
         reads `is_complete`. Verified live by the `live-rejected` run.
         """
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
         speak(monkeypatch, fail_on=(story.pages[1].text[:20],))
 
-        narration = await narrate_story_tool(brief, story, str(tmp_path))
+        narration = await narrate_story_tool(brief, story, "a-book")
 
         assert narration.is_complete is False
         assert narration.pages_narrated == len(story.pages) - 1
@@ -378,10 +381,11 @@ class TestToolErrorTranslation:
         adjacent tools whose pipelines disagree on argument order is exactly the
         swap a type checker cannot catch, since both are Pydantic models.
         """
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
         speak(monkeypatch)
 
-        narration = await narrate_story_tool(brief, story, str(tmp_path))
+        narration = await narrate_story_tool(brief, story, "a-book")
 
         assert narration.voice_id == _VOICES[brief.voice]
         assert len(narration.items) == len(story.pages)
-        assert (tmp_path / "narration.json").exists()
+        assert (tmp_path / "a-book" / "narration.json").exists()

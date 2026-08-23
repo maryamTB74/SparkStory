@@ -279,6 +279,29 @@ class StoryArt(BaseModel):
     style_bible: str
     portraits: list[ArtItem] = Field(default_factory=list)
     pages: list[ArtItem] = Field(default_factory=list)
+    # Mirrors `Story.pdf_saved_to`, and carries it for the same reason: the PDF
+    # is allowed to be absent, so a client needs somewhere to read that rather
+    # than assuming a file it was never told about.
+    #
+    # Why it appears on *this* model at all, when the book already reported a
+    # PDF once: the first render happened before any picture existed, so it was
+    # the text-only book. Drawing the pictures makes that file out of date, and
+    # re-rendering is the only way an illustrated PDF can exist over MCP -- the
+    # prose and the images arrive in separate tool calls. This field is what
+    # tells a client the path it was given earlier now points at a better file.
+    #
+    # The description is caller-facing on purpose; it becomes prompt text a
+    # client's LLM reads.
+    pdf_saved_to: str | None = Field(
+        default=None,
+        description=(
+            "Where the book's PDF was written, now including the pictures. This "
+            "replaces the PDF `write_story` made, which had no illustrations in "
+            "it yet. When this is absent the images were still saved and only "
+            "the PDF is missing - say so rather than reporting the pictures as "
+            "failed."
+        ),
+    )
 
     def page_image(self, page_number: int) -> Path | None:
         """The image to draw on ``page_number``, or None if there is none.

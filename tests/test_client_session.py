@@ -14,9 +14,13 @@ import json
 from typing import Any
 
 import pytest
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from sparkstory.mcp.client.session import ClientSession
+from sparkstory.mcp.client.session import (
+    _NUDGE,
+    _SAID_NOTHING,
+    ClientSession,
+)
 
 
 class FakeClientModel:
@@ -277,6 +281,118 @@ class TestToolLoop:
         assert len(result.executed) == 3
 
 
+class TestTheModelsReplyReachesTheUser:
+    """A reply the client drops is indistinguishable from a model saying nothing.
+
+    ``AIMessage.content`` is either a plain string or a list of content blocks,
+    and which arrives is a property of the provider and the turn rather than of
+    anything we asked for. An earlier version read the string case and returned
+    "" for the list, so a model answering in blocks printed only its tool line
+    and then an empty prompt -- the REPL looked like it had finished when it had
+    in fact discarded the answer.
+    """
+
+    async def test_plain_string_content_is_returned(self) -> None:
+        model = FakeClientModel(AIMessage(content="Here is the plan."))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+
+    async def test_a_list_of_text_blocks_is_flattened(self) -> None:
+        model = FakeClientModel(
+            AIMessage(
+                content=[
+                    {"type": "text", "text": "Here is "},
+                    {"type": "text", "text": "the plan."},
+                ]
+            )
+        )
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+
+    async def test_bare_strings_in_a_block_list_are_kept(self) -> None:
+        model = FakeClientModel(AIMessage(content=["Here is ", "the plan."]))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+
+    async def test_non_text_blocks_are_skipped_rather_than_stringified(self) -> None:
+        """A reasoning or image block rendered as its dict repr would put JSON
+        in front of a parent, which is worse than omitting it."""
+        model = FakeClientModel(
+            AIMessage(
+                content=[
+                    {"type": "thinking", "thinking": "hmm"},
+                    {"type": "text", "text": "Here is the plan."},
+                ]
+            )
+        )
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+
+
+class TestAnEmptyReplyIsSaidOutLoud:
+    """A model that answers with nothing is not the same as a client that broke.
+
+    Observed live on `grok-3-mini`: after `plan_story` returned, the model
+    produced a turn carrying no text and no tool calls, so the REPL printed the
+    tool line and then a bare prompt. The outline it was asked to show reached
+    nobody, and nothing distinguished that from a crash. The same reply is what
+    made `try_prompt.py` report "0 words shown" on one run and pass on the next.
+
+    No prompt wording reliably stops a model returning nothing, so this makes it
+    visible and recoverable rather than pretending it can be prevented.
+    """
+
+    async def test_an_empty_reply_reports_itself(self) -> None:
+        model = FakeClientModel(AIMessage(content=""))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text
+        assert "nothing" in result.text.lower()
+
+    async def test_a_whitespace_only_reply_counts_as_empty(self) -> None:
+        """A model answering with a newline has said as little as one answering
+        with "", and it renders identically to a user."""
+        model = FakeClientModel(AIMessage(content="   \n  "))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert "nothing" in result.text.lower()
+
+    async def test_a_real_reply_is_untouched(self) -> None:
+        model = FakeClientModel(AIMessage(content="Here is the plan."))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+
+
+class TestHittingTheTurnCapIsVisible:
+    """Exhausting the loop used to return empty text, which reads exactly like a
+    model that finished and had nothing to add. A client still asking for tools
+    when it runs out of turns is a different situation and has to say so."""
+
+    async def test_the_cap_reports_itself(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        forever = _turn_calling("plan_story", _brief_args())
+        model = FakeClientModel(forever)
+        async with ClientSession(model=model, max_tool_turns=2) as session:
+            monkeypatch.setattr(session, "_call_tool", _stub_call(_outline_payload()))
+            result = await session.send("plan forever")
+
+        assert result.text
+        assert "2" in result.text
+
+
 class TestInspectMode:
     """Which tools run by default, and which are only looked at.
 
@@ -374,3 +490,88 @@ class TestTransportSelection:
         # __aenter__. If this ever starts hanging, that assumption changed.
         session = ClientSession(transport="stdio")
         assert session is not None
+
+
+class TestAnEmptyTurnIsNudgedOnce:
+    """A turn with neither text nor a tool call gets one second chance.
+
+    Observed live, twice in one run, and it cost more than a missing sentence.
+    `grok-3-mini` returned nothing at exactly the two points where the prompt
+    says "stop" or "end your turn" -- after `plan_story` and after
+    `illustrate_story` -- while the place that names what to say and never says
+    stop, the offer of pictures after `write_story`, worked every time. The model
+    was ending its turn as literally as it could.
+
+    After `plan_story` that swallowed the approval question. The user typed "go"
+    to get any reply at all, the model read it as approval, and a book was
+    written from a plan nobody had been shown -- defeating the one stop the whole
+    prompt exists to protect.
+    """
+
+    async def test_a_nudge_recovers_the_reply(self) -> None:
+        """The empty turn is retried and the real answer reaches the user.
+
+        Asserted on the returned text rather than on the retry count, because
+        what was broken is what the *user* saw: a dead turn where a question
+        belonged.
+        """
+        model = FakeClientModel(
+            AIMessage(content=""),
+            AIMessage(content="Would you like the story read aloud?"),
+        )
+        async with ClientSession(model=model) as session:
+            result = await session.send("the pictures are done")
+
+        assert result.text == "Would you like the story read aloud?"
+        # Two invocations: the empty one and the nudged one. Without the retry
+        # this is 1, so the assertion has room to fail.
+        assert len(model.calls) == 2
+
+    async def test_the_nudge_is_the_newest_message(self) -> None:
+        """The nudge must arrive as a user turn the model can answer.
+
+        Appended to history rather than passed as a fresh `send`, so the turn is
+        still one turn from the caller's point of view and the tool results
+        already in history stay where they are.
+        """
+        model = FakeClientModel(
+            AIMessage(content=""),
+            AIMessage(content="Here is the plan."),
+        )
+        async with ClientSession(model=model) as session:
+            await session.send("plan it")
+
+        nudged_history = model.calls[1]
+        assert isinstance(nudged_history[-1], HumanMessage)
+        assert nudged_history[-1].content == _NUDGE
+
+    async def test_a_model_that_stays_silent_is_reported_honestly(self) -> None:
+        """One retry, not a loop, and the fallback message survives.
+
+        A model that is genuinely finished answers an empty turn with another
+        empty turn. Retrying repeatedly would spend a call per attempt and
+        produce the same nothing, so silence twice is reported rather than
+        chased. This is the case `_SAID_NOTHING` still exists for.
+        """
+        model = FakeClientModel(AIMessage(content=""))
+        async with ClientSession(model=model) as session:
+            result = await session.send("hello")
+
+        assert result.text == _SAID_NOTHING
+        # Exactly two: the original and one nudge. A third would mean the retry
+        # is looping.
+        assert len(model.calls) == 2
+
+    async def test_text_is_never_nudged(self) -> None:
+        """A turn that said something is finished, and must cost no extra call.
+
+        The guard is `not calls and not text`, and getting it wrong the other way
+        -- nudging whenever there are no tool calls -- would add a paid call to
+        every ordinary reply in the session.
+        """
+        model = FakeClientModel(AIMessage(content="Here is the plan."))
+        async with ClientSession(model=model) as session:
+            result = await session.send("plan it")
+
+        assert result.text == "Here is the plan."
+        assert len(model.calls) == 1

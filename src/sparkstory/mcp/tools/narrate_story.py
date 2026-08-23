@@ -22,13 +22,12 @@ The alternative -- raising on partial success -- would throw away a narrated boo
 over one missing page.
 """
 
-from pathlib import Path
-
 from fastmcp.exceptions import ToolError
 
 from sparkstory.entities.exceptions import ConfigurationError
 from sparkstory.entities.narration import StoryNarration
 from sparkstory.entities.stories import Story, StoryBrief
+from sparkstory.mcp.tools.destinations import resolve_destination
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.narrate import run_narration_pipeline
 
@@ -53,7 +52,12 @@ async def narrate_story_tool(
     The tools are what a client sees, so they stay consistent with each other.
     """
     try:
-        return await run_narration_pipeline(story, brief, Path(output_directory))
+        # Resolved rather than used raw, and shared with `write_story` so one
+        # name cannot mean two directories. It did: this tool passed the string
+        # straight to `Path(...)`, so a caller's "kim-metocondry" put the book
+        # under `outputs/` and the audio in the repository root.
+        destination = resolve_destination(output_directory)
+        return await run_narration_pipeline(story, brief, destination)
     except ConfigurationError as exc:
         logger.error("Narration failed -- configuration: %s", exc)
         raise ToolError(str(exc)) from exc

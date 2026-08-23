@@ -25,13 +25,13 @@ alternative is a tool that raises on partial success, which would throw away a b
 over one missing picture.
 """
 
-from pathlib import Path
-
 from fastmcp.exceptions import ToolError
 
 from sparkstory.entities.exceptions import ConfigurationError
 from sparkstory.entities.illustration import StoryArt
 from sparkstory.entities.stories import Story, StoryBrief
+from sparkstory.mcp.tools.destinations import resolve_destination
+from sparkstory.mcp.tools.pdf import render_pdf_beside
 from sparkstory.utils.logging_utils import get_logger
 from sparkstory.workflows.illustrate import run_illustration_pipeline
 
@@ -49,7 +49,12 @@ async def illustrate_story_tool(
     already has to make.
     """
     try:
-        return await run_illustration_pipeline(brief, story, Path(output_directory))
+        # Resolved rather than used raw, and shared with `write_story` so one
+        # name cannot mean two directories. It did: this tool passed the string
+        # straight to `Path(...)`, so a caller's "kim-metocondry" put the book
+        # under `outputs/` and the pictures in the repository root.
+        destination = resolve_destination(output_directory)
+        art = await run_illustration_pipeline(brief, story, destination)
     except ConfigurationError as exc:
         logger.error("Illustration failed -- configuration: %s", exc)
         raise ToolError(str(exc)) from exc
@@ -58,3 +63,24 @@ async def illustrate_story_tool(
     # `StoryArt`, which is what "illustration fails soft" means. Catching it here
     # would be dead code today and, worse, would be the obvious place for someone to
     # later convert a partial success into a raised error, undoing the design.
+
+    # Re-render the book now that there are pictures to put in it. `write_story`
+    # made a PDF before any image existed, so the file sitting beside the JSON is
+    # the text-only book; this replaces it with the illustrated one, and it is the
+    # only way an illustrated PDF can exist over MCP -- the two halves arrive in
+    # separate tool calls and the earlier one cannot be reached again.
+    #
+    # Outside the `try` above on purpose. That block translates
+    # `ConfigurationError` into a client-facing sentence, and a
+    # `StoryStructureError` from the renderer is not a configuration problem; it
+    # would arrive at the client as one. `render_pdf_beside` swallows both of its
+    # own failure modes and reports them as `None`, so there is nothing to catch.
+    #
+    # Passing `art` unconditionally rather than checking whether anything drew:
+    # `render_pdf` treats `None` and an all-failed `StoryArt` identically by
+    # design, so a run where every image failed re-renders the same text-only
+    # book it would have produced anyway. Branching here would add a path with no
+    # different outcome.
+    return art.model_copy(
+        update={"pdf_saved_to": render_pdf_beside(story, destination, art)}
+    )

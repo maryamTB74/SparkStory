@@ -12,6 +12,7 @@ exercised is a path nobody can trust.
 from pathlib import Path
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from sparkstory.config import settings
 from sparkstory.entities.exceptions import StoryStructureError
@@ -26,6 +27,9 @@ from sparkstory.entities.illustration import (
     StoryArt,
 )
 from sparkstory.entities.stories import Story, StoryBrief
+from sparkstory.mcp.tools import destinations as destinations_module
+from sparkstory.mcp.tools.destinations import resolve_destination
+from sparkstory.mcp.tools.illustrate_story import illustrate_story_tool
 from sparkstory.models.fake_image_model import FakeImageProvider
 from sparkstory.models.fake_model import FakeModel
 from sparkstory.nodes.illustration_director import (
@@ -813,3 +817,74 @@ class TestTheConsistencyGate:
         assert all(i.consistency is not None for i in art.portraits), (
             "the cheap check with the most leverage always runs"
         )
+
+
+class TestTheToolLayerConfinesItsOutput:
+    """``illustrate_story_tool`` writes where ``write_story_tool`` wrote.
+
+    This tool had no tests at all until now, and that is exactly how it came to
+    disagree with its sibling: ``write_story`` resolved a caller's directory name
+    under ``outputs/`` while this one passed the string straight to ``Path(...)``.
+    One name therefore meant two places -- the book under ``outputs/`` and the
+    pictures in the repository root, where a stray ``kim-metocondry/`` of six
+    JPEGs and a portrait was found sitting untracked.
+
+    The suite passed throughout. A tool with no test is where a whole-file defect
+    survives a green run.
+    """
+
+    async def test_a_bare_name_lands_under_the_output_root(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        directed: None,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        await illustrate_story_tool(brief, story, "a-book")
+
+        assert (tmp_path / "a-book").is_dir()
+        assert list((tmp_path / "a-book").glob("page-*.*"))
+
+    async def test_the_pictures_land_where_the_book_did(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        directed: None,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The acceptance question, phrased the way the prompt asks a client to
+        behave: it is told to pass ``saved_to`` from ``write_story`` straight
+        back as this tool's ``output_directory``. That only keeps a book and its
+        pictures together if both tools resolve a name the same way.
+        """
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+        book = resolve_destination("a-book")
+        book.mkdir(parents=True)
+        (book / "story.json").write_text("{}")
+
+        await illustrate_story_tool(brief, story, str(book))
+
+        assert (book / "story.json").is_file(), "the book is still there"
+        assert list(book.glob("page-*.*")), "and the pictures are beside it"
+
+    @pytest.mark.parametrize("escape", ["../elsewhere", "/etc/sparkstory"])
+    async def test_an_escaping_path_is_refused(
+        self,
+        brief: StoryBrief,
+        story: Story,
+        provider: FakeImageProvider,
+        directed: None,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        escape: str,
+    ) -> None:
+        monkeypatch.setattr(destinations_module, "_OUTPUT_ROOT", tmp_path)
+
+        with pytest.raises(ToolError):
+            await illustrate_story_tool(brief, story, escape)

@@ -36,6 +36,73 @@ from sparkstory.mcp.server import create_server
 #: loop writes books until the key runs out.
 MAX_TOOL_TURNS = 6
 
+
+def _text_of(content: Any) -> str:
+    """Flatten a model reply to the text a human should see.
+
+    ``AIMessage.content`` is either a plain string or a list of content blocks,
+    and which one arrives is a property of the provider and the turn rather than
+    of anything we asked for. An earlier version handled the string and returned
+    "" for the list, so a model that answered in blocks looked to the REPL like
+    a model that had said nothing: the tool line printed, then an empty prompt.
+    Silence is the one output a user cannot distinguish from success.
+
+    Non-text blocks -- reasoning, images -- are skipped rather than stringified.
+    A dict rendered as its repr would put JSON in front of a parent, which is
+    worse than leaving it out.
+    """
+    if isinstance(content, str):
+        return content.strip()
+
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and block.get("type") == "text":
+            parts.append(block.get("text", ""))
+    # Stripped for the same reason the string branch is: a reply of one newline
+    # has said as little as a reply of "", and renders identically to a reader.
+    return "".join(parts).strip()
+
+
+#: Shown when a turn carries neither text nor a tool call, and only after the
+#: nudge below has already failed. Observed live on `grok-3-mini` right after
+#: `plan_story` returned: the outline it was asked to show reached nobody, and an
+#: empty line is indistinguishable from a crash. No prompt wording reliably
+#: prevents this, so the client names it instead.
+_SAID_NOTHING = (
+    '[the model replied with nothing -- ask it again, for example "show me the plan"]'
+)
+
+#: Sent once when a turn comes back empty, to give the model a second chance
+#: before the user is handed a dead turn.
+#:
+#: **Why this is worth a paid call.** A run on `grok-3-mini` produced empty
+#: replies at exactly the two points where the prompt says "stop" or "end your
+#: turn" -- after `plan_story` and after `illustrate_story` -- while the one
+#: place that names what to say and never says stop, the offer of pictures after
+#: `write_story`, worked every time. So the model was ending its turn as
+#: literally as it could: no tool call and no text. The user's own recovery was
+#: to type "go", which is this message by hand.
+#:
+#: The cost of not doing it is not a missing sentence. After `plan_story` the
+#: empty turn swallowed the approval question, the user typed "go" to get any
+#: reply at all, and the model read that as approval -- so a book was written
+#: from a plan nobody was shown. That is the one stop the prompt exists to
+#: protect.
+#:
+#: Phrased as an instruction to continue rather than as an apology, and it names
+#: no artifact: "show me the plan" would be wrong after illustration, and a
+#: nudge that tells the model what stage it is at is a nudge that can tell it
+#: wrongly. The model has the history and knows where it is.
+_NUDGE = "Continue with what you were about to say."
+
+#: One retry, not a loop. A model that is genuinely finished answers an empty
+#: turn with another empty turn, so retrying repeatedly buys nothing and spends a
+#: call each time. `_SAID_NOTHING` remains the fallback for exactly that case.
+_MAX_EMPTY_RETRIES = 1
+
+
 #: Tools that are inspected rather than run unless ``execute=True``.
 #:
 #: A name list rather than a cost heuristic, deliberately. A heuristic drifts as
@@ -269,6 +336,7 @@ class ClientSession:
         self._history.append(HumanMessage(content=message))
         executed: list[ExecutedCall] = []
         requested: list[ToolCall] = []
+        empty_retries = 0
 
         for _ in range(self._max_tool_turns):
             response = await self._model.ainvoke(self._history)
@@ -281,8 +349,25 @@ class ClientSession:
             requested.extend(calls)
 
             if not calls:
-                text = response.content if isinstance(response.content, str) else ""
-                return TurnResult(text=text, tool_calls=requested, executed=executed)
+                text = _text_of(response.content)
+                if text:
+                    return TurnResult(
+                        text=text, tool_calls=requested, executed=executed
+                    )
+
+                # Neither text nor a tool call: the turn produced nothing at all.
+                # Nudge once and go round again rather than handing the user a
+                # dead turn -- see `_NUDGE` for what this costs and why the
+                # alternative cost more. The nudge is appended to history, so the
+                # next `ainvoke` sees it as the newest message.
+                if empty_retries < _MAX_EMPTY_RETRIES:
+                    empty_retries += 1
+                    self._history.append(HumanMessage(content=_NUDGE))
+                    continue
+
+                return TurnResult(
+                    text=_SAID_NOTHING, tool_calls=requested, executed=executed
+                )
 
             # Inspect mode halts the turn rather than answering with a stand-in
             # result. Anything phrased as a *result* -- even "not executed" --
@@ -304,7 +389,18 @@ class ClientSession:
                 executed.append(ran)
                 self._record(ran)
 
-        return TurnResult(text="", tool_calls=requested, executed=executed)
+        # Falling out of the loop means the model was still asking for tools when
+        # it ran out of turns -- a different situation from finishing, and it
+        # used to be reported the same way: empty text and a fresh prompt. A
+        # client stuck in a loop looked exactly like one that had nothing to add.
+        return TurnResult(
+            text=(
+                f"Stopped after {self._max_tool_turns} tool turns; the model was "
+                "still requesting tools. Say what you want next, or start again."
+            ),
+            tool_calls=requested,
+            executed=executed,
+        )
 
 
 def as_openai_tools(tools: list[Any]) -> list[dict]:

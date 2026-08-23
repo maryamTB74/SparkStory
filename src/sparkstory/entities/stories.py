@@ -512,3 +512,31 @@ class Story(BaseModel):
     # Kept as the pages themselves rather than the StoryProse wrapper: the wrapper
     # exists only because structured output needs a top-level model.
     pages: list[StoryPage]
+    # Set by the tool layer after the book is written, not by any agent -- which
+    # is why it is optional with a default: the pipeline builds a Story that has
+    # not been saved yet, and every existing caller keeps working.
+    #
+    # The description is caller-facing on purpose. It becomes prompt text a
+    # client's LLM reads, and a client that mistook this for an input would try
+    # to choose the path here instead of in `output_directory`.
+    saved_to: str | None = Field(
+        default=None,
+        description=(
+            "The directory the finished book was written into, once it has been "
+            "saved. Tell the reader this path so they can find their book again."
+        ),
+    )
+    # Separate from `saved_to` rather than inferred from it, because the PDF is
+    # allowed to be absent. Rendering can fail on a book that saved perfectly --
+    # `render_pdf` raises when a page's text overflows its frame -- and a
+    # directory path cannot report that, so a client reading only `saved_to`
+    # would promise a file that is not there. `None` says "no PDF" in the one
+    # place the client is already looking.
+    pdf_saved_to: str | None = Field(
+        default=None,
+        description=(
+            "Where the book's PDF was written, if one was made. When this is "
+            "absent the book was still saved and only the PDF is missing - say "
+            "so rather than reporting the whole book as failed."
+        ),
+    )

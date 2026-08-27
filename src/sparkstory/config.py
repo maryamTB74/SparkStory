@@ -23,9 +23,9 @@ Model configuration is deliberately two-level:
 
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # src/sparkstory/config.py -> parents[2] is the repository root. Depth-sensitive:
@@ -198,14 +198,15 @@ class Settings(BaseSettings):
         description="Model used by the offline book judge",
     )
     # Reorders retrieval candidates before the Researcher sees them. Defaults to a
-    # zero-temperature entry deliberately: retrieval is otherwise deterministic --
-    # the embedder is local and the same query has produced the same vector since
-    # the first session -- and a reranker that answers differently on identical
-    # input would convert that into a stage whose output nobody can reproduce.
+    # zero-temperature entry deliberately: a reranker that answers differently on
+    # identical input converts retrieval into a stage nobody can reproduce, which
+    # is what makes a movement in hit-rate readable at all. The provider moved to
+    # Google with the resolver below; the temperature-0 requirement is what
+    # matters and both critic entries satisfy it.
     # Whether temperature 0 is *enough* is measured rather than assumed; see the
     # repeatability check in tests/test_retrieval_eval.py.
     reranker_model: str = Field(
-        default="grok-3-mini-critic",
+        default="gemini-3.5-flash-critic",
         alias="RERANKER_MODEL",
         description="Model that reorders retrieval candidates",
     )
@@ -307,11 +308,16 @@ class Settings(BaseSettings):
     )
     # The *planning* half runs on a chat model, because deciding how a book looks
     # is a writing task. Named separately from `illustrator_model` so the cheap
-    # decision and the expensive drawing can be moved independently -- and it
-    # defaults to Grok rather than Google because three stages have already died
-    # on a Google default while .env pinned everything else to xAI.
+    # decision and the expensive drawing can be moved independently.
+    #
+    # This read `grok-3-mini` until the provider resolver below existed, because
+    # three stages had died on a Google default while .env pinned everything else
+    # to xAI. The resolver removes that hazard at its source -- an xAI-only .env
+    # now rewrites this field along with the other ten -- so the declared default
+    # can state the project's actual preference instead of hedging against a
+    # misconfiguration.
     illustration_director_model: str = Field(
-        default="grok-3-mini",
+        default="gemini-3.5-flash",
         alias="ILLUSTRATION_DIRECTOR_MODEL",
         description="Model that decides the style bible and each page's picture",
     )
@@ -321,12 +327,19 @@ class Settings(BaseSettings):
     # verdict into noise, which is the same reason the two prose critics have
     # zero-temperature entries of their own.
     #
-    # `grok-3-mini` rather than `grok-4` on measured evidence: the spike put both
-    # in front of a green ant described as black, and both reported green. A small
-    # model succeeding is the stronger result -- the behaviour survives a weak
-    # judge -- and it means judging a book does not need an expensive model.
+    # **The measured evidence here is about xAI, and it no longer picks the
+    # default.** A spike put `grok-4` and `grok-3-mini` in front of a green ant
+    # described as black; both reported green, so the small model was chosen --
+    # judging a picture does not need an expensive model. That result still holds
+    # and is why the resolver below sends this to `grok-3-mini-critic` rather than
+    # `grok-4` on an xAI-only setup.
+    #
+    # What it does NOT cover is Gemini: no Google model has ever judged an image
+    # in this project. So the Google path here is the one stage whose provider is
+    # asserted rather than measured, and the same green-ant check should be run
+    # against it before a Gemini verdict is trusted.
     consistency_judge_model: str = Field(
-        default="grok-3-mini-critic",
+        default="gemini-3.5-flash-critic",
         alias="CONSISTENCY_JUDGE_MODEL",
         description="Model that checks a picture against the reference it should match",
     )
@@ -488,6 +501,87 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    #: Which registry entry replaces each Google default when only an xAI key is
+    #: present. Written as data rather than as branches so that adding a stage is
+    #: a field plus, at most, nothing: a new `*_model` defaulting to one of these
+    #: two entries is resolved without touching this mapping at all.
+    #:
+    #: The pairing is by *temperature*, not by name. A critic, a judge and a
+    #: reranker all need an entry at 0.0, because one that answers differently on
+    #: identical input turns an empty-review stop signal into noise and a
+    #: regression signal into variance.
+    _GROK_EQUIVALENT: ClassVar[dict[str, str]] = {
+        "gemini-3.5-flash": "grok-3-mini",
+        "gemini-3.5-flash-critic": "grok-3-mini-critic",
+    }
+
+    #: Fields whose xAI equivalent is not the one the mapping above would give.
+    #: The Researcher is the only one: `grok-3-mini-researcher` is the same model
+    #: at temperature 0.2, which is what every live research run has actually used
+    #: on the command line since Session 5.
+    _GROK_OVERRIDE: ClassVar[dict[str, str]] = {
+        "researcher_model": "grok-3-mini-researcher",
+    }
+
+    @model_validator(mode="after")
+    def _resolve_models_to_an_available_provider(self) -> Settings:
+        """Point every unset ``*_model`` field at a provider we hold a key for.
+
+        Google is the declared default for all eleven chat stages. A .env holding
+        only ``XAI_API_KEY`` therefore used to leave every one of them naming a
+        model it could not authenticate, and the failures were not uniform: most
+        stages raise ``MissingAPIKeyError`` naming the variable, but the memory
+        extractor fails *open* -- it stores nothing, logs an exception nobody
+        reads, and the run produces a book and looks completely normal. That cost
+        a live session, and the fix of "remember to set all of them together" had
+        already failed more than once.
+
+        **Only a field still holding its declared default is rewritten.** An
+        operator who names an entry gets that entry, including a deliberately
+        cross-provider one -- a Gemini critic beside a Grok writer is a real
+        configuration, and substituting a model they did not ask for would be
+        worse than the error they get for a key they did not set.
+
+        The accepted limit of that rule: an explicit ``WRITER_MODEL=gemini-3.5-flash``
+        is indistinguishable from the default and is rewritten. Detecting it needs
+        ``model_fields_set``, which pydantic-settings populates from the env file
+        as well -- so the check would pass here and fail for anyone whose value
+        arrives from ``.env``, which is everyone. A wrong answer on the rare case
+        beats an inconsistent one on the common case.
+
+        **Google wins when both keys are present**, so adding an xAI key to a
+        working setup never silently moves a running system onto another provider.
+
+        Deliberately does NOT touch three settings. ``illustrator_model`` and
+        ``narrator_model`` have no Google entry to move between -- ``image_configs``
+        and ``speech_configs`` register xAI only, so the branch could never fire.
+        And ``embedding_model`` is excluded for a stronger reason: ``db/models.py``
+        gives each embedder its own table, so rewriting it would repoint retrieval
+        at a *different index*, one that may hold nothing. Research would return
+        no facts, and a book with no grounding still plans out complete and
+        plausible -- a silent wrong answer, where the missing-key error is a loud
+        right one.
+        """
+        # `mode="after"` matters for correctness, not style: `_blank_to_none` runs
+        # `mode="before"`, so by here `XAI_API_KEY=` with no value is already None
+        # rather than an empty SecretStr that would read as a usable credential.
+        if self.google_api_key is not None or self.xai_api_key is None:
+            return self
+
+        for field_name, field in type(self).model_fields.items():
+            current = getattr(self, field_name)
+            if current != field.default:
+                continue
+            replacement = self._GROK_OVERRIDE.get(
+                field_name
+            ) or self._GROK_EQUIVALENT.get(str(current))
+            if replacement is not None:
+                # object.__setattr__ is not needed -- Settings is mutable -- but
+                # assigning through the normal path would re-run validation on a
+                # model already being validated.
+                setattr(self, field_name, replacement)
+        return self
 
     # --- Model registry -------------------------------------------------
     @property

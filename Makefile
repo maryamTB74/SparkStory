@@ -21,7 +21,7 @@ QA_PATHS := src tests scripts alembic
 .DEFAULT_GOAL := help
 
 .PHONY: help install hooks format-fix lint-fix format-check lint-check \
-        fix check test test-fast test-corpus test-vision test-video test-web \
+        fix check test test-fast test-corpus test-rerank test-vision test-video test-web \
         corpus-manifest score-books \
         label-skeletons score-alignment migrate \
         migrate-down ingest \
@@ -70,8 +70,16 @@ test-fast: ## Run tests, stopping at the first failure
 	$(PYTEST) -x -q
 
 
-test-corpus: ## Run retrieval quality tests (needs a built index)
-	$(PYTEST) -m corpus || [ $$? -eq 5 ]
+# `not rerank` is what makes this target free. The reranker comparison is
+# corpus-marked too -- it needs the same index -- but it also puts an LLM in
+# front of every labelled query and bills for it. It was swept into a broad
+# `pytest -m corpus` once and spent money nobody had approved, so the exclusion
+# is here rather than left to whoever types the command.
+test-corpus: ## Run retrieval quality tests (needs a built index; free)
+	$(PYTEST) -m "corpus and not rerank" || [ $$? -eq 5 ]
+
+test-rerank: ## Compare reranking against fusion (COSTS MODEL CALLS; needs a key)
+	$(PYTEST) -m rerank || [ $$? -eq 5 ]
 
 
 test-vision: ## Judge the known drifts in committed runs (needs XAI_API_KEY)

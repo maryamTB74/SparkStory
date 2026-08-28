@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from pydantic import SecretStr
 
 from sparkstory.mcp.client.session import (
     _NUDGE,
@@ -70,10 +71,34 @@ def _final_turn(text: str = "Here is the plan.") -> AIMessage:
     return AIMessage(content=text)
 
 
+@pytest.fixture
+def _a_key_is_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give the settings a placeholder credential.
+
+    These tests build a *real* server, and registering its tools constructs the
+    chat models the stages name -- so a machine with no key fails at connect
+    time, before any assertion runs. That is what CI is: `.env` is loaded from
+    the repository root whatever the environment holds (see the note on
+    `_PROJECT_ROOT` in config.py), so a developer's keys mask this locally and a
+    runner has none. These tests failed on every keyless runner for several
+    commits before anyone saw it.
+
+    A placeholder rather than a real key, and scoped to the tests that need one
+    rather than made autouse: `test_missing_key_is_a_configuration_error` and its
+    siblings assert on a key being *absent*, and a suite-wide fixture would make
+    those unable to fail. Nothing here reaches the network -- the client model is
+    a fake and no tool is executed -- so the value only has to be non-empty.
+    """
+    from sparkstory.config import settings
+
+    monkeypatch.setattr(settings, "google_api_key", SecretStr("test-key-not-real"))
+    monkeypatch.setattr(settings, "xai_api_key", SecretStr("test-key-not-real"))
+
+
 class TestCapabilities:
     """What a client is handed at connect time."""
 
-    async def test_it_fetches_the_servers_tools(self) -> None:
+    async def test_it_fetches_the_servers_tools(self, _a_key_is_present: None) -> None:
         async with ClientSession() as session:
             assert {t.name for t in session.tools} >= {
                 "plan_story",
@@ -81,11 +106,15 @@ class TestCapabilities:
                 "illustrate_story",
             }
 
-    async def test_it_fetches_the_create_storybook_prompt(self) -> None:
+    async def test_it_fetches_the_create_storybook_prompt(
+        self, _a_key_is_present: None
+    ) -> None:
         async with ClientSession() as session:
             assert "create_storybook" in {p.name for p in session.prompts}
 
-    async def test_it_reads_prompt_text_from_the_server(self) -> None:
+    async def test_it_reads_prompt_text_from_the_server(
+        self, _a_key_is_present: None
+    ) -> None:
         # Fetched rather than imported, which is what makes a prompt-obedience
         # harness measure what a client is really handed. `try_prompt.py` fetches
         # it the same way, which is the reason its results mean anything.
@@ -95,7 +124,7 @@ class TestCapabilities:
         assert "plan_story" in text
         assert "write_story" in text
 
-    async def test_an_unknown_prompt_raises(self) -> None:
+    async def test_an_unknown_prompt_raises(self, _a_key_is_present: None) -> None:
         async with ClientSession() as session:
             with pytest.raises(KeyError):
                 await session.get_prompt("no-such-prompt")
@@ -113,7 +142,9 @@ class TestConnectionGuard:
         with pytest.raises(RuntimeError):
             _ = session.tools
 
-    async def test_tools_are_available_inside_the_context(self) -> None:
+    async def test_tools_are_available_inside_the_context(
+        self, _a_key_is_present: None
+    ) -> None:
         session = ClientSession()
         async with session:
             assert session.tools

@@ -2,6 +2,7 @@
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from sparkstory.entities.exceptions import (
     AudioConfigurationError,
@@ -96,8 +97,29 @@ def test_missing_key_is_a_configuration_error(monkeypatch: pytest.MonkeyPatch) -
         get_speech_model("grok-speech")
 
 
+@pytest.fixture
+def _a_key_is_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give the settings a placeholder xAI credential.
+
+    ``get_speech_model`` checks for the key before it builds anything, so these
+    two tests -- which fake only the HTTP transport -- cannot reach the request
+    they exist to inspect on a machine with no key. `.env` is loaded from the
+    repository root regardless of the environment, so a developer's key masks
+    this locally and a CI runner has none.
+
+    Deliberately NOT autouse: ``test_missing_key_is_a_configuration_error`` below
+    asserts the opposite, and a suite-wide key would leave it unable to fail --
+    which is worse than the failure it was written to catch. The transport is
+    faked in both tests here, so nothing reaches the network and the value only
+    has to be non-empty.
+    """
+    from sparkstory.config import settings
+
+    monkeypatch.setattr(settings, "xai_api_key", SecretStr("test-key-not-real"))
+
+
 async def test_speak_sends_the_measured_request_shape(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, _a_key_is_present: None
 ) -> None:
     """The payload is asserted because every field in it was measured.
 
@@ -145,7 +167,7 @@ async def test_speak_sends_the_measured_request_shape(
 
 
 async def test_a_transport_failure_is_the_retryable_class(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, _a_key_is_present: None
 ) -> None:
     class _DyingClient:
         def __init__(self, *args: object, **kwargs: object) -> None:

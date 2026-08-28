@@ -17,6 +17,10 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  # The corpus job below runs ONLY from here -- see the `if` on that job. It is
+  # off the per-push path deliberately: it needs a database and an ingest, and
+  # neither belongs on the path that gates an ordinary commit.
+  workflow_dispatch:
 
 # A second push to the same branch makes the first run's result irrelevant.
 concurrency:
@@ -100,6 +104,20 @@ jobs:
   corpus:
     name: retrieval quality (needs postgres)
     runs-on: ubuntu-latest
+    # Manual only. Two things pushed it off the per-push path, and the second is
+    # the one that matters: it is the slowest job here by far (a database
+    # service, a migration and a full ingest before a single assertion), and
+    # `make ingest` stopped being free when EMBEDDING_MODEL moved to the hosted
+    # Gemini entry -- so on the push path it would either fail for want of a
+    # credential or spend Google quota on every commit.
+    #
+    # Run it from the Actions tab after touching retrieval, the corpus, or the
+    # migrations. Keeping it as a job rather than deleting it is deliberate:
+    # this is the ONLY place PgVectorStore's actual SQL runs -- `<=>`, `ts_rank`
+    # and RRF fused in one CTE. The offline suite fakes the store over SQLite,
+    # which has no `vector` type, so without this job that SQL is exercised on
+    # nobody's machine but the author's.
+    if: github.event_name == 'workflow_dispatch'
 
     # `postgres:postgres` is GitHub's own documented service-container example for
     # PostgreSQL, and it is used here because it is the pattern a reviewer expects
@@ -136,6 +154,20 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
       OPIK_TRACK_DISABLE: "true"
+      # Pinned to the LOCAL embedder, which is what keeps this job free and
+      # secret-free. The shipped default is `gemini-embedding`, and pointing this
+      # job at it would mean a real GOOGLE_API_KEY in CI plus quota on every run.
+      #
+      # State the cost rather than let a green run imply more than it measures:
+      # this measures retrieval over `potion-base-8M`, NOT the embedder the app
+      # ships with. What it still proves is that the pgvector SQL, the RRF fusion
+      # and the migrations work -- which is what this job was built for. Hosted
+      # retrieval quality is measured by `make test-corpus` locally, where the
+      # 0.79 -> 0.95 hit-rate@1 figure came from.
+      #
+      # It is also what `db/models.py`'s one-table-per-embedder design buys:
+      # both indexes coexist, so this is one env var and no re-ingest.
+      EMBEDDING_MODEL: potion-base-8M
 
     services:
       postgres:
@@ -176,4 +208,9 @@ jobs:
       #
       # -m corpus overrides the addopts exclusion; --no-header -rN keeps the
       # printed hit-rate lines visible in the log, which is the actual output.
-      - run: uv run pytest -m corpus -s -q --no-header
+      #
+      # `not rerank` keeps this job free and keyless. Those two tests need the
+      # same index, so they carry `corpus` too -- but they put an LLM in front of
+      # every labelled query, so without this they fail here for want of a
+      # credential this job is built not to have.
+      - run: uv run pytest -m "corpus and not rerank" -s -q --no-header

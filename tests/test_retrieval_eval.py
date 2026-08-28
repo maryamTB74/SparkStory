@@ -296,6 +296,16 @@ def test_every_fact_file_has_labelled_queries() -> None:
     )
 
 
+# `rerank` in addition to the file-wide `corpus`, so this class is excluded from
+# `make test-corpus` and from CI's corpus job. The distinction is what each
+# marker actually promises: `corpus` means "needs the index and real embedding
+# weights", which is free and offline once ingest has run; these two tests put an
+# LLM in front of every labelled query and bill for it. Sharing one marker is how
+# a paid comparison got run unasked, and how it ended up inside a CI job that
+# deliberately holds no credentials.
+#
+# Run it deliberately, having decided to pay:  uv run pytest -m rerank
+@pytest.mark.rerank
 class TestRerankingAgainstFusion:
     """Does reranking beat plain fusion? Measured, not argued.
 

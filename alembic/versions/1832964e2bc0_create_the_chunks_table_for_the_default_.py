@@ -7,13 +7,27 @@ Create Date: 2026-08-09 12:32:41.467588
 Creates the pgvector extension and one chunks table, for whichever embedder
 ``EMBEDDING_MODEL`` names when this migration runs.
 
-**This migration is parameterised by settings, which is unusual and deliberate.**
 The table name embeds the embedder and its dimensionality
 (``chunks_potion_base_8m_256``) because a ``vector(n)`` column is fixed width and
-two embedders cannot share one. So the schema depends on configuration in a way
+two embedders cannot share one. So the schema depends on the registry in a way
 Alembic's autogenerate cannot see -- hence a hand-written revision that calls the
 same ``chunks_table()`` factory the store uses, rather than restating the columns
 here where they could silently drift from the model.
+
+**The embedder is named literally, and that is a correction.** This revision used
+to read ``settings.embedding_model``, so the table it built depended on an
+environment variable at the moment it ran. That was invisible while there was one
+registry entry and it was the default. When the default moved to
+``gemini-embedding``, this revision began building *that* table on any machine
+with no ``EMBEDDING_MODEL`` set -- so a fresh database got no local table at all,
+and revision 9c4a1f7b2d10 then failed with ``DuplicateTable`` because the table it
+creates already existed. CI caught it; a laptop with the variable set never would.
+
+A migration is a record of one schema change and has to produce the same schema
+wherever it runs, which is why the course's eight migrations import no settings at
+all. Importing the *factory* is a different thing from reading the *environment*:
+the factory is what keeps the column width and the table name from disagreeing,
+and it is pinned to a key here so the result cannot vary.
 
 Adding a second embedder means a new revision calling the same factory with the
 new registry entry. Both tables then coexist, which is what makes "is the hosted
@@ -35,17 +49,21 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+#: The registry key this revision creates a table for. A literal, so the schema
+#: this migration produces does not depend on ``EMBEDDING_MODEL``. Revision
+#: 9c4a1f7b2d10 names its own embedder the same way, for the same reason.
+_MODEL_ID = "potion-base-8M"
+
+
 def _table() -> sa.Table:
-    """Build the table description for the configured embedder.
+    """Build the table description for the local embedder.
 
     A fresh ``MetaData`` rather than ``Base.metadata``: this module is imported
     once per migration run, and registering the same table name on the shared
     metadata twice raises.
     """
-    config = settings.embedding_configs[settings.embedding_model]
-    return chunks_table(
-        settings.embedding_model, int(config["dimensions"]), sa.MetaData()
-    )
+    config = settings.embedding_configs[_MODEL_ID]
+    return chunks_table(_MODEL_ID, int(config["dimensions"]), sa.MetaData())
 
 
 def upgrade() -> None:

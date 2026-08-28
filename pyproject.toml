@@ -119,6 +119,13 @@ markers = [
     "vision: needs a real vision model and the committed run images",
     "video: needs ffmpeg and ffprobe on PATH",
     "web: exercises the web-search half; the searching tests need TAVILY_API_KEY",
+    # Split out of `corpus`, which means "needs the index and real embedding
+    # weights" -- free and offline once the index exists. The reranker
+    # comparison is neither: it puts an LLM in front of every labelled query and
+    # bills for it. Sharing one marker meant a broad `pytest -m corpus` spent
+    # money unasked, which has happened, and it put a paid call inside a CI job
+    # built to hold no credentials.
+    "rerank: compares reranking against fusion; COSTS MODEL CALLS, needs a key",
 ]
 filterwarnings = [
     # fastmcp's JWT provider imports the deprecated authlib.jose module.

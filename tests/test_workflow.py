@@ -138,6 +138,14 @@ class TestCallerGroundingIsVerified:
         monkeypatch.setattr(
             write_story_module, "build_store", lambda *a, **k: _EmptyStore()
         )
+        # Stubbed for the same reason as `build_store` above, and it became
+        # necessary at the same moment: EMBEDDING_MODEL now defaults to the
+        # hosted Gemini entry, so constructing an embedder needs a credential
+        # where it used to need none. This test is about a fabricated chunk_id
+        # being dropped -- the store answers nothing, so nothing is ever embedded.
+        monkeypatch.setattr(
+            write_story_module, "get_embedder", lambda *a, **k: object()
+        )
         grounded = StoryOutline.model_validate(
             outline.model_dump()
             | {

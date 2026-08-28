@@ -543,6 +543,13 @@ class TestWebLedgerConstruction:
         # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
         # index; `build_store` now needs DATABASE_URL, which a runner has not got.
         monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
+        # The embedder joined this list when EMBEDDING_MODEL moved to the hosted
+        # Gemini entry: retrieval used to need no credential, so it was the one
+        # seam these tests could leave real. `build_research_context` constructs
+        # it eagerly, so on a keyless machine it now raises before the assertion
+        # below is reached. Stubbed for the same reason as the three seams
+        # beside it -- nothing here embeds anything.
+        monkeypatch.setattr(module, "get_embedder", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools
@@ -564,6 +571,7 @@ class TestWebLedgerConstruction:
         # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
         # index; `build_store` now needs DATABASE_URL, which a runner has not got.
         monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
+        monkeypatch.setattr(module, "get_embedder", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools
@@ -587,6 +595,7 @@ class TestWebLedgerConstruction:
         # Postgres the equivalent was `knowledge_root = tmp_path`, i.e. an empty
         # index; `build_store` now needs DATABASE_URL, which a runner has not got.
         monkeypatch.setattr(module, "build_store", lambda *a, **k: object())
+        monkeypatch.setattr(module, "get_embedder", lambda *a, **k: object())
         monkeypatch.setattr(module, "get_chat_model", lambda *a, **k: object())
         monkeypatch.setattr(
             module, "build_researcher_agent", lambda model, tools: tools

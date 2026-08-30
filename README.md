@@ -1,5 +1,10 @@
 # SparkStory
 
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
+[![CI](https://github.com/maryamTB74/SparkStory/actions/workflows/ci.yml/badge.svg)](https://github.com/maryamTB74/SparkStory/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-1139%20passing-brightgreen.svg)](#11-testing)
+
 An agentic MCP server that turns a short idea into a personalised children's storybook.
 
 A parent describes their child — name, age, pronouns, what they love — and a sketch of
@@ -99,12 +104,38 @@ The annotated file tree and the dependency rules are in
 
 ## 3. Install
 
+**1. Clone the repository.**
+
+```bash
+git clone https://github.com/maryamTB74/SparkStory.git
+cd SparkStory
+```
+
+**2. Install dependencies.**
+
 ```bash
 make install                                   # uv sync + install the pre-commit hooks
+```
+
+Or without `make`:
+
+```bash
+uv sync                                        # dependencies only
+```
+
+`make install` is the same `uv sync` plus `pre-commit install`, so the hooks that keep
+lint and formatting clean are active from your first commit.
+
+`uv` reads `.python-version` and fetches Python 3.14.0 itself, so no system Python of that
+version is needed.
+
+**3. Build the knowledge index** — optional.
+
+```bash
 uv run python scripts/ingest_knowledge.py      # build the knowledge index (once)
 ```
 
-The second command reads `corpus/` and loads it into Postgres, so it needs `DATABASE_URL`
+This command reads `corpus/` and loads it into Postgres, so it needs `DATABASE_URL`
 and a `make migrate` first. It also needs `GOOGLE_API_KEY`, since the default embedder is
 hosted; set `EMBEDDING_MODEL=potion-base-8M` to embed locally with no key instead, which
 downloads about 30 MB of weights the first time. Skip ingestion and everything still works:
@@ -439,7 +470,55 @@ directory name, since a run directory is named after the premise, and it never o
 `brief.json`, which holds the child's name. Neither resource reads `data/`, which holds
 per-child memory.
 
-## 8. Run the server
+## 8. Example queries
+
+Once the server is connected to a client, these are the things to ask it. The first is the
+whole point of the project; the rest exercise one tool each.
+
+**The guided workflow — this is the one to try first.** It runs the `create_storybook`
+prompt, which is where the parent's approval step lives.
+
+```text
+Use the create_storybook prompt to make a book for my daughter Ada, who is 6,
+uses she/her, and loves thunderstorms and the sea.
+```
+
+The client will ask for anything missing, call `plan_story`, show you the whole outline —
+title, theme, characters and every beat — and then **stop and wait**. Reply with an
+approval or a change ("make Ada the one who wants to sail"), and only then does it call
+`write_story`.
+
+**Plan an outline without writing the book** — one to four model calls, the cheapest way
+to see the engine work.
+
+```text
+Call plan_story for a 8-page early-reader story about a fox who wants to visit the moon.
+The child is Maryam, age 5, she/her, and the story must include a paper rocket.
+```
+
+**Illustrate a finished book** — needs `XAI_API_KEY` and `ILLUSTRATION_ENABLED=true`.
+
+```text
+Illustrate the story you just wrote.
+```
+
+**Narrate a finished book** — needs `XAI_API_KEY` and `NARRATION_ENABLED=true`. Roughly two
+orders of magnitude cheaper than illustration, which is why the two have separate switches.
+
+```text
+Narrate that story with the eve voice.
+```
+
+**Read a resource** — no model call, and no cost.
+
+```text
+List the books in the SparkStory library.
+```
+
+To drive the server programmatically instead of through a client, see
+[the MCP client configuration](#mcp-client-configuration) and [writing a story from the terminal](#10-write-a-story-from-the-terminal).
+
+## 9. Run the server
 
 ```bash
 make run              # stdio transport (the default)
@@ -547,17 +626,30 @@ For Cursor (`.cursor/mcp.json`) or Claude Desktop:
   "mcpServers": {
     "sparkstory": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/SparkStory", "sparkstory"]
+      "args": [
+        "--directory",
+        "/absolute/path/to/SparkStory",
+        "run",
+        "sparkstory"
+      ],
+      "env": {
+        "GOOGLE_API_KEY": "your-google-api-key-here",
+        "XAI_API_KEY": "your-xai-api-key-here"
+      }
     }
   }
 }
 ```
 
-No API keys belong in this file — the server reads `.env` from the repository root, which
-it resolves from its own location rather than the working directory, so a client can
-launch it from anywhere.
+Replace `/absolute/path/to/SparkStory` with where you cloned the repository.
 
-## 9. Write a story from the terminal
+**The `env` block is optional and the worse of the two options.** The server resolves `.env`
+from its own location rather than from the working directory, so it finds your keys wherever
+a client launches it from. Putting them in `.env` instead keeps credentials out of a file
+that often lives in a repository — and only one of the two keys is needed, since every stage
+switches to whichever provider you have. Delete the `env` block entirely if you use `.env`.
+
+## 10. Write a story from the terminal
 
 ```bash
 uv run python scripts/write_one_story.py                     # full book
@@ -575,22 +667,43 @@ real child's name.
 
 The best test of a children's story is reading it aloud, which is what this script is for.
 
-## 10. Development
+## 11. Testing
+
+```bash
+make test             # 1139 tests, no network, ~18 seconds
+make test-fast        # stop at the first failure
+make ci-local         # format-check, lint-check and test — everything CI runs
+```
+
+**1139 tests pass offline and need no API key**, because agents are tested by passing a
+`FakeModel` to the node constructor rather than by patching module attributes. `ruff check`
+and `ruff format` are clean across `src`, `tests` and `scripts`, and the same three commands
+run in GitHub Actions on every push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+A further **23 tests are marked and excluded** from `make test`, because each needs
+something a clean clone does not have:
+
+```bash
+make test-corpus      # retrieval hit-rate@1 and @3 — needs a built index; free only
+                      # under EMBEDDING_MODEL=potion-base-8M, since the default
+                      # embedder is hosted and charges per query
+make test-vision      # the consistency judge on committed images — needs XAI_API_KEY
+make test-video       # assembles a video from committed artifacts — needs ffmpeg; free
+```
+
+Excluding them is what keeps *clone the repo and the tests pass* true. `make test-video` is
+free and local, so it is the one to run first if you want to see a marked test work.
+
+## 12. Development
 
 ```bash
 make help             # list every target
-make test             # run the suite
-make test-fast        # stop at the first failure
 make fix              # auto-fix lint, then reformat
 make check            # format + lint, without changing files
-make ci-local         # everything CI would run
 make clean            # drop caches
 ```
 
-The suite needs no network: agents are tested by passing a `FakeModel` to the node
-constructor rather than by patching module attributes.
-
-## 11. Troubleshooting
+## 13. Troubleshooting
 
 **`MissingAPIKeyError` although `.env` has the key.** A blank value (`GOOGLE_API_KEY=`)
 is normalised to unset on purpose. Check the value is actually present.
@@ -609,7 +722,7 @@ prompt only re-rolls the dice.
 
 **A tool call returns a JSON parse error.** Something wrote to stdout. See §7.
 
-## 12. Known gaps
+## 14. Known gaps
 
 Stated explicitly rather than implied:
 
@@ -691,14 +804,14 @@ Stated explicitly rather than implied:
   "you must possess a plan", and a fabricated outline is still indistinguishable from an
   approved one.
 
-## 13. Certification
+## 15. Certification
 
 Which course requirements are met, where each one is implemented, and what has actually been
 verified: [docs/certification.md](docs/certification.md).
 
 All four required custom features are banked, and every mandatory requirement is closed.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | # | Session | Status |
 |---|---|---|
@@ -717,7 +830,7 @@ All four required custom features are banked, and every mandatory requirement is
 | 13 | Long-term memory, per child | Done |
 | 14 | Cloud deployment | Not started |
 | 15 | Polished UI | **Done** — a parent-facing web UI served from the MCP server itself, with the plan-approve step as its centre. See [The web UI](#the-web-ui) |
-| 16 | Animated video | **Half done** — assembly works and is frame-exact; the animation itself is unbuilt. See [Known gaps](#12-known-gaps) |
+| 16 | Animated video | **Half done** — assembly works and is frame-exact; the animation itself is unbuilt. See [Known gaps](#14-known-gaps) |
 
 ## License
 

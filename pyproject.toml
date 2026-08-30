@@ -84,13 +84,6 @@ requires = ["uv_build>=0.9.28,<0.13.0"]
 build-backend = "uv_build"
 
 # Resolve dependencies from public PyPI.
-#
-# This is committed deliberately. Without it, uv inherits whatever index is
-# marked `default = true` in the user-level ~/.config/uv/uv.toml -- on this
-# machine that is a private AWS CodeArtifact mirror, which (a) requires an SSO
-# session, and (b) would leak internal infrastructure into a public repo's
-# lockfile. Declaring a project-level default index displaces the user-level
-# one, so anyone cloning this repo resolves from PyPI with no extra setup.
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
